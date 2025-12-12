@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	azcoreto "github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/services/preview/dns/mgmt/2018-03-01-preview/dns"
@@ -47,8 +48,6 @@ type ClusterUninstaller struct {
 	ResourceGroupName           string
 	BaseDomainResourceGroupName string
 	NetworkResourceGroupName    string
-	ZoneName                    string
-	ClusterName                 string
 
 	Logger logrus.FieldLogger
 
@@ -60,6 +59,8 @@ type ClusterUninstaller struct {
 	msgraphClient           *msgraphsdk.GraphServiceClient
 	resourceGraphClient     *armresourcegraph.Client
 	tagsClient              *armresources.TagsClient
+	vnetClient              *armnetwork.VirtualNetworksClient
+	subnetClient            *armnetwork.SubnetsClient
 }
 
 func (o *ClusterUninstaller) configureClients() error {
@@ -115,6 +116,17 @@ func (o *ClusterUninstaller) configureClients() error {
 	}
 	o.tagsClient = tagsClient
 
+	vnetClient, err := armnetwork.NewVirtualNetworksClient(subscriptionID, o.Session.TokenCreds, clientOpts)
+	if err != nil {
+		return err
+	}
+	o.vnetClient = vnetClient
+
+	subnetClient, err := armnetwork.NewSubnetsClient(subscriptionID, o.Session.TokenCreds, clientOpts)
+	if err != nil {
+		return err
+	}
+	o.subnetClient = subnetClient
 	return nil
 }
 
@@ -136,8 +148,6 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 		Logger:                      logger,
 		BaseDomainResourceGroupName: metadata.Azure.BaseDomainResourceGroupName,
 		CloudName:                   cloudName,
-		ZoneName:                    metadata.Azure.BaseDomainName,
-		ClusterName:                 metadata.ClusterName,
 	}, nil
 }
 
@@ -197,12 +207,37 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 			if o.CloudName == azure.StackCloud {
 				err = deleteAzureStackPublicRecords(ctx, o)
 			} else {
-				err = deletePublicRecords(ctx, o)
+				err = deletePublicRecords(ctx, o.zonesClient, o.recordsClient, o.privateZonesClient, o.privateRecordSetsClient, o.Logger, o.ResourceGroupName)
 			}
 			if err != nil {
 				o.Logger.Debug(err)
 				if isAuthError(err) {
 					errs = append(errs, fmt.Errorf("unable to authenticate when deleting public DNS records: %w", err))
+					return true, err
+				}
+				return false, nil
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("failed to delete public DNS records: %w", err))
+		o.Logger.Debug(err)
+	}
+
+	err = wait.PollUntilContextCancel(
+		waitCtx,
+		1*time.Second,
+		false,
+		func(ctx context.Context) (bool, error) {
+			o.Logger.Debugf("disassociating NAT gateway from subnets")
+			if o.CloudName != azure.StackCloud {
+				err = disassociateNATGateways(ctx, o.vnetClient, o.subnetClient, o.Logger, o.ResourceGroupName, o.InfraID)
+			}
+			if err != nil {
+				o.Logger.Debug(err)
+				if isAuthError(err) {
+					errs = append(errs, fmt.Errorf("unable to authenticate when disassociating NAT gateways: %w", err))
 					return true, err
 				}
 				return false, nil
@@ -423,70 +458,17 @@ func deleteAzureStackPublicRecords(ctx context.Context, o *ClusterUninstaller) e
 	return utilerrors.NewAggregate(errs)
 }
 
-func deleteRecordsFromBaseDomain(ctx context.Context, o *ClusterUninstaller) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-	defer cancel()
-
-	if o.BaseDomainResourceGroupName == "" || o.ZoneName == "" || o.ClusterName == "" {
-		o.Logger.Debugf("could not find values in the metadata to get record set")
-		return nil
-	}
-
-	var errs []error
-	apiURL := fmt.Sprintf("api.%s", o.ClusterName)
-	appsURL := fmt.Sprintf("*.apps.%s", o.ClusterName)
-	errs = append(errs, deleteRecordsets(ctx, o, apiURL, dns.CNAME))
-	errs = append(errs, deleteRecordsets(ctx, o, appsURL, dns.A))
-	return utilerrors.NewAggregate(errs)
-}
-
-func deleteRecordsets(ctx context.Context, o *ClusterUninstaller, url string, recordType dns.RecordType) error {
-	var errs []error
-	tag := fmt.Sprintf("kubernetes.io_cluster.%s", o.InfraID)
-	result, err := o.recordsClient.Get(ctx, o.BaseDomainResourceGroupName, o.ZoneName, url, recordType)
-	if err != nil {
-		logrus.Debugf("unable to find %s: already deleted or insufficient permissions", url)
-		if isAuthError(err) {
-			return err
-		}
-		return nil
-	}
-
-	if value, ok := result.Metadata[tag]; ok && *value == "owned" {
-		deleteResult, err := o.recordsClient.Delete(ctx, o.BaseDomainResourceGroupName, o.ZoneName, url, recordType, "")
-		if err != nil {
-			if deleteResult.IsHTTPStatus(http.StatusNotFound) {
-				o.Logger.Debug("already deleted")
-				return utilerrors.NewAggregate(errs)
-			}
-			errs = append(errs, fmt.Errorf("failed to delete base domain dns zone: %w", err))
-			if isAuthError(err) {
-				return err
-			}
-		} else {
-			o.Logger.WithField("record", url).Info("deleted")
-		}
-	} else {
-		o.Logger.WithField("record", url).Debugf("metadata mismatch")
-	}
-	return utilerrors.NewAggregate(errs)
-}
-
-func deletePublicRecords(ctx context.Context, o *ClusterUninstaller) error {
+func deletePublicRecords(ctx context.Context, dnsClient dns.ZonesClient, recordsClient dns.RecordSetsClient, privateDNSClient privatedns.PrivateZonesClient, privateRecordsClient privatedns.RecordSetsClient, logger logrus.FieldLogger, rgName string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	// collect records from private zones in rgName
 	var errs []error
 
-	zonesPage, err := o.zonesClient.ListByResourceGroup(ctx, o.ResourceGroupName, to.Int32Ptr(100))
+	zonesPage, err := dnsClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
 	if err != nil {
 		if zonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
-			o.Logger.Debug("private zone not found, checking public records")
-			err2 := deleteRecordsFromBaseDomain(ctx, o)
-			if err2 != nil {
-				o.Logger.Debugf("failed to delete record sets from the base domain: %w", err)
-			}
+			logger.Debug("already deleted")
 			return utilerrors.NewAggregate(errs)
 		}
 		errs = append(errs, fmt.Errorf("failed to list dns zone: %w", err))
@@ -505,7 +487,7 @@ func deletePublicRecords(ctx context.Context, o *ClusterUninstaller) error {
 
 		for _, zone := range zonesPage.Values() {
 			if zone.ZoneType == dns.Private {
-				if err := deletePublicRecordsForZone(ctx, o.zonesClient, o.recordsClient, o.Logger, o.ResourceGroupName, to.String(zone.Name)); err != nil {
+				if err := deletePublicRecordsForZone(ctx, dnsClient, recordsClient, logger, rgName, to.String(zone.Name)); err != nil {
 					errs = append(errs, fmt.Errorf("failed to delete public records for %s: %w", to.String(zone.Name), err))
 					if isAuthError(err) {
 						return err
@@ -516,10 +498,10 @@ func deletePublicRecords(ctx context.Context, o *ClusterUninstaller) error {
 		}
 	}
 
-	privateZonesPage, err := o.privateZonesClient.ListByResourceGroup(ctx, o.ResourceGroupName, to.Int32Ptr(100))
+	privateZonesPage, err := privateDNSClient.ListByResourceGroup(ctx, rgName, to.Int32Ptr(100))
 	if err != nil {
 		if privateZonesPage.Response().IsHTTPStatus(http.StatusNotFound) {
-			o.Logger.Debug("already deleted")
+			logger.Debug("already deleted")
 			return utilerrors.NewAggregate(errs)
 		}
 		errs = append(errs, fmt.Errorf("failed to list private dns zone: %w", err))
@@ -536,7 +518,7 @@ func deletePublicRecords(ctx context.Context, o *ClusterUninstaller) error {
 		pageCount++
 
 		for _, zone := range privateZonesPage.Values() {
-			if err := deletePublicRecordsForPrivateZone(ctx, o.privateRecordSetsClient, o.zonesClient, o.recordsClient, o.Logger, o.ResourceGroupName, to.String(zone.Name)); err != nil {
+			if err := deletePublicRecordsForPrivateZone(ctx, privateRecordsClient, dnsClient, recordsClient, logger, rgName, to.String(zone.Name)); err != nil {
 				errs = append(errs, fmt.Errorf("failed to delete public records for %s: %w", to.String(zone.Name), err))
 				if isAuthError(err) {
 					return err
@@ -547,7 +529,7 @@ func deletePublicRecords(ctx context.Context, o *ClusterUninstaller) error {
 	}
 
 	if pageCount == 0 {
-		o.Logger.Warn("no DNS records found: either they were already deleted or the service principal lacks permissions to list them")
+		logger.Warn("no DNS records found: either they were already deleted or the service principal lacks permissions to list them")
 	}
 
 	return utilerrors.NewAggregate(errs)
@@ -733,7 +715,11 @@ func isAuthError(err error) bool {
 	// https://github.com/Azure/azure-sdk-for-go/blob/sdk/azidentity/v1.1.0/sdk/azidentity/errors.go#L36
 	var authErr *azidentity.AuthenticationFailedError
 	if errors.As(err, &authErr) {
-		if authErr.RawResponse.StatusCode >= 400 && authErr.RawResponse.StatusCode <= 403 {
+		if authErr.RawResponse == nil {
+			// Unable to get a proper response, probably due to some proxy error. Fixing this piece of code
+			// so it doesn't throw a panic.
+			return true
+		} else if authErr.RawResponse.StatusCode >= 400 && authErr.RawResponse.StatusCode <= 403 {
 			return true
 		}
 	}
@@ -835,4 +821,73 @@ func getServicePrincipalsByTag(ctx context.Context, graphClient *msgraphsdk.Grap
 		return nil, err
 	}
 	return resp.GetValue(), nil
+}
+
+func disassociateNATGateways(ctx context.Context, vnetClient *armnetwork.VirtualNetworksClient, subnetsClient *armnetwork.SubnetsClient, logger logrus.FieldLogger, resourceGroupName, infraID string) error {
+	vnets := vnetClient.NewListAllPager(nil)
+	for vnets.More() {
+		vnetPage, err := vnets.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to list virtual networks: %w", err)
+		}
+		for _, vnet := range vnetPage.Value {
+			if vnet.Name == nil || vnet.Properties == nil || vnet.Properties.Subnets == nil {
+				continue
+			}
+			vnetName := *vnet.Name
+			logger.Debugf("checking vnet: %s", vnetName)
+			value, ok := vnet.Tags[fmt.Sprintf("sigs.k8s.io_cluster-api-provider-azure_cluster_%s", infraID)]
+			if !ok {
+				value, ok = vnet.Tags[fmt.Sprintf("kubernetes.io_cluster.%s", infraID)]
+				if !ok {
+					continue
+				}
+			}
+			if *value != "owned" && *value != "shared" {
+				continue
+			}
+			vnetInfo, err := arm.ParseResourceID(*vnet.ID)
+			if err != nil {
+				logger.Warnf("error parsing vnet ID %s: %v", vnet.Name, err)
+			}
+			for _, subnet := range vnet.Properties.Subnets {
+				if subnet.Name == nil || subnet.Properties == nil {
+					continue
+				}
+				subnetName := *subnet.Name
+				if subnet.Properties.NatGateway != nil && subnet.Properties.NatGateway.ID != nil {
+					natGateway, err := arm.ParseResourceID(*subnet.Properties.NatGateway.ID)
+					if err != nil {
+						logger.Warnf("error parsing nat gateway in subnet %s: %v", subnetName, err)
+					}
+					if !strings.HasPrefix(natGateway.Name, infraID) {
+						continue
+					}
+					if !strings.HasPrefix(natGateway.ResourceGroupName, infraID) {
+						continue
+					}
+					logger.Debugf("found NAT Gateway association in Subnet: %s", subnetName)
+					err = removeSubnetFromNATGateway(ctx, subnetsClient, vnetInfo.ResourceGroupName, vnetName, subnetName, subnet)
+					if err != nil {
+						logger.Warnf("error disassociating NAT Gateway from subnet '%s': %v", subnetName, err)
+					}
+					logger.Debug("subnet disassociated")
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func removeSubnetFromNATGateway(ctx context.Context, subnetsClient *armnetwork.SubnetsClient, resourceGroupName, vnetName, subnetName string, subnet *armnetwork.Subnet) error {
+	subnet.Properties.NatGateway = nil
+	poller, err := subnetsClient.BeginCreateOrUpdate(ctx, resourceGroupName, vnetName, subnetName, *subnet, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin update for subnet '%s': %w", subnetName, err)
+	}
+	_, err = poller.PollUntilDone(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("subnet update operation failed for '%s': %w", subnetName, err)
+	}
+	return nil
 }

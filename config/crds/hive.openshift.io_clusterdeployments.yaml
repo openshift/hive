@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.18.0
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: clusterdeployments.hive.openshift.io
 spec:
   group: hive.openshift.io
@@ -557,6 +557,38 @@ spec:
                               2147483647ms (24.85 days).  Both are subject to change over time.
                             pattern: ^(0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+)$
                             type: string
+                          httpKeepAliveTimeout:
+                            description: |-
+                              httpKeepAliveTimeout defines the maximum allowed time to wait for
+                              a new HTTP request to appear on a connection from the client to the router.
+
+                              This field expects an unsigned duration string of a decimal number, with optional
+                              fraction and a unit suffix, e.g. "300ms", "1.5s" or "2m45s".
+                              Valid time units are "ms", "s", "m".
+                              The allowed range is from 1 millisecond to 15 minutes.
+
+                              When omitted, this means the user has no opinion and the platform is left
+                              to choose a reasonable default. This default is subject to change over time.
+                              The current default is 300s.
+
+                              Low values (tens of milliseconds or less) can cause clients to close and reopen connections
+                              for each request, leading to reduced connection sharing.
+                              For HTTP/2, special care should be taken with low values.
+                              A few seconds is a reasonable starting point to avoid holding idle connections open
+                              while still allowing subsequent requests to reuse the connection.
+
+                              High values (minutes or more) favor connection reuse but may cause idle
+                              connections to linger longer.
+                            maxLength: 16
+                            minLength: 1
+                            type: string
+                            x-kubernetes-validations:
+                              - message: httpKeepAliveTimeout must be a valid duration string composed of an unsigned integer value, optionally followed by a decimal fraction and a unit suffix (ms, s, m)
+                                rule: self.matches('^([0-9]+(\\.[0-9]+)?(ms|s|m))+$')
+                              - message: httpKeepAliveTimeout must be less than or equal to 15 minutes
+                                rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'') || duration(self) <= duration(''15m'')'
+                              - message: httpKeepAliveTimeout must be greater than or equal to 1 millisecond
+                                rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'') || duration(self) >= duration(''1ms'')'
                           maxConnections:
                             description: |-
                               maxConnections defines the maximum number of simultaneous
@@ -691,6 +723,7 @@ spec:
                       - domain
                       - name
                     type: object
+                  maxItems: 16
                   type: array
                 installAttemptsLimit:
                   description: InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
@@ -1362,7 +1395,9 @@ spec:
                         description: EnvVar represents an environment variable present in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be a C_IDENTIFIER.
+                            description: |-
+                              Name of the environment variable.
+                              May consist of any printable ASCII characters except '='.
                             type: string
                           value:
                             description: |-
@@ -1414,6 +1449,42 @@ spec:
                                     type: string
                                 required:
                                   - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: |-
+                                  FileKeyRef selects a key of the env file.
+                                  Requires the EnvFiles feature gate to be enabled.
+                                properties:
+                                  key:
+                                    description: |-
+                                      The key within the env file. An invalid key will prevent the pod from starting.
+                                      The keys defined within a source may consist of any printable ASCII characters except '='.
+                                      During Alpha stage of the EnvFiles feature gate, the key size is limited to 128 characters.
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: |-
+                                      Specify whether the file or its key must be defined. If the file or key
+                                      does not exist, then the env var is not published.
+                                      If optional is set to true and the specified key does not exist,
+                                      the environment variable will not be set in the Pod's containers.
+
+                                      If optional is set to false and the specified key does not exist,
+                                      an error will be returned during Pod creation.
+                                    type: boolean
+                                  path:
+                                    description: |-
+                                      The path within the volume from which to select the file.
+                                      Must be relative and may not contain the '..' path or start with '..'.
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing the env file.
+                                    type: string
+                                required:
+                                  - key
+                                  - path
+                                  - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -2019,7 +2090,7 @@ spec:
                             description: |-
                               acceptedRisks records risks which were accepted to initiate the update.
                               For example, it may menition an Upgradeable=False or missing signature
-                              that was overriden via desiredUpdate.force, or an update that was
+                              that was overridden via desiredUpdate.force, or an update that was
                               initiated despite not being in the availableUpdates set of recommended
                               update targets.
                             type: string

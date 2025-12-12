@@ -145,6 +145,41 @@ func TestGenerateMachineSets(t *testing.T) {
 			clusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testNutanixClusterDeployment()
 				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
+					{
+						Name: "valid-domain-1",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-1",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism1.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "valid-domain-2",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-2",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism2.example.com",
+								Port:    9440,
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				p.Spec.Platform.Nutanix.FailureDomains = []string{"valid-domain-1", "valid-domain-2"}
+				return p
+			}(),
+			expectedErr: false,
+		},
+		{
+			name: "Missing PrismElements",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
 					{Name: "valid-domain-1"},
 					{Name: "valid-domain-2"},
 				}
@@ -155,7 +190,7 @@ func TestGenerateMachineSets(t *testing.T) {
 				p.Spec.Platform.Nutanix.FailureDomains = []string{"valid-domain-1", "valid-domain-2"}
 				return p
 			}(),
-			expectedErr: false,
+			expectedErr: true,
 		},
 		{
 			name:              "BootType is correctly set",

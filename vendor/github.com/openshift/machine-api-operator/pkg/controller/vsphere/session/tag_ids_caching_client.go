@@ -138,7 +138,7 @@ func (t *CachingTagsManager) GetTag(ctx context.Context, id string) (*tags.Tag, 
 		klog.V(4).Infof("tag %s: found cached tag id value", id)
 		if cachedTagID == notFoundValue {
 			klog.V(4).Infof("tag %s: cache contains special value indicates that tag was not found when cache was filled, treating as non existed tag", id)
-			return nil, fmt.Errorf(notFoundErrMessage)
+			return nil, fmt.Errorf("%s", notFoundErrMessage)
 		}
 
 		tag, err := t.Manager.GetTag(ctx, cachedTagID)
@@ -191,7 +191,7 @@ func (t *CachingTagsManager) GetCategory(ctx context.Context, id string) (*tags.
 		klog.V(4).Infof("category %s: found cached category id value", id)
 		if cachedCategoryID == notFoundValue {
 			klog.V(4).Infof("category %s: cache contains special value indicates that tag was not found when cache was filled, treating as non existing category", id)
-			return nil, fmt.Errorf(notFoundErrMessage)
+			return nil, fmt.Errorf("%s", notFoundErrMessage)
 		}
 
 		category, err := t.Manager.GetCategory(ctx, cachedCategoryID)

@@ -45,6 +45,8 @@ import (
 	openstackvalidation "github.com/openshift/installer/pkg/types/openstack/validation"
 	"github.com/openshift/installer/pkg/types/ovirt"
 	ovirtvalidation "github.com/openshift/installer/pkg/types/ovirt/validation"
+	"github.com/openshift/installer/pkg/types/powervc"
+	powervcvalidation "github.com/openshift/installer/pkg/types/powervc/validation"
 	"github.com/openshift/installer/pkg/types/powervs"
 	powervsvalidation "github.com/openshift/installer/pkg/types/powervs/validation"
 	"github.com/openshift/installer/pkg/types/vsphere"
@@ -77,8 +79,13 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 	if c.FIPS {
 		allErrs = append(allErrs, validateFIPSconfig(c)...)
 	} else if c.SSHKey != "" {
-		if err := validate.SSHPublicKey(c.SSHKey); err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, err.Error()))
+		sshKeys := strings.Split(c.SSHKey, "\n")
+		for _, sshKey := range sshKeys {
+			if sshKey != "" {
+				if err := validate.SSHPublicKey(sshKey); err != nil {
+					allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), sshKey, err.Error()))
+				}
+			}
 		}
 	}
 
@@ -96,7 +103,7 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 	if c.Platform.GCP != nil || c.Platform.Azure != nil {
 		nameErr = validate.ClusterName1035(c.ObjectMeta.Name)
 	}
-	if c.Platform.VSphere != nil || c.Platform.BareMetal != nil || c.Platform.OpenStack != nil || c.Platform.Nutanix != nil {
+	if c.Platform.VSphere != nil || c.Platform.BareMetal != nil || c.Platform.OpenStack != nil || c.Platform.Nutanix != nil || c.Platform.PowerVC != nil {
 		nameErr = validate.OnPremClusterName(c.ObjectMeta.Name)
 	}
 	if nameErr != nil {
@@ -135,8 +142,7 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("arbiter"), fmt.Sprintf("%s feature must be enabled in order to use arbiter cluster deployment", features.FeatureGateHighlyAvailableArbiter)))
 		}
 	}
-	multiArchEnabled := types.MultiArchFeatureGateEnabled(c.Platform.Name(), c.EnabledFeatureGates())
-	allErrs = append(allErrs, validateCompute(&c.Platform, c.ControlPlane, c.Compute, field.NewPath("compute"), multiArchEnabled)...)
+	allErrs = append(allErrs, validateCompute(&c.Platform, c.ControlPlane, c.Compute, field.NewPath("compute"))...)
 
 	releaseArch, err := version.ReleaseArchitecture()
 	if err != nil {
@@ -359,7 +365,10 @@ func validateNetworkingIPVersion(n *types.Networking, p *types.Platform) field.E
 		case p.Ovirt != nil:
 		case p.Nutanix != nil:
 		case p.None != nil:
+			// DualStack IPv6 Primary is supported both on None and external platforms
+			allowV6Primary = true
 		case p.External != nil:
+			allowV6Primary = true
 		default:
 			allErrs = append(allErrs, field.Invalid(field.NewPath("networking"), "DualStack", "dual-stack IPv4/IPv6 is not supported for this platform, specify only one type of address"))
 		}
@@ -579,10 +588,10 @@ func validateNetworkNotOverlapDefaultOVNSubnets(n *types.Networking, network *ne
 
 	// We only check against OVNKubernetes default subnets.
 	// Any overrides of default subnets is validated in func validateOVNKubernetesConfig.
-	subnetsCheck := func(joinSubnet, transitSubnet, masqueradeSubnet *net.IPNet) {
+	subnetsCheck := func(joinSubnet, transitSubnet, masqueradeSubnet *net.IPNet, ipversion string) {
 		// Join subnet
 		if ovnsubnet, configured := getOVNSubnet(joinSubnet); !configured && validate.DoCIDRsOverlap(network, ovnsubnet) {
-			allErrs = append(allErrs, field.Invalid(fldPath, network.String(), fmt.Sprintf("must not overlap with OVNKubernetes default internal subnet %s", ovnsubnet.String())))
+			allErrs = append(allErrs, field.Invalid(fldPath, network.String(), fmt.Sprintf("must not overlap with OVNKubernetes default internal subnet %s: please run 'openshift-install explain installconfig.networking.ovnKubernetesConfig.%s' for further documentation", ovnsubnet.String(), ipversion)))
 		}
 
 		// Transit subnet
@@ -597,9 +606,9 @@ func validateNetworkNotOverlapDefaultOVNSubnets(n *types.Networking, network *ne
 	}
 
 	if network.IP.To4() != nil {
-		subnetsCheck(validate.OVNIPv4JoinSubnet, validate.OVNIPv4TransitSubnet, validate.OVNIPv4MasqueradeSubnet)
+		subnetsCheck(validate.OVNIPv4JoinSubnet, validate.OVNIPv4TransitSubnet, validate.OVNIPv4MasqueradeSubnet, "ipv4")
 	} else {
-		subnetsCheck(validate.OVNIPv6JoinSubnet, validate.OVNIPv6TransitSubnet, validate.OVNIPv6MasqueradeSubnet)
+		subnetsCheck(validate.OVNIPv6JoinSubnet, validate.OVNIPv6TransitSubnet, validate.OVNIPv6MasqueradeSubnet, "ipv6")
 	}
 
 	return allErrs
@@ -788,8 +797,11 @@ func validateComputeEdge(platform *types.Platform, pName string, fldPath *field.
 	return allErrs
 }
 
-func validateCompute(platform *types.Platform, control *types.MachinePool, pools []types.MachinePool, fldPath *field.Path, isMultiArchEnabled bool) field.ErrorList {
+func validateCompute(platform *types.Platform, control *types.MachinePool, pools []types.MachinePool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	// Multi Arch is enabled by default for AWS and GCP, these are also the only
+	// two valid platforms for multi arch installations.
+	isMultiArchEnabled := platform.AWS != nil || platform.GCP != nil
 	poolNames := map[string]bool{}
 	for i, p := range pools {
 		poolFldPath := fldPath.Index(i)
@@ -977,19 +989,27 @@ func validateAPIAndIngressVIPs(vips vips, fieldNames vipFields, vipIsRequired, r
 			allErrs = append(allErrs, field.Required(fldPath.Child(fieldNames.IngressVIPs), "must specify VIP for ingress, when VIP for API is set"))
 		}
 
-		if len(vips.API) == 1 {
-			hasIPv4, hasIPv6, presence, _ := inferIPVersionFromInstallConfig(n)
+		hasIPv4, hasIPv6, presence, _ := inferIPVersionFromInstallConfig(n)
 
-			apiVIPIPFamily := corev1.IPv4Protocol
-			if utilsnet.IsIPv6String(vips.API[0]) {
-				apiVIPIPFamily = corev1.IPv6Protocol
-			}
+		apiVIPIPFamily := corev1.IPv4Protocol
+		if utilsnet.IsIPv6String(vips.API[0]) {
+			apiVIPIPFamily = corev1.IPv6Protocol
+		}
 
-			if hasIPv4 && hasIPv6 && apiVIPIPFamily != presence["machineNetwork"].Primary {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.APIVIPs), vips.API[0], "VIP for the API must be of the same IP family with machine network's primary IP Family for dual-stack IPv4/IPv6"))
+		if hasIPv4 && hasIPv6 {
+			for _, k := range sortedPresenceKeys(presence) {
+				v := presence[k]
+				if v.Primary != apiVIPIPFamily {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.APIVIPs), vips.API[0], fmt.Sprintf("%s primary IP Family and primary IP family for the API VIP should match", k)))
+				}
 			}
-		} else if len(vips.API) == 2 {
-			if isDualStack, _ := utilsnet.IsDualStackIPStrings(vips.API); !isDualStack {
+		}
+
+		if len(vips.API) == 2 {
+			if isDualStack, err := utilsnet.IsDualStackIPStrings(vips.API); !isDualStack {
+				if err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, vips, err.Error()))
+				}
 				allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.APIVIPs), vips.API, "If two API VIPs are given, one must be an IPv4 address, the other an IPv6"))
 			}
 		}
@@ -1020,19 +1040,27 @@ func validateAPIAndIngressVIPs(vips vips, fieldNames vipFields, vipIsRequired, r
 			allErrs = append(allErrs, field.Required(fldPath.Child(fieldNames.APIVIPs), "must specify VIP for API, when VIP for ingress is set"))
 		}
 
-		if len(vips.Ingress) == 1 {
-			hasIPv4, hasIPv6, presence, _ := inferIPVersionFromInstallConfig(n)
+		hasIPv4, hasIPv6, presence, _ := inferIPVersionFromInstallConfig(n)
 
-			ingressVIPIPFamily := corev1.IPv4Protocol
-			if utilsnet.IsIPv6String(vips.Ingress[0]) {
-				ingressVIPIPFamily = corev1.IPv6Protocol
-			}
+		ingressVIPIPFamily := corev1.IPv4Protocol
+		if utilsnet.IsIPv6String(vips.Ingress[0]) {
+			ingressVIPIPFamily = corev1.IPv6Protocol
+		}
 
-			if hasIPv4 && hasIPv6 && ingressVIPIPFamily != presence["machineNetwork"].Primary {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.IngressVIPs), vips.Ingress[0], "VIP for the Ingress must be of the same IP family with machine network's primary IP Family for dual-stack IPv4/IPv6"))
+		if hasIPv4 && hasIPv6 {
+			for _, k := range sortedPresenceKeys(presence) {
+				v := presence[k]
+				if v.Primary != ingressVIPIPFamily {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.IngressVIPs), vips.Ingress[0], fmt.Sprintf("%s primary IP Family and primary IP family for the Ingress VIP should match", k)))
+				}
 			}
-		} else if len(vips.Ingress) == 2 {
-			if isDualStack, _ := utilsnet.IsDualStackIPStrings(vips.Ingress); !isDualStack {
+		}
+
+		if len(vips.Ingress) == 2 {
+			if isDualStack, err := utilsnet.IsDualStackIPStrings(vips.Ingress); !isDualStack {
+				if err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, vips, err.Error()))
+				}
 				allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldNames.IngressVIPs), vips.Ingress, "If two Ingress VIPs are given, one must be an IPv4 address, the other an IPv6"))
 			}
 		}
@@ -1069,7 +1097,8 @@ func validatePlatform(platform *types.Platform, usingAgentMethod bool, fldPath *
 		allErrs = append(allErrs, field.Invalid(fldPath, activePlatform, fmt.Sprintf("must specify one of the platforms (%s)", strings.Join(platforms, ", "))))
 	}
 	validate := func(n string, value interface{}, validation func(*field.Path) field.ErrorList) {
-		if n != activePlatform {
+		// PowerVC is a thin platform which also uses OpenStack
+		if n != activePlatform && n != powervc.Name && activePlatform != powervc.Name {
 			allErrs = append(allErrs, field.Invalid(fldPath, activePlatform, fmt.Sprintf("must only specify a single type of platform; cannot use both %q and %q", activePlatform, n)))
 		}
 		allErrs = append(allErrs, validation(fldPath.Child(n))...)
@@ -1089,6 +1118,11 @@ func validatePlatform(platform *types.Platform, usingAgentMethod bool, fldPath *
 	}
 	if platform.IBMCloud != nil {
 		validate(ibmcloud.Name, platform.IBMCloud, func(f *field.Path) field.ErrorList { return ibmcloudvalidation.ValidatePlatform(platform.IBMCloud, f) })
+	}
+	if platform.PowerVC != nil {
+		validate(powervc.Name, platform.PowerVC, func(f *field.Path) field.ErrorList {
+			return powervcvalidation.ValidatePlatform(platform.PowerVC, f)
+		})
 	}
 	if platform.OpenStack != nil {
 		validate(openstack.Name, platform.OpenStack, func(f *field.Path) field.ErrorList {
@@ -1196,8 +1230,25 @@ func validateImageDigestSources(groups []types.ImageDigestSource, fldPath *field
 				continue
 			}
 		}
+		if group.SourcePolicy != "" {
+			if len(group.Mirrors) == 0 {
+				allErrs = append(allErrs, field.Invalid(groupf.Child("sourcePolicy"), group.SourcePolicy, "sourcePolicy cannot be configured without a mirror"))
+			}
+			if err := validateImageMirrorSourcePolicy(group.SourcePolicy); err != nil {
+				allErrs = append(allErrs, field.Invalid(groupf.Child("sourcePolicy"), group.SourcePolicy, err.Error()))
+			}
+		}
 	}
 	return allErrs
+}
+
+func validateImageMirrorSourcePolicy(sourcePolicy configv1.MirrorSourcePolicy) error {
+	switch sourcePolicy {
+	case configv1.NeverContactSource, configv1.AllowContactingSource:
+		return nil
+	default:
+		return fmt.Errorf("supported values are %q and %q", configv1.NeverContactSource, configv1.AllowContactingSource)
+	}
 }
 
 func validateNamedRepository(r string) error {
@@ -1259,12 +1310,14 @@ func validateCloudCredentialsMode(mode types.CredentialsMode, fldPath *field.Pat
 	// validPlatformCredentialsModes is a map from the platform name to a slice of credentials modes that are valid
 	// for the platform. If a platform name is not in the map, then the credentials mode cannot be set for that platform.
 	validPlatformCredentialsModes := map[string][]types.CredentialsMode{
-		aws.Name:      {types.MintCredentialsMode, types.PassthroughCredentialsMode, types.ManualCredentialsMode},
-		azure.Name:    allowedAzureModes,
-		gcp.Name:      {types.MintCredentialsMode, types.PassthroughCredentialsMode, types.ManualCredentialsMode},
-		ibmcloud.Name: {types.ManualCredentialsMode},
-		powervs.Name:  {types.ManualCredentialsMode},
-		nutanix.Name:  {types.ManualCredentialsMode},
+		aws.Name:       {types.MintCredentialsMode, types.PassthroughCredentialsMode, types.ManualCredentialsMode},
+		azure.Name:     allowedAzureModes,
+		gcp.Name:       {types.MintCredentialsMode, types.PassthroughCredentialsMode, types.ManualCredentialsMode},
+		openstack.Name: {types.PassthroughCredentialsMode},
+		ibmcloud.Name:  {types.ManualCredentialsMode},
+		powervc.Name:   {types.PassthroughCredentialsMode},
+		powervs.Name:   {types.ManualCredentialsMode},
+		nutanix.Name:   {types.ManualCredentialsMode},
 	}
 	if validModes, ok := validPlatformCredentialsModes[platform.Name()]; ok {
 		validModesSet := sets.NewString()
@@ -1591,6 +1644,12 @@ func validateFencingCredentials(installConfig *types.InstallConfig) (errors fiel
 	if fencingCredentials != nil {
 		allErrs = append(allErrs, common.ValidateUniqueAndRequiredFields(fencingCredentials.Credentials, fldPath.Child("credentials"), func([]byte) bool { return false })...)
 		allErrs = append(allErrs, validateFencingForPlatform(installConfig, fldPath)...)
+
+		for i, credential := range fencingCredentials.Credentials {
+			if len(credential.CertificateVerification) > 0 && credential.CertificateVerification != types.CertificateVerificationDisabled && credential.CertificateVerification != types.CertificateVerificationEnabled {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("credentials").Index(i).Key("CertificateVerification"), installConfig.ControlPlane.Fencing.Credentials[i].CertificateVerification, fmt.Sprintf("invalid certificate verification; %q should set to one of the following: ['Enabled' (default), 'Disabled']", credential.CertificateVerification)))
+			}
+		}
 	}
 	allErrs = append(allErrs, validateCredentialsNumber(installConfig, fencingCredentials, fldPath.Child("credentials"))...)
 
@@ -1600,13 +1659,20 @@ func validateFencingCredentials(installConfig *types.InstallConfig) (errors fiel
 func validateFencingForPlatform(config *types.InstallConfig, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 	switch {
-	case config.None != nil, config.External != nil:
-	case config.BareMetal != nil:
-		if len(config.Platform.BareMetal.Hosts) > 0 {
-			errs = append(errs, field.Forbidden(fldPath, "fencing is mutually exclusive with hosts, please remove either of them"))
-		}
+	case config.None != nil, config.External != nil, config.BareMetal != nil:
+		// Allowed platforms
 	default:
 		errs = append(errs, field.Forbidden(fldPath, fmt.Sprintf("fencing is only supported on baremetal, external or none platforms, instead %s platform was found", config.Platform.Name())))
 	}
 	return errs
+}
+
+// sortedPresenceKeys returns map keys in sorted order for consistent error messages.
+func sortedPresenceKeys(presence ipAddressTypeByField) []string {
+	keys := make([]string, 0, len(presence))
+	for k := range presence {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

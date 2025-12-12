@@ -130,6 +130,11 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		},
 	}
 
+	if len(ic.Platform.Nutanix.PrismElements) == 0 {
+		// installer will panic if this slice is empty
+		return nil, false, errors.New("Nutanix config has no PrismElements")
+	}
+
 	osImage, err := getRHCOSImageNameFromMasterMachine(a.masterMachine, cd, logger)
 	if err != nil {
 		if updateErr := a.setUnsupportedConfigurationCondition(pool, logger, "MissingRHCOSImage", "no RHCOS image found in master machine provider spec"); updateErr != nil {

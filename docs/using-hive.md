@@ -35,6 +35,7 @@
   - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
   - [Adopting with hiveutil](#adopting-with-hiveutil)
   - [Transferring ownership](#transferring-ownership)
+  - [MachinePool Adoption](#machinepool-adoption)
 - [Configuration Management](#configuration-management)
   - [Vertical Scaling](#vertical-scaling)
   - [SyncSet](#syncset)
@@ -1212,7 +1213,7 @@ Hive will then:
 
 It is possible to adopt cluster deployments into Hive.
 This will allow you to manage the cluster as if it had been provisioned by Hive, including:
-- [MachinePools](#machine-pools)
+- [MachinePools](#machine-pools) - See [MachinePool Adoption](#machinepool-adoption) for how to adopt existing MachineSets when adopting a cluster
 - [SyncSets and SelectorSyncSets](syncset.md)
 - [Deprovisioning](#cluster-deprovisioning)
 
@@ -1254,9 +1255,13 @@ spec:
 ```
 
 Note for `metadataJSONSecretRef`:
-1. If the referenced Secret is available -- e.g. if the cluster was previously managed by hive -- simply copy it in.
-1. If you have the original metadata.json file -- e.g. if the cluster was provisioned directly via openshift-install -- create the Secret from it: `oc create secret generic my-gcp-cluster-metadata-json -n mynamespace --from-file=metadata.json=/tmp/metadata.json`
-1. Otherwise, you may need to compose the file by hand. See the samples below.
+- The `metadataJSONSecretRef` file is optional for cluster adoption. If you do not specify `metadataJSONSecretRef` in the ClusterDeployment, Hive will automatically generate the metadata.json content from the ClusterDeployment fields and create a secret named `{cluster-name}-metadata-json` (see [retrofitMetadataJSON](https://github.com/openshift/hive/blob/master/pkg/controller/clusterdeployment/clusterdeployment_controller.go#L1110)). The ClusterDeployment will be automatically updated with the `metadataJSONSecretRef` after the secret is created. You only need to manually provide a metadata.json secret if you have specific metadata that cannot be derived from the ClusterDeployment fields.
+- If you need to manually provide the metadata.json secret, use one of the following approaches:
+  1. If the referenced Secret is available -- e.g. if the cluster was previously managed by hive -- simply copy it in.
+  2. If you have the original metadata.json file -- e.g. if the cluster was provisioned directly via openshift-install -- create the Secret from it: `oc create secret generic my-gcp-cluster-metadata-json -n mynamespace --from-file=metadata.json=/tmp/metadata.json`.  
+  3. Otherwise, you may need to compose the file by hand. See the [metadata.json samples](#metadatajson-samples) below.
+
+#### metadata.json Samples
 
 If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment.
 
@@ -1360,6 +1365,207 @@ If you wish to transfer ownership of a cluster which is already managed by hive,
 1. Edit the `ClusterDeployment`, setting `spec.preserveOnDelete` to `true`. This ensures that the next step will only release the hive resources without destroying the cluster in the cloud infrastructure.
 1. Delete the `ClusterDeployment`
 1. From the hive instance that will adopt the cluster, `oc apply` the `ClusterDeployment`, creds and certs manifests you saved in the first step.
+
+### MachinePool Adoption
+
+When adopting a cluster, you can also adopt existing MachineSets by creating MachinePools that match the existing MachineSets. 
+
+Hive supports adopting existing MachineSets into MachinePool management in two scenarios:
+
+#### Scenario 1: Adopt MachinePools When Adopting a Cluster
+
+This scenario applies when you are adopting a cluster that was previously unmanaged by Hive. After adopting the cluster, you can bring the MachinePools along by labeling the existing MachineSets and creating corresponding MachinePools.
+
+Steps:
+
+1. Adopt the cluster  (see [Cluster Adoption](#cluster-adoption) above)
+2. Adopt the MachinePools using the [MachinePool Adoption Procedure](#machinepool-adoption-procedure) outlined below
+   - If there are additional MachineSets that should also be managed by Hive, create separate MachinePools for each distinct configuration
+
+#### Scenario 2: Adopt Additional MachineSets for a Cluster Already Managed by Hive
+
+If you want to adopt additional MachineSets for a cluster that is already managed by Hive, you can do so by creating MachinePools that match the existing MachineSets.
+
+Steps:  
+1. Label the existing MachineSets with `hive.openshift.io/machine-pool=<pool-name>`
+2. Create a corresponding MachinePool in the Hive hub cluster to manage these MachineSets
+
+#### MachinePool Adoption Procedure
+
+To adopt existing MachineSets:  
+
+1. Identify and inspect the existing MachineSets in the cluster that you want to manage:
+   ```bash
+   # List all MachineSets
+   oc get machinesets -n openshift-machine-api
+   
+   # Get detailed information about a specific MachineSet
+   oc get machineset <machineset-name> -n openshift-machine-api -o yaml
+   ```
+
+   **Important**: Note the following details for each MachineSet you want to adopt:
+   - Instance type (e.g., `m5.xlarge` for AWS)
+   - Availability zone/failure domain (e.g., `us-east-1a`)
+   - Current replica count
+   - Any platform-specific configurations (root volume settings, etc.)
+
+2. **Label the existing MachineSets** with the `hive.openshift.io/machine-pool` label. The label value must match the `spec.name` you will use in the MachinePool:
+   ```bash
+   oc label machineset <machineset-name> -n openshift-machine-api hive.openshift.io/machine-pool=<pool-name>
+   ```
+   
+   **Note**: You must label each MachineSet you want to adopt. Each MachineSet in each availability zone needs the label. 
+
+3. **Create a MachinePool** with specifications that exactly match the existing MachineSets:
+   - The `spec.name` must match the label value you applied in step 2
+   - The `spec.platform` configuration (instance type, zones, etc.) must exactly match the existing MachineSets
+   - The `spec.replicas` should match the current total replica count across all zones, or you can adjust it and Hive will reconcile
+   - The `spec.platform.<cloud>.zones` array must include all zones where MachineSets are labeled, and the order matters (see [Zone Configuration Warnings](#zone-configuration-warnings) below)
+
+   Example MachinePool for adopting existing worker MachineSets on AWS:
+   ```yaml
+   apiVersion: hive.openshift.io/v1
+   kind: MachinePool
+   metadata:
+     name: mycluster-worker
+     namespace: mynamespace
+   spec:
+     clusterDeploymentRef:
+       name: mycluster
+     name: worker  # Must match the label value from step 2
+     platform:
+       aws:
+         type: m5.xlarge  # Must exactly match existing MachineSet instance type
+         zones: # Must match all zones where MachineSets are labeled
+           - us-east-1a
+           - us-east-1b
+           - us-east-1c
+     replicas: 3  # Total replicas across all zones
+   ```
+   Example MachinePool for adopting existing worker MachineSets on GCP:
+   ```yaml
+   apiVersion: hive.openshift.io/v1
+   kind: MachinePool
+   metadata:
+     name: mihuanggcp-worker
+   spec:
+     clusterDeploymentRef:
+       name: mihuanggcp
+     name: worker
+     platform:
+       gcp:
+         osDisk:
+           diskSizeGB: 128
+           diskType: pd-ssd
+         type: n1-standard-4
+         zones:
+           - us-central1-a
+           # - us-central1-b
+           - us-central1-c
+           - us-central1-f
+     replicas: 3
+   ```
+
+   Example MachinePool for adopting existing worker MachineSets on vSphere:
+   ```yaml
+   apiVersion: hive.openshift.io/v1
+   kind: MachinePool
+   metadata:
+     name: mihuang-1213a-worker
+     namespace: adopt
+   spec:
+     clusterDeploymentRef:
+       name: mihuang-1213a
+     name: worker
+     platform:
+       vsphere:
+         coresPerSocket: 4
+         cpus: 8
+         memoryMB: 16384
+         osDisk:
+           diskSizeGB: 120
+     replicas: 2
+   ```
+4. **Apply the MachinePool**:
+   ```bash
+   oc apply -f machinepool-adopt.yaml
+   ```
+
+5. **Verify the adoption**:
+   ```bash
+   # Check MachinePool status, MachineSets are listed in status
+   oc get machinepool mycluster-worker -n mynamespace -o yaml
+   
+   # Check that existing MachineSets were not recreated
+   oc get machinesets -n openshift-machine-api
+   ```
+
+#### Zone Configuration Warnings
+
+Zone configuration (failure domain configuration) is one of the most error-prone aspects of MachinePool adoption. Incorrect zone configuration can cause Hive to create new MachineSets and delete existing ones, leading to unexpected resource creation and potential service disruption.
+
+1: Zone Mismatch Causes New MachineSet Creation
+
+If the configured zones in `MachinePool.spec.platform.<cloud>.zones` do not match the existing MachineSets' failure domains (availability zones), Hive will:
+- NOT adopt the existing MachineSets (even if they have the correct label)
+- Create new MachineSets in the configured zones
+- This can lead to unexpected resource creation and costs
+
+Example of zone mismatch:
+- Existing MachineSets: in zones `us-east-1a` and `us-east-1f` (with `hive.openshift.io/machine-pool=worker` label)
+- MachinePool configured with zones: `us-east-1b` and `us-east-1c`
+- Result: 
+  - Existing MachineSets in `us-east-1a` and `us-east-1f` are not adopted (zone mismatch)
+  - If the existing MachineSets have the `hive.openshift.io/machine-pool` label, they will be deleted because they are considered controlled by the MachinePool but don't match the generated MachineSets
+  - New MachineSets are created in `us-east-1b` and `us-east-1c` to match MachinePool config
+
+2: Zone Order Affects Replica Distribution
+
+When using fixed replicas (not autoscaling), the order of zones (failure domains) in the array determines how replicas are distributed. You must ensure the zone order in `MachinePool.spec.platform.<cloud>.zones` matches the current replica distribution across zones, as incorrect zone order will cause Hive to redistribute replicas, leading to Machine creation or deletion. 
+
+Hive distributes replicas using this algorithm:
+
+```go
+replicas := int32(total / numOfAZs)
+if int64(idx) < total % numOfAZs {
+    replicas++  // Earlier zones in the array get extra replicas
+}
+```
+
+Example of zone order impact:
+
+Current state (total: 3 replicas):
+- `us-east-1f`: 2 replicas
+- `us-east-1a`: 1 replica
+
+Correct zone order (preserves current distribution):
+```yaml
+spec:
+  platform:
+    aws:
+      zones:
+        - us-east-1f  # Index 0: gets 2 replicas
+        - us-east-1a  # Index 1: gets 1 replica
+  replicas: 3
+```
+
+Incorrect zone order (causes Machine recreation):
+```yaml
+spec:
+  platform:
+    aws:
+      zones:
+        - us-east-1a  # Index 0: will get 2 replicas
+        - us-east-1f  # Index 1: will get 1 replica
+  replicas: 3
+```
+
+Result of incorrect order:
+- Hive will scale `us-east-1a` from 1 to 2 replicas → 1 new Machine created
+- Hive will scale `us-east-1f` from 2 to 1 replica → 1 Machine deleted
+
+Special case: If the total number of replicas equals the number of zones, zone order does not matter (each zone gets exactly 1 replica).
+
 ## Configuration Management
 
 ### Vertical Scaling

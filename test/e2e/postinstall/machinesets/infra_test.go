@@ -298,6 +298,11 @@ poll:
 	machineSetList := &machinev1.MachineSetList{}
 	rc.List(context.Background(), machineSetList)
 	for _, machineSet := range machineSetList.Items {
+		// Only check machinesets that belong to this worker pool
+		poolLabel, hasPoolLabel := machineSet.Labels["hive.openshift.io/machine-pool"]
+		if !hasPoolLabel || poolLabel != pool.Spec.Name {
+			continue
+		}
 		// Check labels
 		require.Equal(t, "true", machineSet.Labels[constants.HiveManagedLabel], "Incorrect hive managed label on machineset")
 		require.Equal(t, pool.Spec.Name, machineSet.Labels["hive.openshift.io/machine-pool"], "Incorrect machine pool label on machineset")

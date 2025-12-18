@@ -15,6 +15,38 @@ To view what `create-cluster` generates, *without* submitting it to the API serv
 
 `--release-image` can be specified to control which OpenShift release image to use.
 
+#### Pull Secret
+
+OpenShift installation requires a pull secret obtained from https://console.redhat.com/openshift/install/pull-secret. 
+
+Save it to `~/.pull-secret` and `hiveutil` will automatically use it:
+
+```bash
+# Save your pull secret to the default location
+cat > ~/.pull-secret << 'EOF'
+{"auths":{"xxx":{"auth":"...","email":"..."}}}
+EOF
+
+# Now hiveutil will automatically find and use it
+bin/hiveutil create-cluster mycluster --cloud=aws
+```
+
+Other options:
+
+```bash
+# Option 1: Specify the file location
+bin/hiveutil create-cluster mycluster --pull-secret-file=/path/to/pull-secret
+
+# Option 2: Set as environment variable
+export PULL_SECRET='{"auths":{...}}'
+bin/hiveutil create-cluster mycluster --cloud=cloud
+
+# Option 3: Pass directly as parameter
+bin/hiveutil create-cluster mycluster --pull-secret '{"auths":{...}}'
+
+# Option 4: You can configure a global pull secret in HiveConfig instead of providing one for each cluster. See the Pull Secret section in using-hive.md for details.
+```
+
 #### Create Cluster on AWS
 
 Credentials will be read from your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables. If the environment variables are missing or empty, then `create-cluster` will look for creds at `~/.aws/credentials`. Alternatively you can specify an AWS credentials file with `--creds-file`.

@@ -34,3 +34,7 @@ config/apiserver/certificates/**
 *.swo
 *~
 /_output/
+
+# AI related files
+.claude/settings.local.json
+.claude/test_artifacts/

@@ -325,6 +325,7 @@ podman-operatorhub-build:
 		--build-arg=BUILD_IMAGE_CUSTOMIZATION=./hack/ubi-build-deps.sh \
 		--build-arg=EL8_BUILD_IMAGE=registry.access.redhat.com/ubi8/ubi:8.10 \
 		--build-arg=EL9_BUILD_IMAGE=registry.access.redhat.com/ubi9:9.5 \
+		--build-arg=DNF=dnf \
 		-f ./Dockerfile .
 
 # Build and push the dev image with buildah

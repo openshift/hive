@@ -1394,9 +1394,25 @@ func baseMachinePool(pool *hivev1.MachinePool) *installertypes.MachinePool {
 }
 
 func isControlledByMachinePool(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, obj metav1.Object) bool {
+	// Primary check: MachineSets with the machinePoolNameLabel matching the pool name are controlled.
+	labelValue := obj.GetLabels()[machinePoolNameLabel]
+	if labelValue != "" {
+		// If label exists, it must match exactly. If it doesn't match, this MachineSet belongs
+		// to a different pool. Return false immediately to avoid false positives from prefix
+		// matching when one pool's name is a prefix of another (e.g., "worker" and "worker2").
+		return labelValue == pool.Spec.Name
+	}
+
+	// Secondary check: For prefix-based matching, we require the HiveManagedLabel to be present.
+	// This prevents false positives where MachineSets match the naming prefix pattern but aren't
+	// actually managed by Hive. MachineSets managed by Hive (either created by Hive or adopted by Hive)
+	// will have the HiveManagedLabel.
 	prefix := strings.Join([]string{cd.Spec.ClusterName, pool.Spec.Name, ""}, "-")
-	return strings.HasPrefix(obj.GetName(), prefix) ||
-		obj.GetLabels()[machinePoolNameLabel] == pool.Spec.Name
+	if strings.HasPrefix(obj.GetName(), prefix) {
+		return obj.GetLabels()[constants.HiveManagedLabel] == "true"
+	}
+
+	return false
 }
 
 func (r *ReconcileMachinePool) removeFinalizer(pool *hivev1.MachinePool, logger log.FieldLogger) (reconcile.Result, error) {

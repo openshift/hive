@@ -83,7 +83,7 @@ func validateVolumeSize(p *aws.MachinePool, fldPath *field.Path) field.ErrorList
 	allErrs := field.ErrorList{}
 	volumeSize := p.EC2RootVolume.Size
 
-	if volumeSize <= 0 {
+	if volumeSize < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("size"), volumeSize, "volume size value must be a positive number"))
 	}
 
@@ -97,7 +97,7 @@ func validateIOPS(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
 
 	switch volumeType {
 	case "io1", "io2":
-		if iops <= 0 {
+		if iops < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iops"), iops, "iops must be a positive number"))
 		}
 	case "gp3":
@@ -117,18 +117,21 @@ func validateIOPS(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
 
 func validateThroughput(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	if p.EC2RootVolume.Throughput == nil {
+		return allErrs
+	}
+
 	volumeType := strings.ToLower(p.EC2RootVolume.Type)
-	throughput := p.EC2RootVolume.Throughput
+	throughput := *p.EC2RootVolume.Throughput
 
 	switch volumeType {
 	case "gp3":
-		if throughput != 0 && (throughput < 125 || throughput > 2000) {
+		if throughput < 125 || throughput > 2000 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, "throughput must be between 125 MiB/s and 2000 MiB/s"))
 		}
 	default:
-		if throughput != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, fmt.Sprintf("throughput not supported for type %s", volumeType)))
-		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, fmt.Sprintf("throughput not supported for type %s", volumeType)))
 	}
 
 	return allErrs

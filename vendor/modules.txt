@@ -1983,7 +1983,7 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v1.4.21-pre
+# github.com/openshift/installer v1.4.21-pre2.0.20251222173018-614e18ee6a52
 ## explicit; go 1.24.0
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset
@@ -4172,7 +4172,7 @@ sigs.k8s.io/cluster-api/feature
 sigs.k8s.io/cluster-api/util/annotations
 sigs.k8s.io/cluster-api/util/conversion
 sigs.k8s.io/cluster-api/util/topology
-# sigs.k8s.io/cluster-api-provider-aws/v2 v2.7.1-0.20250314180547-17a09f59176c => github.com/clebs/cluster-api-provider-aws/v2 v2.0.0-20251107144358-6be716cd866c
+# sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.1-0.20251121222432-04a4f62bf90a => github.com/clebs/cluster-api-provider-aws/v2 v2.0.0-20251107144358-6be716cd866c
 ## explicit; go 1.24.0
 sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2
 sigs.k8s.io/cluster-api-provider-aws/v2/feature

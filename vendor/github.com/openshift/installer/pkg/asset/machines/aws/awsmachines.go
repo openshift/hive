@@ -107,7 +107,6 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 					Size:          int64(mpool.EC2RootVolume.Size),
 					Type:          capa.VolumeType(mpool.EC2RootVolume.Type),
 					IOPS:          int64(mpool.EC2RootVolume.IOPS),
-					Throughput:    ptr.To(mpool.EC2RootVolume.Throughput),
 					Encrypted:     ptr.To(true),
 					EncryptionKey: mpool.KMSKeyARN,
 				},
@@ -118,6 +117,10 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 			},
 		}
 		awsMachine.SetGroupVersionKind(capa.GroupVersion.WithKind("AWSMachine"))
+
+		if throughput := mpool.EC2RootVolume.Throughput; throughput != nil {
+			awsMachine.Spec.RootVolume.Throughput = ptr.To(int64(*throughput))
+		}
 
 		if in.Role == "bootstrap" {
 			awsMachine.Name = capiutils.GenerateBoostrapMachineName(clusterID)

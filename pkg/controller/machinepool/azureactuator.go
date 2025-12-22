@@ -2,11 +2,8 @@ package machinepool
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
-
-	"github.com/blang/semver/v4"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -27,8 +24,6 @@ import (
 	"github.com/openshift/hive/pkg/azureclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
-
-var versionsSupportingAzureImageGallery = semver.MustParseRange(">=4.12.0")
 
 // AzureActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
@@ -97,6 +92,9 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 			Role: capiazure.SubnetNode,
 		}}
 	}
+	// If ic.Platform.Azure.Subnets is NOT empty, this value is never read.
+	// It is only used to populate a default subnet when none is provided.
+	var subnetZones []string = nil
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.Azure = &installertypesazure.MachinePool{
@@ -171,7 +169,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 	}
 
-	// The imageID parameter is not used. The image is determined by the infraID.
+	// If we leave the imageID, the image is determined by the installer
 	const imageID = ""
 
 	installerMachineSets, err := installazure.MachineSets(
@@ -182,7 +180,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		workerRole,
 		workerUserDataName,
 		capabilities,
-		[]string{},
+		subnetZones,
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
@@ -235,18 +233,4 @@ func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) 
 		}
 	}
 	return false, nil
-}
-
-func shouldUseImageGallery(cd *hivev1.ClusterDeployment) (bool, error) {
-	versionString, err := getClusterVersion(cd)
-	if err != nil {
-		return true, fmt.Errorf("failed to get cluster semver: %w", err)
-	}
-
-	version, err := semver.ParseTolerant(versionString)
-	if err != nil {
-		return true, fmt.Errorf("failed to parse cluster semver: %w", err)
-	}
-
-	return versionsSupportingAzureImageGallery(version), nil
 }

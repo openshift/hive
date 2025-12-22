@@ -37,7 +37,7 @@ require (
 	github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
 	github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v1.4.21-pre
+	github.com/openshift/installer v1.4.21-pre2.0.20251222173018-614e18ee6a52
 	github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
 	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20241021180644-0eca0846914a
@@ -123,7 +123,7 @@ require (
 	gitlab.com/bosi/decorder v0.4.2 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	sigs.k8s.io/cluster-api v1.11.3 // indirect
-	sigs.k8s.io/cluster-api-provider-aws/v2 v2.7.1-0.20250314180547-17a09f59176c // indirect
+	sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.1-0.20251121222432-04a4f62bf90a // indirect
 	sigs.k8s.io/cluster-api-provider-gcp v1.10.1-0.20251030112604-5c2bfd5aadb3 // indirect
 )
 

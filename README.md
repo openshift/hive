@@ -17,6 +17,7 @@ The Hive service can be used to provision and perform initial configuration of O
 * Nutanix
 * OpenStack
 * vSphere
+* Bare Metal
 
 In the future Hive will support more cloud providers.
 

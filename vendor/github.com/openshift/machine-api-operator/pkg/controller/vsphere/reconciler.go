@@ -8,8 +8,12 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/vmware/govmomi/task"
 
 	"github.com/openshift/machine-api-operator/pkg/util/ipam"
 
@@ -27,9 +31,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
+	apifeatures "github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -45,6 +51,10 @@ const (
 	regionKey             = "region"
 	zoneKey               = "zone"
 	minimumHWVersion      = 15
+	// maxUnitNumber constant is used to define the maximum number of devices that can be assigned to a virtual machine's controller.
+	// Not all controllers support up to 30, but the maximum is 30.
+	// xref: https://docs.vmware.com/en/VMware-vSphere/8.0/vsphere-vm-administration/GUID-5872D173-A076-42FE-8D0B-9DB0EB0E7362.html#:~:text=If%20you%20add%20a%20hard,values%20from%200%20to%2014.
+	maxUnitNumber = 30
 )
 
 // These are the guestinfo variables used by Ignition.
@@ -81,11 +91,11 @@ func (r *Reconciler) create() error {
 		return fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
 	}
 
-	if ipam.HasStaticIPConfiguration(r.providerSpec) {
-		if !r.staticIPFeatureGateEnabled {
-			return fmt.Errorf("%v: static IP/IPAM configuration is only available with the VSphereStaticIPs feature gate", r.machine.GetName())
-		}
+	if r.providerSpec.Workspace.VMGroup != "" && !r.featureGates.Enabled(featuregate.Feature(apifeatures.FeatureGateVSphereHostVMGroupZonal)) {
+		return fmt.Errorf("%v: vmGroup is only available with the VSphereHostVMGroupZonal feature gate", r.machine.GetName())
+	}
 
+	if ipam.HasStaticIPConfiguration(r.providerSpec) {
 		outstandingClaims, err := ipam.HasOutstandingIPAddressClaims(
 			r.Context,
 			r.client,
@@ -194,7 +204,7 @@ func (r *Reconciler) create() error {
 			if statusError != nil {
 				return fmt.Errorf("failed to set provider status: %w", statusError)
 			}
-			return machinecontroller.CreateMachine(err.Error())
+			return machinecontroller.CreateMachine("%s", err.Error())
 		} else {
 			return fmt.Errorf("failed to check task status: %w", err)
 		}
@@ -207,7 +217,21 @@ func (r *Reconciler) create() error {
 	}
 
 	// if clone task finished successfully, power on the vm
-	if moTask.Info.DescriptionId == cloneVmTaskDescriptionId {
+	// The simulator task.Info.DescriptionId is different (VirtualMachine.cloneVM)
+	if strings.Contains(moTask.Info.DescriptionId, cloneVmTaskDescriptionId) {
+		if r.machineScope.providerSpec.Workspace.VMGroup != "" {
+			klog.Infof("Adding on cloned machine: %s to vm group: %s", r.machine.Name, r.machineScope.providerSpec.Workspace.VMGroup)
+
+			if err := modifyVMGroup(r.machineScope, false); err != nil {
+				var taskError task.Error
+				if errors.As(err, &taskError) {
+					return fmt.Errorf("could not update VM Group membership: %w", taskError)
+				}
+
+				return fmt.Errorf("could not update VM Group membership: %w", err)
+			}
+		}
+
 		klog.Infof("Powering on cloned machine: %v", r.machine.Name)
 		task, err := powerOn(r.machineScope)
 		if err != nil {
@@ -389,13 +413,13 @@ func (r *Reconciler) delete() error {
 			return err
 		}
 		klog.Infof("%v: vm does not exist", r.machine.GetName())
-		if r.staticIPFeatureGateEnabled {
-			// remove any finalizers for IPAddressClaims which may be associated with the machine
-			err = ipam.RemoveFinalizersForIPAddressClaims(r.Context, r.client, *r.machine)
-			if err != nil {
-				return fmt.Errorf("unable to remove finalizer for IP address claims: %w", err)
-			}
+
+		// remove any finalizers for IPAddressClaims which may be associated with the machine
+		err = ipam.RemoveFinalizersForIPAddressClaims(r.Context, r.client, *r.machine)
+		if err != nil {
+			return fmt.Errorf("unable to remove finalizer for IP address claims: %w", err)
 		}
+
 		return nil
 	}
 
@@ -456,9 +480,12 @@ func (r *Reconciler) delete() error {
 	if err != nil {
 		return fmt.Errorf("%v: can not obtain virtual disks attached to the vm: %w", r.machine.GetName(), err)
 	}
-	// Currently, MAPI does not provide any API knobs to configure additional volumes for a VM.
-	// So, we are expecting the VM to have only one disk, which is OS disk.
-	if len(disks) > 1 {
+
+	additionalDisks := len(r.providerSpec.DataDisks)
+	// Currently, MAPI only allows VMs to be configured w/ 1 primary disk in the template and a limited number of additional
+	// disks via the data disks configuration.  So, we are expecting the VM to have only one disk, which is OS disk, plus
+	// the additional disks defined in the DataDisks configuration.
+	if len(disks) > 1+additionalDisks {
 		// If node drain was skipped we need to detach disks forcefully to prevent possible data corruption.
 		if drainSkipped {
 			klog.V(1).Infof(
@@ -490,6 +517,13 @@ func (r *Reconciler) delete() error {
 			Reason:    "Destroy finished with error",
 		})
 		return fmt.Errorf("%v: failed to destroy vm: %w", r.machine.GetName(), err)
+	}
+
+	if r.machineScope.providerSpec.Workspace.VMGroup != "" {
+		klog.Infof("Removing machine: %v from vm group: %v", r.machine.Name, r.machineScope.providerSpec.Workspace.VMGroup)
+		if err := modifyVMGroup(r.machineScope, true); err != nil {
+			return fmt.Errorf("failed to remove machine from vm group: %w", err)
+		}
 	}
 
 	if err := setProviderStatus(task.Reference().Value, conditionSuccess(), r.machineScope, vm); err != nil {
@@ -867,12 +901,10 @@ func clone(s *machineScope) (string, error) {
 	}
 	if hwVersion < minimumHWVersion {
 		return "", machinecontroller.InvalidMachineConfiguration(
-			fmt.Sprintf(
-				"Hardware lower than %d is not supported, clone stopped. "+
-					"Detected machine template version is %d. "+
-					"Please update machine template: https://docs.openshift.com/container-platform/latest/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.html",
-				minimumHWVersion, hwVersion,
-			),
+			"Hardware lower than %d is not supported, clone stopped. "+
+				"Detected machine template version is %d. "+
+				"Please update machine template: https://docs.openshift.com/container-platform/latest/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.html",
+			minimumHWVersion, hwVersion,
 		)
 	}
 
@@ -968,6 +1000,13 @@ func clone(s *machineScope) (string, error) {
 		deviceSpecs = append(deviceSpecs, diskSpec)
 	}
 
+	// Process all DataDisks definitions to dynamically create and add disks to the VM
+	additionalDisks, err := createDataDisks(s, devices)
+	if err != nil {
+		return "", fmt.Errorf("error getting additional disk specs: %w", err)
+	}
+	deviceSpecs = append(deviceSpecs, additionalDisks...)
+
 	klog.V(3).Infof("Getting network devices")
 	networkDevices, err := getNetworkDevices(s, resourcepool, devices)
 	if err != nil {
@@ -988,18 +1027,16 @@ func clone(s *machineScope) (string, error) {
 		Value: "TRUE",
 	})
 
-	if s.staticIPFeatureGateEnabled {
-		if ipam.HasStaticIPConfiguration(s.providerSpec) {
-			networkKargs, err := constructKargsFromNetworkConfig(s)
-			if err != nil {
-				return "", err
-			}
-			if len(networkKargs) > 0 {
-				extraConfig = append(extraConfig, &types.OptionValue{
-					Key:   GuestInfoNetworkKargs,
-					Value: networkKargs,
-				})
-			}
+	if ipam.HasStaticIPConfiguration(s.providerSpec) {
+		networkKargs, err := constructKargsFromNetworkConfig(s)
+		if err != nil {
+			return "", err
+		}
+		if len(networkKargs) > 0 {
+			extraConfig = append(extraConfig, &types.OptionValue{
+				Key:   GuestInfoNetworkKargs,
+				Value: networkKargs,
+			})
 		}
 	}
 
@@ -1034,6 +1071,86 @@ func clone(s *machineScope) (string, error) {
 	taskVal := task.Reference().Value
 	klog.V(3).Infof("%v: running task: %+v", s.machine.GetName(), taskVal)
 	return taskVal, nil
+}
+
+func modifyVMGroup(s *machineScope, delete bool) error {
+	vmRef, err := findVM(s)
+	if err != nil {
+		if isNotFound(err) {
+			return fmt.Errorf("virtual machine %s was not found: %w", s.machine.Name, err)
+		}
+		return fmt.Errorf("error finding virtual machine: %w", err)
+	}
+
+	rp, err := s.session.Finder.ResourcePool(s.Context, s.providerSpec.Workspace.ResourcePool)
+	if err != nil {
+		return fmt.Errorf("error getting resource pool %s: %w", s.providerSpec.Workspace.ResourcePool, err)
+	}
+
+	ownerRef, err := rp.Owner(s.Context)
+	if err != nil {
+		return fmt.Errorf("error getting cluster owner reference from resource pool %s: %w", s.providerSpec.Workspace.ResourcePool, err)
+	}
+
+	var ccr *object.ClusterComputeResource
+	var ok bool
+	if ccr, ok = ownerRef.(*object.ClusterComputeResource); !ok {
+		return fmt.Errorf("error getting cluster from resource pool %s: %w", s.providerSpec.Workspace.ResourcePool, err)
+	}
+
+	clusterConfig, err := ccr.Configuration(s.Context)
+	if err != nil {
+		return fmt.Errorf("error getting cluster %s configuration: %w", s.providerSpec.Workspace.ResourcePool, err)
+	}
+
+	var clusterVmGroup *types.ClusterVmGroup
+
+	for _, g := range clusterConfig.Group {
+		if vmg, ok := g.(*types.ClusterVmGroup); ok {
+			if vmg.Name == s.providerSpec.Workspace.VMGroup {
+				clusterVmGroup = vmg
+				break
+			}
+		}
+	}
+
+	switch {
+	case clusterVmGroup == nil:
+		clusterVmGroup = &types.ClusterVmGroup{
+			Vm: []types.ManagedObjectReference{vmRef},
+		}
+	case slices.Contains(clusterVmGroup.Vm, vmRef) && delete:
+		clusterVmGroup.Vm = slices.DeleteFunc(clusterVmGroup.Vm, func(ref types.ManagedObjectReference) bool {
+			return vmRef.Value == ref.Value
+		})
+	case !slices.Contains(clusterVmGroup.Vm, vmRef):
+		clusterVmGroup.Vm = append(clusterVmGroup.Vm, vmRef)
+	default:
+		return nil
+	}
+
+	clusterConfigSpec := &types.ClusterConfigSpecEx{
+		GroupSpec: []types.ClusterGroupSpec{
+			{
+				ArrayUpdateSpec: types.ArrayUpdateSpec{
+					Operation: types.ArrayUpdateOperation("edit"),
+				},
+				Info: &types.ClusterVmGroup{
+					ClusterGroupInfo: types.ClusterGroupInfo{
+						Name: s.providerSpec.Workspace.VMGroup,
+					},
+					Vm: clusterVmGroup.Vm,
+				},
+			},
+		},
+	}
+
+	clusterTask, err := ccr.Reconfigure(s.Context, clusterConfigSpec, true)
+	if err != nil {
+		return fmt.Errorf("error reconfiguring cluster %s for vm-host group %s: %w", ccr.Name(), clusterVmGroup.Name, err)
+	}
+
+	return clusterTask.Wait(s.Context)
 }
 
 func powerOn(s *machineScope) (string, error) {
@@ -1086,6 +1203,138 @@ func getDiskSpec(s *machineScope, devices object.VirtualDeviceList) (types.BaseV
 		Operation: types.VirtualDeviceConfigSpecOperationEdit,
 		Device:    disk,
 	}, nil
+}
+
+func createDataDisks(s *machineScope, devices object.VirtualDeviceList) ([]types.BaseVirtualDeviceConfigSpec, error) {
+	var diskSpecs []types.BaseVirtualDeviceConfigSpec
+
+	// Only add additional disks if the feature gate is enabled.
+	if len(s.providerSpec.DataDisks) > 0 && !s.featureGates.Enabled(featuregate.Feature(apifeatures.FeatureGateVSphereMultiDisk)) {
+		return nil, machinecontroller.InvalidMachineConfiguration(
+			"machines cannot contain additional disks due to VSphereMultiDisk feature gate being disabled")
+	}
+
+	// Get primary disk
+	disks := devices.SelectByType((*types.VirtualDisk)(nil))
+	if len(disks) == 0 {
+		return nil, fmt.Errorf("invalid disk count: %d", len(disks))
+	}
+
+	// There is at least one disk
+	primaryDisk := disks[0].(*types.VirtualDisk)
+
+	// Get the controller of the primary disk.
+	controller, ok := devices.FindByKey(primaryDisk.ControllerKey).(types.BaseVirtualController)
+	if !ok {
+		return nil, fmt.Errorf("unable to find controller with key=%v", primaryDisk.ControllerKey)
+	}
+
+	controllerKey := controller.GetVirtualController().Key
+	unitNumberAssigner, err := newUnitNumberAssigner(controller, devices)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create unit number assigner: %v", err)
+	}
+
+	// Let's create the data disks now
+	for i, dataDisk := range s.providerSpec.DataDisks {
+		klog.V(2).InfoS("Adding disk", "name", dataDisk.Name, "spec", dataDisk)
+
+		backing := &types.VirtualDiskFlatVer2BackingInfo{
+			DiskMode: string(types.VirtualDiskModePersistent),
+			VirtualDeviceFileBackingInfo: types.VirtualDeviceFileBackingInfo{
+				FileName: "",
+			},
+		}
+
+		// Set provisioning type for the new data disk.
+		// Currently, if ThinProvisioned is not set, GOVC will set default to false.  We may want to change this behavior
+		// to match what template image OS disk has configured to make them match if not set.
+		switch dataDisk.ProvisioningMode {
+		case machinev1.ProvisioningModeThin:
+			backing.ThinProvisioned = types.NewBool(true)
+		case machinev1.ProvisioningModeThick:
+			backing.ThinProvisioned = types.NewBool(false)
+		case machinev1.ProvisioningModeEagerlyZeroed:
+			backing.ThinProvisioned = types.NewBool(false)
+			backing.EagerlyScrub = types.NewBool(true)
+		default:
+			klog.V(2).Infof("No provisioning type detected.  Leaving configuration empty.")
+		}
+
+		dev := &types.VirtualDisk{
+			VirtualDevice: types.VirtualDevice{
+				// Key needs to be unique and cannot match another new disk being added.  So we'll use the index as an
+				// input to NewKey.  NewKey() will always return same value since our new devices are not part of devices yet.
+				Key:           devices.NewKey() - int32(i),
+				Backing:       backing,
+				ControllerKey: controller.GetVirtualController().Key,
+			},
+			CapacityInKB: int64(dataDisk.SizeGiB) * 1024 * 1024,
+		}
+
+		vd := dev.GetVirtualDevice()
+		vd.ControllerKey = controllerKey
+
+		// Assign unit number to the new disk.  Should be next available slot on the controller.
+		unitNumber, err := unitNumberAssigner.assign()
+		if err != nil {
+			return nil, err
+		}
+		vd.UnitNumber = &unitNumber
+
+		klog.V(2).InfoS("Created device for data disk device", "name", dataDisk.Name, "spec", dataDisk, "device", dev)
+		diskSpecs = append(diskSpecs, &types.VirtualDeviceConfigSpec{
+			Device:        dev,
+			Operation:     types.VirtualDeviceConfigSpecOperationAdd,
+			FileOperation: types.VirtualDeviceConfigSpecFileOperationCreate,
+		})
+	}
+
+	return diskSpecs, nil
+}
+
+type unitNumberAssigner struct {
+	used   []bool
+	offset int32
+}
+
+func newUnitNumberAssigner(controller types.BaseVirtualController, existingDevices object.VirtualDeviceList) (*unitNumberAssigner, error) {
+	if controller == nil {
+		return nil, errors.New("controller parameter cannot be nil")
+	}
+	used := make([]bool, maxUnitNumber)
+
+	// SCSIControllers also use a unit.
+	if scsiController, ok := controller.(types.BaseVirtualSCSIController); ok {
+		used[scsiController.GetVirtualSCSIController().ScsiCtlrUnitNumber] = true
+	}
+	controllerKey := controller.GetVirtualController().Key
+
+	// Mark all unit numbers of existing devices as used
+	for _, device := range existingDevices {
+		d := device.GetVirtualDevice()
+		if d.ControllerKey == controllerKey && d.UnitNumber != nil {
+			used[*d.UnitNumber] = true
+		}
+	}
+
+	// Set offset to 0, it will auto-increment on the first assignment.
+	return &unitNumberAssigner{used: used, offset: 0}, nil
+}
+
+func (a *unitNumberAssigner) assign() (int32, error) {
+	if int(a.offset) > len(a.used) {
+		return -1, fmt.Errorf("all unit numbers are already in-use")
+	}
+	for i, isInUse := range a.used[a.offset:] {
+		unit := int32(i) + a.offset
+		if !isInUse {
+			a.used[unit] = true
+			a.offset++
+			return unit, nil
+		}
+	}
+	return -1, fmt.Errorf("all unit numbers are already in-use")
 }
 
 func getNetworkDevices(s *machineScope, resourcepool *object.ResourcePool, devices object.VirtualDeviceList) ([]types.BaseVirtualDeviceConfigSpec, error) {
@@ -1225,12 +1474,12 @@ func setProviderStatus(taskRef string, condition metav1.Condition, scope *machin
 func handleVSphereError(multipleFoundMsg, notFoundMsg string, defaultError, vsphereError error) error {
 	var multipleFoundError *find.MultipleFoundError
 	if errors.As(vsphereError, &multipleFoundError) {
-		return machinecontroller.InvalidMachineConfiguration(multipleFoundMsg)
+		return machinecontroller.InvalidMachineConfiguration("%s", multipleFoundMsg)
 	}
 
 	var notFoundError *find.NotFoundError
 	if errors.As(vsphereError, &notFoundError) {
-		return machinecontroller.InvalidMachineConfiguration(notFoundMsg)
+		return machinecontroller.InvalidMachineConfiguration("%s", notFoundMsg)
 	}
 
 	return defaultError
@@ -1520,15 +1769,16 @@ type attachedDisk struct {
 	diskMode string
 }
 
-// Filters out disks that look like vm OS disk.
+// Filters out disks that look like vm OS disk or any of the additional disks.
 // VM os disks filename contains the machine name in it
 // and has the format like "[DATASTORE] path-within-datastore/machine-name.vmdk".
 // This is based on vSphere behavior, an OS disk file gets a name that equals the target VM name during the clone operation.
 func filterOutVmOsDisk(attachedDisks []attachedDisk, machine *machinev1.Machine) []attachedDisk {
 	var disks []attachedDisk
+	regex, _ := regexp.Compile(fmt.Sprintf(".*\\/%s(_\\d*)?.vmdk", machine.GetName()))
 
 	for _, disk := range attachedDisks {
-		if strings.HasSuffix(disk.fileName, fmt.Sprintf("/%s.vmdk", machine.GetName())) {
+		if regex.MatchString(disk.fileName) {
 			continue
 		}
 		disks = append(disks, disk)

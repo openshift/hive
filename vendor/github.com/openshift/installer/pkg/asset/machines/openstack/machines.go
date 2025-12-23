@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/openstack"
 	openstackdefaults "github.com/openshift/installer/pkg/types/openstack/defaults"
+	"github.com/openshift/installer/pkg/types/powervc"
 )
 
 const (
@@ -38,10 +39,10 @@ const (
 
 // Machines returns a list of machines for a machinepool.
 func Machines(ctx context.Context, clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage, role, userDataSecret string) ([]machineapi.Machine, *machinev1.ControlPlaneMachineSet, error) {
-	if configPlatform := config.Platform.Name(); configPlatform != openstack.Name {
+	if configPlatform := config.Platform.Name(); configPlatform != openstack.Name && configPlatform != powervc.Name {
 		return nil, nil, fmt.Errorf("non-OpenStack configuration: %q", configPlatform)
 	}
-	if poolPlatform := pool.Platform.Name(); poolPlatform != openstack.Name {
+	if poolPlatform := pool.Platform.Name(); poolPlatform != openstack.Name && poolPlatform != powervc.Name {
 		return nil, nil, fmt.Errorf("non-OpenStack machine-pool: %q", poolPlatform)
 	}
 
@@ -62,7 +63,7 @@ func Machines(ctx context.Context, clusterID string, config *types.InstallConfig
 		providerSpec, err := generateProviderSpec(
 			ctx,
 			clusterID,
-			config.Platform.OpenStack,
+			config,
 			mpool,
 			osImage,
 			role,
@@ -101,7 +102,7 @@ func Machines(ctx context.Context, clusterID string, config *types.InstallConfig
 	machineSetProviderSpec, err := generateProviderSpec(
 		ctx,
 		clusterID,
-		config.Platform.OpenStack,
+		config,
 		mpool,
 		osImage,
 		role,
@@ -166,10 +167,12 @@ func Machines(ctx context.Context, clusterID string, config *types.InstallConfig
 	return machines, controlPlaneMachineSet, nil
 }
 
-func generateProviderSpec(ctx context.Context, clusterID string, platform *openstack.Platform, mpool *openstack.MachinePool, osImage string, role, userDataSecret string, failureDomain machinev1.OpenStackFailureDomain, configDrive *bool) (*machinev1alpha1.OpenstackProviderSpec, error) {
+func generateProviderSpec(ctx context.Context, clusterID string, config *types.InstallConfig, mpool *openstack.MachinePool, osImage string, role, userDataSecret string, failureDomain machinev1.OpenStackFailureDomain, configDrive *bool) (*machinev1alpha1.OpenstackProviderSpec, error) {
 	var controlPlaneNetwork machinev1alpha1.NetworkParam
 	additionalNetworks := make([]machinev1alpha1.NetworkParam, 0, len(mpool.AdditionalNetworkIDs))
 	primarySubnet := ""
+
+	platform := config.Platform.OpenStack
 
 	if platform.ControlPlanePort != nil {
 		var subnets []machinev1alpha1.SubnetParam
@@ -229,6 +232,9 @@ func generateProviderSpec(ctx context.Context, clusterID string, platform *opens
 			UUID: sg,
 		})
 	}
+	if config.Platform.Name() == powervc.Name {
+		securityGroups = nil
+	}
 
 	serverGroupName := clusterID + "-" + role
 	// We initially used the AZ name as part of the server group name for the masters
@@ -238,7 +244,7 @@ func generateProviderSpec(ctx context.Context, clusterID string, platform *opens
 	// For the workers, we still use the AZ name as part of the server group name
 	// so the user can control the scheduling policy per AZ and change the MachineSets
 	// if needed on a day 2 operation.
-	if role == "worker" && failureDomain.AvailabilityZone != "" {
+	if role == workerRole && failureDomain.AvailabilityZone != "" {
 		serverGroupName += "-" + failureDomain.AvailabilityZone
 	}
 

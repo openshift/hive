@@ -27,6 +27,11 @@ var (
 	}()
 
 	validMetadataAuthValues = sets.NewString("Required", "Optional")
+
+	validConfidentialComputePolicy = []aws.ConfidentialComputePolicy{
+		aws.ConfidentialComputePolicyDisabled,
+		aws.ConfidentialComputePolicySEVSNP,
+	}
 )
 
 // AWS has a limit of 16 security groups. See:
@@ -46,6 +51,7 @@ func ValidateMachinePool(platform *aws.Platform, p *aws.MachinePool, fldPath *fi
 	if p.EC2RootVolume.Type != "" {
 		allErrs = append(allErrs, validateVolumeSize(p, fldPath)...)
 		allErrs = append(allErrs, validateIOPS(p, fldPath)...)
+		allErrs = append(allErrs, validateThroughput(p, fldPath)...)
 	}
 
 	if p.EC2Metadata.Authentication != "" && !validMetadataAuthValues.Has(p.EC2Metadata.Authentication) {
@@ -53,6 +59,7 @@ func ValidateMachinePool(platform *aws.Platform, p *aws.MachinePool, fldPath *fi
 	}
 
 	allErrs = append(allErrs, validateSecurityGroups(platform, p, fldPath)...)
+	allErrs = append(allErrs, ValidateCPUOptions(p, fldPath)...)
 
 	return allErrs
 }
@@ -76,7 +83,7 @@ func validateVolumeSize(p *aws.MachinePool, fldPath *field.Path) field.ErrorList
 	allErrs := field.ErrorList{}
 	volumeSize := p.EC2RootVolume.Size
 
-	if volumeSize <= 0 {
+	if volumeSize < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("size"), volumeSize, "volume size value must be a positive number"))
 	}
 
@@ -90,7 +97,7 @@ func validateIOPS(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
 
 	switch volumeType {
 	case "io1", "io2":
-		if iops <= 0 {
+		if iops < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("iops"), iops, "iops must be a positive number"))
 		}
 	case "gp3":
@@ -103,6 +110,28 @@ func validateIOPS(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
 		}
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), volumeType, fmt.Sprintf("failed to find volume type %s", volumeType)))
+	}
+
+	return allErrs
+}
+
+func validateThroughput(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if p.EC2RootVolume.Throughput == nil {
+		return allErrs
+	}
+
+	volumeType := strings.ToLower(p.EC2RootVolume.Type)
+	throughput := *p.EC2RootVolume.Throughput
+
+	switch volumeType {
+	case "gp3":
+		if throughput < 125 || throughput > 2000 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, "throughput must be between 125 MiB/s and 2000 MiB/s"))
+		}
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, fmt.Sprintf("throughput not supported for type %s", volumeType)))
 	}
 
 	return allErrs
@@ -131,5 +160,43 @@ func ValidateMachinePoolArchitecture(pool *types.MachinePool, fldPath *field.Pat
 	if !validArchitectures[pool.Architecture] {
 		allErrs = append(allErrs, field.NotSupported(fldPath, pool.Architecture, validArchitectureValues))
 	}
+	return allErrs
+}
+
+// ValidateCPUOptions checks that valid CPU options are set for a machine pool.
+func ValidateCPUOptions(p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
+	if p.CPUOptions == nil {
+		return nil
+	}
+
+	allErrs := field.ErrorList{}
+
+	if *p.CPUOptions == (aws.CPUOptions{}) {
+		allErrs = append(
+			allErrs,
+			field.Invalid(
+				fldPath.Child("cpuOptions"),
+				"{}",
+				"At least one field must be set if cpuOptions is provided",
+			),
+		)
+	}
+
+	if p.CPUOptions.ConfidentialCompute != nil {
+		switch *p.CPUOptions.ConfidentialCompute {
+		case aws.ConfidentialComputePolicyDisabled, aws.ConfidentialComputePolicySEVSNP:
+			// Valid values
+		default:
+			allErrs = append(
+				allErrs,
+				field.NotSupported(
+					fldPath.Child("confidentialCompute"),
+					p.CPUOptions.ConfidentialCompute,
+					validConfidentialComputePolicy,
+				),
+			)
+		}
+	}
+
 	return allErrs
 }

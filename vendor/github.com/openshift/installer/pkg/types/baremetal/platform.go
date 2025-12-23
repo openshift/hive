@@ -187,7 +187,6 @@ type Platform struct {
 	// one VIP
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:UniqueItems=true
 	// +kubebuilder:validation:Format=ip
 	// +optional
 	APIVIPs []string `json:"apiVIPs,omitempty"`
@@ -203,7 +202,6 @@ type Platform struct {
 	// clusters it contains an IPv4 and IPv6 address, otherwise only one VIP
 	//
 	// +kubebuilder:validation:MaxItems=2
-	// +kubebuilder:validation:UniqueItems=true
 	// +kubebuilder:validation:Format=ip
 	// +optional
 	IngressVIPs []string `json:"ingressVIPs,omitempty"`
@@ -239,6 +237,22 @@ type Platform struct {
 	// +optional
 	LoadBalancer *configv1.BareMetalPlatformLoadBalancer `json:"loadBalancer,omitempty"`
 
+	// dnsRecordsType determines whether records for api, api-int, and ingress
+	// are provided by the internal DNS service or externally.
+	// Allowed values are `Internal`, `External`, and omitted.
+	// When set to `Internal`, records are provided by the internal infrastructure and
+	// no additional user configuration is required for the cluster to function.
+	// When set to `External`, records are not provided by the internal infrastructure
+	// and must be configured by the user on a DNS server outside the cluster.
+	// Cluster nodes must use this external server for their upstream DNS requests.
+	// This value may only be set when loadBalancer.type is set to UserManaged.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is `Internal`.
+	// +openshift:enable:FeatureGate=OnPremDNSRecords
+	// +optional
+	DNSRecordsType configv1.DNSRecordsType `json:"dnsRecordsType,omitempty"`
+
 	// BootstrapExternalStaticDNS is the static network DNS of the bootstrap node.
 	// This can be useful in environments without a DHCP server.
 	// +kubebuilder:validation:Format=ip
@@ -247,7 +261,8 @@ type Platform struct {
 
 	// AdditionalNTPServers defines a list of additional NTP servers
 	// to use for provisioning
-	// +kubebuilder:validation:UniqueItems=true
 	//  +optional
 	AdditionalNTPServers []string `json:"additionalNTPServers,omitempty"`
+
+	BMCVerifyCA string `json:"bmcVerifyCA,omitempty"`
 }

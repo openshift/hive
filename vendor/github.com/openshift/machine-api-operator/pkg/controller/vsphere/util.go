@@ -24,7 +24,9 @@ const (
 	OpenshiftConfigNamespace = "openshift-config"
 )
 
-func getInfrastructure(c runtimeclient.Reader) (*configv1.Infrastructure, error) {
+// GetInfrastructure retrieves the Infrastructure object from the provided API reader.
+// It returns an error if the API reader is nil or if there's an issue fetching the Infrastructure.
+func GetInfrastructure(c runtimeclient.Reader) (*configv1.Infrastructure, error) {
 	if c == nil {
 		return nil, errors.New("no API reader -- will not fetch infrastructure config")
 	}
@@ -44,7 +46,7 @@ func getVSphereConfig(c runtimeclient.Reader, configNamespace string) (*vsphere.
 		return nil, errors.New("no API reader -- will not fetch vSphere config")
 	}
 
-	infra, err := getInfrastructure(c)
+	infra, err := GetInfrastructure(c)
 	if err != nil {
 		return nil, err
 	}

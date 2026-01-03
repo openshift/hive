@@ -1254,9 +1254,13 @@ spec:
 ```
 
 Note for `metadataJSONSecretRef`:
-1. If the referenced Secret is available -- e.g. if the cluster was previously managed by hive -- simply copy it in.
-1. If you have the original metadata.json file -- e.g. if the cluster was provisioned directly via openshift-install -- create the Secret from it: `oc create secret generic my-gcp-cluster-metadata-json -n mynamespace --from-file=metadata.json=/tmp/metadata.json`
-1. Otherwise, you may need to compose the file by hand. See the samples below.
+- The `metadataJSONSecretRef` file is optional for cluster adoption. If you do not specify `metadataJSONSecretRef` in the ClusterDeployment, Hive will automatically generate the metadata.json content from the ClusterDeployment fields and create a secret named `{cluster-name}-metadata-json` (see [retrofitMetadataJSON](https://github.com/openshift/hive/blob/master/pkg/controller/clusterdeployment/clusterdeployment_controller.go#L1110)). The ClusterDeployment will be automatically updated with the `metadataJSONSecretRef` after the secret is created. You only need to manually provide a metadata.json secret if you have specific metadata that cannot be derived from the ClusterDeployment fields.
+- If you need to manually provide the metadata.json secret, use one of the following approaches:
+  1. If the referenced Secret is available -- e.g. if the cluster was previously managed by hive -- simply copy it in.
+  2. If you have the original metadata.json file -- e.g. if the cluster was provisioned directly via openshift-install -- create the Secret from it: `oc create secret generic my-gcp-cluster-metadata-json -n mynamespace --from-file=metadata.json=/tmp/metadata.json`.  
+  3. Otherwise, you may need to compose the file by hand. See the [metadata.json samples](#metadatajson-samples) below.
+
+#### metadata.json Samples
 
 If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment.
 

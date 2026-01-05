@@ -12,6 +12,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -254,7 +255,14 @@ func WithAWSPlatformStatus(platformStatus *hivev1aws.PlatformStatus) Option {
 	}
 }
 
-// WithAWSPlatformStatus sets the specified aws platform on the supplied object.
+// WithOpenStackPlatform sets the specified OpenStack platform on the cd.
+func WithOpenStackPlatform(platform *hivev1openstack.Platform) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Platform.OpenStack = platform
+	}
+}
+
+// WithGCPPlatformStatus sets the specified aws platform on the supplied object.
 func WithGCPPlatformStatus(platformStatus *hivev1gcp.PlatformStatus) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		if clusterDeployment.Status.Platform == nil {

@@ -126,7 +126,13 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	}
 
 	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
+		var plan = installertypesazure.ImageWithPurchasePlan // default value
+		if osImage.Plan != "" {
+			plan = installertypesazure.ImagePurchasePlan(osImage.Plan)
+		}
+
 		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
+			Plan:      plan,
 			Publisher: osImage.Publisher,
 			Offer:     osImage.Offer,
 			SKU:       osImage.SKU,

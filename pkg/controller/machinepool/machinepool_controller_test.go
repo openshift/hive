@@ -2140,16 +2140,6 @@ func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 }
 
 func TestIsControlledByMachinePool(t *testing.T) {
-	cd := &hivev1.ClusterDeployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: testNamespace,
-		},
-		Spec: hivev1.ClusterDeploymentSpec{
-			ClusterName: "test-cluster",
-		},
-	}
-
 	pool := &hivev1.MachinePool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster-worker",
@@ -2177,36 +2167,11 @@ func TestIsControlledByMachinePool(t *testing.T) {
 			description: "MachineSet with matching machinePoolNameLabel should be controlled",
 		},
 		{
-			name:           "MachineSet with prefix and HiveManagedLabel",
-			machineSetName: "test-cluster-worker-us-east-1a",
-			labels: map[string]string{
-				constants.HiveManagedLabel: "true",
-			},
-			expected:    true,
-			description: "MachineSet with matching prefix and HiveManagedLabel should be controlled",
-		},
-		{
-			name:           "MachineSet with prefix but no HiveManagedLabel",
-			machineSetName: "test-cluster-worker-copied-by-user",
-			labels:         map[string]string{},
-			expected:       false,
-			description:    "MachineSet with matching prefix but no HiveManagedLabel should NOT be controlled (prevents false positives)",
-		},
-		{
-			name:           "MachineSet with prefix and wrong HiveManagedLabel value",
-			machineSetName: "test-cluster-worker-us-east-1a",
-			labels: map[string]string{
-				constants.HiveManagedLabel: "false",
-			},
-			expected:    false,
-			description: "MachineSet with matching prefix but wrong HiveManagedLabel value should NOT be controlled",
-		},
-		{
-			name:           "MachineSet with neither label nor matching prefix",
+			name:           "MachineSet without machinePoolNameLabel",
 			machineSetName: "some-other-machineset",
 			labels:         map[string]string{},
 			expected:       false,
-			description:    "MachineSet with no matching label or prefix should NOT be controlled",
+			description:    "MachineSet without machinePoolNameLabel should NOT be controlled",
 		},
 		{
 			name:           "MachineSet with wrong machinePoolNameLabel value",
@@ -2216,34 +2181,6 @@ func TestIsControlledByMachinePool(t *testing.T) {
 			},
 			expected:    false,
 			description: "MachineSet with non-matching machinePoolNameLabel should NOT be controlled",
-		},
-		{
-			name:           "MachineSet with both label and prefix",
-			machineSetName: "test-cluster-worker-us-east-1a",
-			labels: map[string]string{
-				machinePoolNameLabel:       "worker",
-				constants.HiveManagedLabel: "true",
-			},
-			expected:    true,
-			description: "MachineSet with both matching label and prefix should be controlled",
-		},
-		{
-			name:           "MachineSet with prefix matching but different pool name in prefix",
-			machineSetName: "test-cluster-different-pool-us-east-1a",
-			labels: map[string]string{
-				constants.HiveManagedLabel: "true",
-			},
-			expected:    false,
-			description: "MachineSet with prefix that doesn't match the pool name should NOT be controlled",
-		},
-		{
-			name:           "MachineSet with non-matching label but prefix matches (worker vs worker2)",
-			machineSetName: "test-cluster-worker2-us-east-1a",
-			labels: map[string]string{
-				machinePoolNameLabel: "worker2",
-			},
-			expected:    false,
-			description: "MachineSet with non-matching machinePoolNameLabel should NOT be controlled even if prefix matches (prevents false positives when one pool name is prefix of another)",
 		},
 	}
 
@@ -2255,8 +2192,7 @@ func TestIsControlledByMachinePool(t *testing.T) {
 					Labels: test.labels,
 				},
 			}
-
-			result := isControlledByMachinePool(cd, pool, obj)
+			result := isControlledByMachinePool(pool, obj)
 			assert.Equal(t, test.expected, result, test.description)
 		})
 	}

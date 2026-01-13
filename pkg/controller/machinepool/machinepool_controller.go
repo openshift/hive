@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -420,7 +419,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
 	}
 
-	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
+	if err := r.syncMachineAutoscalers(pool, machineSets, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
 		err := r.updateCondition(
 			pool,
@@ -931,7 +930,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 
 	// Find MachineSets that need deleting
 	for i, rMS := range remoteMachineSets.Items {
-		if !isControlledByMachinePool(cd, pool, &rMS) {
+		if !isControlledByMachinePool(pool, &rMS) {
 			continue
 		}
 		delete := true
@@ -978,7 +977,6 @@ func (r *ReconcileMachinePool) syncMachineSets(
 
 func (r *ReconcileMachinePool) syncMachineAutoscalers(
 	pool *hivev1.MachinePool,
-	cd *hivev1.ClusterDeployment,
 	machineSets []*machineapi.MachineSet,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
@@ -1066,7 +1064,7 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 
 	// Find MachineAutoscalers that need deleting
 	for i, rMA := range remoteMachineAutoscalers.Items {
-		if !isControlledByMachinePool(cd, pool, &rMA) {
+		if !isControlledByMachinePool(pool, &rMA) {
 			continue
 		}
 		delete := true
@@ -1393,26 +1391,9 @@ func baseMachinePool(pool *hivev1.MachinePool) *installertypes.MachinePool {
 	}
 }
 
-func isControlledByMachinePool(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, obj metav1.Object) bool {
-	// Primary check: MachineSets with the machinePoolNameLabel matching the pool name are controlled.
+func isControlledByMachinePool(pool *hivev1.MachinePool, obj metav1.Object) bool {
 	labelValue := obj.GetLabels()[machinePoolNameLabel]
-	if labelValue != "" {
-		// If label exists, it must match exactly. If it doesn't match, this MachineSet belongs
-		// to a different pool. Return false immediately to avoid false positives from prefix
-		// matching when one pool's name is a prefix of another (e.g., "worker" and "worker2").
-		return labelValue == pool.Spec.Name
-	}
-
-	// Secondary check: For prefix-based matching, we require the HiveManagedLabel to be present.
-	// This prevents false positives where MachineSets match the naming prefix pattern but aren't
-	// actually managed by Hive. MachineSets managed by Hive (either created by Hive or adopted by Hive)
-	// will have the HiveManagedLabel.
-	prefix := strings.Join([]string{cd.Spec.ClusterName, pool.Spec.Name, ""}, "-")
-	if strings.HasPrefix(obj.GetName(), prefix) {
-		return obj.GetLabels()[constants.HiveManagedLabel] == "true"
-	}
-
-	return false
+	return labelValue == pool.Spec.Name
 }
 
 func (r *ReconcileMachinePool) removeFinalizer(pool *hivev1.MachinePool, logger log.FieldLogger) (reconcile.Result, error) {

@@ -37,7 +37,7 @@ require (
 	github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
 	github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v1.4.21-pre2.0.20251222173018-614e18ee6a52
+	github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23
 	github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
 	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20241021180644-0eca0846914a
@@ -541,7 +541,6 @@ replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.19.3
 // See: https://issues.redhat.com/browse/CORS-4262
 replace (
 	github.com/nutanix-cloud-native/cluster-api-provider-nutanix => github.com/nutanix-cloud-native/cluster-api-provider-nutanix v1.7.2-0.20251007022949-442bc2ebe286
-	sigs.k8s.io/cluster-api-provider-aws/v2 => github.com/clebs/cluster-api-provider-aws/v2 v2.0.0-20251107144358-6be716cd866c
 	sigs.k8s.io/cluster-api-provider-azure => github.com/mboersma/cluster-api-provider-azure v0.3.1-0.20251030205607-3161b9cc8d3e
 )
 

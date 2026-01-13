@@ -276,8 +276,6 @@ github.com/cjlapao/common-go v0.0.39 h1:bAAUrj2B9v0kMzbAOhzjSmiyDy+rd56r2sy7oEiQ
 github.com/cjlapao/common-go v0.0.39/go.mod h1:M3dzazLjTjEtZJbbxoA5ZDiGCiHmpwqW9l4UWaddwOA=
 github.com/ckaznocha/intrange v0.3.0 h1:VqnxtK32pxgkhJgYQEeOArVidIPg+ahLP7WBOXZd5ZY=
 github.com/ckaznocha/intrange v0.3.0/go.mod h1:+I/o2d2A1FBHgGELbGxzIcyd3/9l9DuwjM8FsbSS3Lo=
-github.com/clebs/cluster-api-provider-aws/v2 v2.0.0-20251107144358-6be716cd866c h1:lqDI4MV1hUYiCg39QcV+EyBlBc9NwWjzR4Z+iebepIk=
-github.com/clebs/cluster-api-provider-aws/v2 v2.0.0-20251107144358-6be716cd866c/go.mod h1:+p5dAqZpjuOv4EHI/9wLN6tZ63qO4uIZno4vOQLmkMM=
 github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 h1:aQ3y1lwWyqYPiWZThqv1aFbZMiM9vblcSArJRf2Irls=
 github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443/go.mod h1:W+zGtBO5Y1IgJhy4+A9GOqVhqLpfZi+vwmdNXUehLA8=
 github.com/containers/image/v5 v5.31.0 h1:eDFVlz5XaYICxe9dXpf23htEKvyosgkl62mJlIATXE4=
@@ -857,8 +855,8 @@ github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-202510290
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20251029084908-344babe6a957/go.mod h1:TBlORAAtNZ/Tl86pO7GjNXKsH/g0QAW5GnvYstdOhYI=
 github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6 h1:+2D45NQ1B53nU0Lbsqa6rX9duCcO1df6U1HGCboijEQ=
 github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6/go.mod h1:5gqtfZSOJ7CWfrzPJ5c6B1Ju3r+W4UHIWXuav/+OGJQ=
-github.com/openshift/installer v1.4.21-pre2.0.20251222173018-614e18ee6a52 h1:W4CZxl821QzGdHGAkJTBaHGaAF/ml4W5pZtOvNmK9vs=
-github.com/openshift/installer v1.4.21-pre2.0.20251222173018-614e18ee6a52/go.mod h1:3ATaLOa+jMDvA30gkrTskppvkggXmtKHtMWQ1Sog6kA=
+github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23 h1:yoi8j9RmeCOKPolpYfNIRiO6NE7xN5Q1+UpS6GfOhtE=
+github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23/go.mod h1:3ATaLOa+jMDvA30gkrTskppvkggXmtKHtMWQ1Sog6kA=
 github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5 h1:Gq8jCFgSrilZ2ZHjQleFZWlblikc1aaRZ0hqs+yvrP4=
 github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5/go.mod h1:OlFFws1AO51uzfc48MsStGE4SFMWlMZD0+f5a/zCtKI=
 github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f h1:nExol3fBEA615EeN7bZ6wvd4EaANOAIgj9aXfdyIja4=
@@ -1408,6 +1406,8 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0 h1:XotDXzqvJ8Nx5
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
 sigs.k8s.io/cluster-api v1.11.3 h1:apxfugbP1X8AG7THCM74CTarCOW4H2oOc6hlbm1hY80=
 sigs.k8s.io/cluster-api v1.11.3/go.mod h1:CA471SACi81M8DzRKTlWpHV33G0cfWEj7sC4fALFVok=
+sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.1-0.20251121222432-04a4f62bf90a h1:uuAu/5de6VstJSERL1xS2DbQVFi7UkA7PhvgPiUakks=
+sigs.k8s.io/cluster-api-provider-aws/v2 v2.9.1-0.20251121222432-04a4f62bf90a/go.mod h1:8G7UH96RyBHQhJgSDS62ASIeWaw9qWlE0WO40BhOTMQ=
 sigs.k8s.io/cluster-api-provider-gcp v1.10.1-0.20251030112604-5c2bfd5aadb3 h1:hX2TCLts4fGf33RAkfMViy5qHZfMLZJfeu2BGYxXQkI=
 sigs.k8s.io/cluster-api-provider-gcp v1.10.1-0.20251030112604-5c2bfd5aadb3/go.mod h1:BR9XUljy5o4V6MNTZva4XFh7Gj++4d5G8AnKa6iB6Tc=
 sigs.k8s.io/cluster-api-provider-ibmcloud v0.12.0 h1:0+jfWLg+UmnGOdHZ9SrEpnUJgQPyyXpcjXGdkN5E5M4=

@@ -197,9 +197,9 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
-			// V1 image is chosen for machinepool
+			// Empty image is chosen for machinepool, and MAO will decide
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "",
 			},
 		},
 		{
@@ -216,9 +216,9 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
-			// V1 image is chosen for machinepool
+			// Empty image is chosen for machinepool, and MAO will decide
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "",
 			},
 		},
 		{
@@ -235,9 +235,9 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
-			// V2 ("-gen2") image is chosen for machinepool
+			// Empty image is chosen for machinepool, and MAO will decide
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "",
 			},
 		},
 		{
@@ -254,9 +254,9 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
-			// V2 ("-gen2") image is chosen for machinepool
+			// Empty image is chosen for machinepool, and MAO will decide
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "",
 			},
 		},
 		{

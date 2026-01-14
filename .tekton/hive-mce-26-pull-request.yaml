@@ -50,6 +50,8 @@ spec:
     value: 'true'
   - name: build-image-index
     value: 'true'
+  - name: enable-cache-proxy
+    value: 'true'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while reducing network traffic.

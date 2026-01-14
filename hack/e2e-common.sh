@@ -23,9 +23,9 @@ set -o monitor
 if [[ $0 == */e2e-pool-test.sh ]]; then
   # TODO: set this back to 148 when we figure out how to make the *test script*
   # timeout something other than 2h.
-  timeout_minutes=118
+  timeout_minutes=148
 else
-  timeout_minutes=118
+  timeout_minutes=148
 fi
 /usr/bin/bash -c "sleep $(($timeout_minutes*60)) && echo 'Timed out!' && kill -n 2 $$" &
 ###

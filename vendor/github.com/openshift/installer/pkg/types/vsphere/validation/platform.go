@@ -46,7 +46,7 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 		if len(p.FailureDomains) == 0 {
 			return append(allErrs, field.Required(fldPath.Child("failureDomains"), "must be defined"))
 		}
-		allErrs = append(allErrs, validateFailureDomains(p, fldPath.Child("failureDomains"), isLegacyUpi)...)
+		allErrs = append(allErrs, validateFailureDomains(p, fldPath, fldPath.Child("failureDomains"), isLegacyUpi)...)
 
 		// Validate hosts if configured for static IP
 		if p.Hosts != nil {
@@ -68,7 +68,7 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 			if p.FailureDomains[0].Name != conversion.GeneratedFailureDomainName &&
 				p.FailureDomains[0].Zone != conversion.GeneratedFailureDomainZone &&
 				p.FailureDomains[0].Region != conversion.GeneratedFailureDomainRegion {
-				allErrs = append(allErrs, validateFailureDomains(p, fldPath.Child("failureDomains"), isLegacyUpi)...)
+				allErrs = append(allErrs, validateFailureDomains(p, fldPath, fldPath.Child("failureDomains"), isLegacyUpi)...)
 			}
 		}
 	}
@@ -80,6 +80,10 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 		if !validateLoadBalancer(c.VSphere.LoadBalancer.Type) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("loadBalancer", "type"), c.VSphere.LoadBalancer.Type, "invalid load balancer type"))
 		}
+	}
+
+	if c.VSphere.DNSRecordsType == configv1.DNSRecordsTypeExternal && (c.VSphere.LoadBalancer == nil || c.VSphere.LoadBalancer.Type != configv1.LoadBalancerTypeUserManaged) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("dnsRecordsType"), c.VSphere.DNSRecordsType, "external DNS records can only be configured with user-managed loadbalancers"))
 	}
 
 	return allErrs
@@ -151,13 +155,22 @@ func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 	return allErrs
 }
 
-func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUpi bool) field.ErrorList {
+func validateFailureDomains(p *vsphere.Platform, platformFldPath *field.Path, fldPath *field.Path, isLegacyUpi bool) field.ErrorList { //nolint:gocyclo
 	var fdNames []string
 	tagUrnPattern := regexp.MustCompile(`^(urn):(vmomi):(InventoryServiceTag):([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}):([^:]+)$`)
 	allErrs := field.ErrorList{}
 	topologyFld := fldPath.Child("topology")
 	var associatedVCenter *vsphere.VCenter
+
+	zoneNames := make(map[string]string)
+
 	for index, failureDomain := range p.FailureDomains {
+		if regionName, ok := zoneNames[failureDomain.Zone]; !ok {
+			zoneNames[failureDomain.Zone] = failureDomain.Region
+		} else if regionName == failureDomain.Region {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("zone"), failureDomain.Zone, fmt.Sprintf("cannot be used more than once for the failure domain region %q", failureDomain.Region)))
+		}
+
 		if failureDomain.ZoneType == "" && failureDomain.RegionType == "" {
 			logrus.Debug("using the defaults regionType is Datacenter and zoneType is ComputeCluster")
 		}
@@ -309,6 +322,12 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			}
 
 			p.FailureDomains[index].Topology.ResourcePool = filepath.Clean(p.FailureDomains[index].Topology.ResourcePool)
+		}
+
+		// Validate that template and clusterOSImage are mutually exclusive
+		if len(failureDomain.Topology.Template) > 0 && len(p.ClusterOSImage) > 0 {
+			allErrs = append(allErrs, field.Invalid(topologyFld.Child("template"), failureDomain.Topology.Template, "cannot be specified when clusterOSImage is set"))
+			allErrs = append(allErrs, field.Invalid(platformFldPath.Child("clusterOSImage"), p.ClusterOSImage, "cannot be specified when failuredomain.topology.template is set"))
 		}
 
 		if len(failureDomain.Topology.Template) > 0 {

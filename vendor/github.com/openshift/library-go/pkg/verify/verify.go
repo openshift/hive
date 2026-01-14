@@ -137,7 +137,7 @@ func (v *releaseVerifier) String() string {
 				fmt.Fprint(&builder, ", ")
 			}
 			if entity.PrimaryKey != nil {
-				fmt.Fprintf(&builder, strings.ToUpper(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint)))
+				fmt.Fprintf(&builder, "%s", strings.ToUpper(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint)))
 				fmt.Fprint(&builder, ": ")
 			}
 			count := 0

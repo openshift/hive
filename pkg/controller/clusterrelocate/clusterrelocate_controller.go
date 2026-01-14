@@ -669,7 +669,7 @@ func (r *ReconcileClusterRelocate) replaceResourceIfChanged(destClient client.Cl
 		return nil
 	}
 	if logger.WithFields(nil).Logger.IsLevelEnabled(log.DebugLevel) {
-		logger.WithField("diff", diff.ObjectReflectDiff(srcObj, clearedDestObj)).
+		logger.WithField("diff", diff.Diff(srcObj, clearedDestObj)).
 			Debug("resource in destination cluster is out of sync")
 	}
 

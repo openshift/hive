@@ -7,7 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: checkpoints.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -91,7 +91,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterclaims.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -288,7 +288,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -589,7 +589,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeployments.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -1335,6 +1335,69 @@ objects:
                               \ to change over time."
                             pattern: "^(0|([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|\u03BCs|ms|s|m|h))+)$"
                             type: string
+                          httpKeepAliveTimeout:
+                            description: 'httpKeepAliveTimeout defines the maximum
+                              allowed time to wait for
+
+                              a new HTTP request to appear on a connection from the
+                              client to the router.
+
+
+                              This field expects an unsigned duration string of a
+                              decimal number, with optional
+
+                              fraction and a unit suffix, e.g. "300ms", "1.5s" or
+                              "2m45s".
+
+                              Valid time units are "ms", "s", "m".
+
+                              The allowed range is from 1 millisecond to 15 minutes.
+
+
+                              When omitted, this means the user has no opinion and
+                              the platform is left
+
+                              to choose a reasonable default. This default is subject
+                              to change over time.
+
+                              The current default is 300s.
+
+
+                              Low values (tens of milliseconds or less) can cause
+                              clients to close and reopen connections
+
+                              for each request, leading to reduced connection sharing.
+
+                              For HTTP/2, special care should be taken with low values.
+
+                              A few seconds is a reasonable starting point to avoid
+                              holding idle connections open
+
+                              while still allowing subsequent requests to reuse the
+                              connection.
+
+
+                              High values (minutes or more) favor connection reuse
+                              but may cause idle
+
+                              connections to linger longer.'
+                            maxLength: 16
+                            minLength: 1
+                            type: string
+                            x-kubernetes-validations:
+                            - message: httpKeepAliveTimeout must be a valid duration
+                                string composed of an unsigned integer value, optionally
+                                followed by a decimal fraction and a unit suffix (ms,
+                                s, m)
+                              rule: self.matches('^([0-9]+(\\.[0-9]+)?(ms|s|m))+$')
+                            - message: httpKeepAliveTimeout must be less than or equal
+                                to 15 minutes
+                              rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'')
+                                || duration(self) <= duration(''15m'')'
+                            - message: httpKeepAliveTimeout must be greater than or
+                                equal to 1 millisecond
+                              rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'')
+                                || duration(self) >= duration(''1ms'')'
                           maxConnections:
                             description: 'maxConnections defines the maximum number
                               of simultaneous
@@ -1548,6 +1611,7 @@ objects:
                     - domain
                     - name
                     type: object
+                  maxItems: 16
                   type: array
                 installAttemptsLimit:
                   description: InstallAttemptsLimit is the maximum number of times
@@ -2432,8 +2496,10 @@ objects:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: 'Name of the environment variable.
+
+                              May consist of any printable ASCII characters except
+                              ''=''.'
                             type: string
                           value:
                             description: 'Variable references $(VAR_NAME) are expanded
@@ -2509,6 +2575,58 @@ objects:
                                     type: string
                                 required:
                                 - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: 'FileKeyRef selects a key of the env
+                                  file.
+
+                                  Requires the EnvFiles feature gate to be enabled.'
+                                properties:
+                                  key:
+                                    description: 'The key within the env file. An
+                                      invalid key will prevent the pod from starting.
+
+                                      The keys defined within a source may consist
+                                      of any printable ASCII characters except ''=''.
+
+                                      During Alpha stage of the EnvFiles feature gate,
+                                      the key size is limited to 128 characters.'
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: 'Specify whether the file or its
+                                      key must be defined. If the file or key
+
+                                      does not exist, then the env var is not published.
+
+                                      If optional is set to true and the specified
+                                      key does not exist,
+
+                                      the environment variable will not be set in
+                                      the Pod''s containers.
+
+
+                                      If optional is set to false and the specified
+                                      key does not exist,
+
+                                      an error will be returned during Pod creation.'
+                                    type: boolean
+                                  path:
+                                    description: 'The path within the volume from
+                                      which to select the file.
+
+                                      Must be relative and may not contain the ''..''
+                                      path or start with ''..''.'
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -3352,7 +3470,7 @@ objects:
                               For example, it may menition an Upgradeable=False or
                               missing signature
 
-                              that was overriden via desiredUpdate.force, or an update
+                              that was overridden via desiredUpdate.force, or an update
                               that was
 
                               initiated despite not being in the availableUpdates
@@ -3629,7 +3747,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeprovisions.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4145,7 +4263,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterimagesets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4217,7 +4335,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterpools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4479,7 +4597,9 @@ objects:
                       in a Container.
                     properties:
                       name:
-                        description: Name of the environment variable. Must be a C_IDENTIFIER.
+                        description: 'Name of the environment variable.
+
+                          May consist of any printable ASCII characters except ''=''.'
                         type: string
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -4554,6 +4674,57 @@ objects:
                                 type: string
                             required:
                             - fieldPath
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          fileKeyRef:
+                            description: 'FileKeyRef selects a key of the env file.
+
+                              Requires the EnvFiles feature gate to be enabled.'
+                            properties:
+                              key:
+                                description: 'The key within the env file. An invalid
+                                  key will prevent the pod from starting.
+
+                                  The keys defined within a source may consist of
+                                  any printable ASCII characters except ''=''.
+
+                                  During Alpha stage of the EnvFiles feature gate,
+                                  the key size is limited to 128 characters.'
+                                type: string
+                              optional:
+                                default: false
+                                description: 'Specify whether the file or its key
+                                  must be defined. If the file or key
+
+                                  does not exist, then the env var is not published.
+
+                                  If optional is set to true and the specified key
+                                  does not exist,
+
+                                  the environment variable will not be set in the
+                                  Pod''s containers.
+
+
+                                  If optional is set to false and the specified key
+                                  does not exist,
+
+                                  an error will be returned during Pod creation.'
+                                type: boolean
+                              path:
+                                description: 'The path within the volume from which
+                                  to select the file.
+
+                                  Must be relative and may not contain the ''..''
+                                  path or start with ''..''.'
+                                type: string
+                              volumeName:
+                                description: The name of the volume mount containing
+                                  the env file.
+                                type: string
+                            required:
+                            - key
+                            - path
+                            - volumeName
                             type: object
                             x-kubernetes-map-type: atomic
                           resourceFieldRef:
@@ -5550,7 +5721,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
     name: clusterprovisions.hive.openshift.io
@@ -5799,7 +5970,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterrelocates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5939,7 +6110,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterstates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6062,7 +6233,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -6125,7 +6296,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clustersyncs.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -6400,7 +6571,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: dnszones.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6713,7 +6884,7 @@ objects:
   metadata:
     annotations:
       contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
     name: fakeclusterinstalls.hiveinternal.openshift.io
@@ -6988,7 +7159,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: hiveconfigs.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7359,8 +7530,7 @@ objects:
                                       that are used by this container.
 
 
-                                      This is an alpha field and requires enabling
-                                      the
+                                      This field depends on the
 
                                       DynamicResourceAllocation feature gate.
 
@@ -7523,7 +7693,7 @@ objects:
                                 that are used by this container.
 
 
-                                This is an alpha field and requires enabling the
+                                This field depends on the
 
                                 DynamicResourceAllocation feature gate.
 
@@ -7637,7 +7807,7 @@ objects:
                               that are used by this container.
 
 
-                              This is an alpha field and requires enabling the
+                              This field depends on the
 
                               DynamicResourceAllocation feature gate.
 
@@ -8453,7 +8623,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: machinepoolnameleases.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8529,7 +8699,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: machinepools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8867,6 +9037,14 @@ objects:
                           properties:
                             offer:
                               description: Offer is the offer of the image.
+                              type: string
+                            plan:
+                              description: 'Plan is the purchase plan of the image.
+
+                                If omitted, it defaults to "WithPurchasePlan".'
+                              enum:
+                              - WithPurchasePlan
+                              - NoPurchasePlan
                               type: string
                             publisher:
                               description: Publisher is the publisher of the image.
@@ -9608,10 +9786,8 @@ objects:
                         description: Required. The taint key to be applied to a node.
                         type: string
                       timeAdded:
-                        description: 'TimeAdded represents the time at which the taint
+                        description: TimeAdded represents the time at which the taint
                           was added.
-
-                          It is only written for NoExecute taints.'
                         format: date-time
                         type: string
                       value:
@@ -9803,7 +9979,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10629,7 +10805,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: selectorsyncsets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10935,7 +11111,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: syncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -11730,7 +11906,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: syncsets.hive.openshift.io
   spec:
     group: hive.openshift.io

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/azure"
 )
@@ -61,26 +61,46 @@ func ValidatePlatform(p *azure.Platform, publish types.PublishingStrategy, fldPa
 	if p.Region == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("region"), "region should be set to one of the supported Azure regions"))
 	}
-	if !p.IsARO() && publish != types.InternalPublishingStrategy {
+	if publish != types.InternalPublishingStrategy {
 		if p.BaseDomainResourceGroupName == "" {
 			allErrs = append(allErrs, field.Required(fldPath.Child("baseDomainResourceGroupName"), "baseDomainResourceGroupName is the resource group name where the azure dns zone is deployed"))
 		}
 	}
 	if p.DefaultMachinePlatform != nil {
-		allErrs = append(allErrs, ValidateMachinePool(p.DefaultMachinePlatform, "", p, fldPath.Child("defaultMachinePlatform"))...)
+		allErrs = append(allErrs, ValidateMachinePool(p.DefaultMachinePlatform, "", p, nil, fldPath.Child("defaultMachinePlatform"))...)
+	}
+	hasControlPlane := false
+	numCompute := 0
+	subnetSpecList := map[string]bool{}
+	for _, subnets := range p.Subnets {
+		if _, ok := subnetSpecList[subnets.Name]; ok {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("subnets"), subnets.Name, "duplicate value for subnet name"))
+		}
+		subnetSpecList[subnets.Name] = true
+		switch subnets.Role {
+		case capz.SubnetControlPlane:
+			if hasControlPlane {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("subnets"), subnets.Name, "CAPZ currently does not support multiple control plane subnets"))
+			}
+			hasControlPlane = true
+		case capz.SubnetNode:
+			numCompute++
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("subnets"), subnets.Name, fmt.Sprintf("role %s not supported", subnets.Role)))
+		}
 	}
 	if p.VirtualNetwork != "" {
-		if p.ComputeSubnet == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("computeSubnet"), "must provide a compute subnet when a virtual network is specified"))
-		}
-		if p.ControlPlaneSubnet == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("controlPlaneSubnet"), "must provide a control plane subnet when a virtual network is specified"))
-		}
 		if p.NetworkResourceGroupName == "" {
 			allErrs = append(allErrs, field.Required(fldPath.Child("networkResourceGroupName"), "must provide a network resource group when a virtual network is specified"))
 		}
+		if numCompute == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("computeSubnet"), "must provide a compute subnet when a virtual network is specified"))
+		}
+		if !hasControlPlane {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controlPlaneSubnet"), "must provide a control plane subnet when a virtual network is specified"))
+		}
 	}
-	if (p.ComputeSubnet != "" || p.ControlPlaneSubnet != "") && (p.VirtualNetwork == "" || p.NetworkResourceGroupName == "") {
+	if (numCompute > 0 || hasControlPlane) && (p.VirtualNetwork == "" || p.NetworkResourceGroupName == "") {
 		if p.VirtualNetwork == "" {
 			allErrs = append(allErrs, field.Required(fldPath.Child("virtualNetwork"), "must provide a virtual network when supplying subnets"))
 		}
@@ -98,13 +118,15 @@ func ValidatePlatform(p *azure.Platform, publish types.PublishingStrategy, fldPa
 	if p.OutboundType == azure.UserDefinedRoutingOutboundType && p.VirtualNetwork == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, fmt.Sprintf("%s is only allowed when installing to pre-existing network", azure.UserDefinedRoutingOutboundType)))
 	}
-	if p.OutboundType == azure.NatGatewayOutboundType {
-		if ic.FeatureSet != configv1.TechPreviewNoUpgrade {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "not supported in this feature set"))
+
+	if p.OutboundType == azure.NATGatewayMultiZoneOutboundType || p.OutboundType == azure.NATGatewaySingleZoneOutboundType {
+		if publish == types.InternalPublishingStrategy || (publish == types.MixedPublishingStrategy && ic.OperatorPublishingStrategy.Ingress == "Internal") {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "outbound type invalid for internal publish strategy or internal ingress strategy"))
 		}
-		if p.VirtualNetwork != "" {
-			// For now, BYO network and NAT gateways are not compatible
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, fmt.Sprintf("%s is not allowed when installing to pre-existing network", azure.NatGatewayOutboundType)))
+		if numCompute > 1 && p.OutboundType == azure.NATGatewaySingleZoneOutboundType {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "cannot have multiple compute subnets and outbound type single zone"))
+		} else if numCompute == 1 && p.OutboundType == azure.NATGatewayMultiZoneOutboundType {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "cannot have one compute subnet and outbound type multi zone"))
 		}
 	}
 
@@ -242,9 +264,10 @@ func findDuplicateTagKeys(tagSet map[string]string) error {
 
 var (
 	validOutboundTypes = map[azure.OutboundType]struct{}{
-		azure.LoadbalancerOutboundType:       {},
-		azure.NatGatewayOutboundType:         {},
-		azure.UserDefinedRoutingOutboundType: {},
+		azure.LoadbalancerOutboundType:         {},
+		azure.NATGatewayMultiZoneOutboundType:  {},
+		azure.NATGatewaySingleZoneOutboundType: {},
+		azure.UserDefinedRoutingOutboundType:   {},
 	}
 
 	validOutboundTypeValues = func() []string {
@@ -262,11 +285,8 @@ func validateAzureStack(p *azure.Platform, fldPath *field.Path) field.ErrorList 
 	if p.ARMEndpoint == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("armEndpoint"), "ARM endpoint must be set when installing on Azure Stack"))
 	}
-	switch p.OutboundType {
-	case azure.UserDefinedRoutingOutboundType:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "Azure Stack does not support user-defined routing"))
-	case azure.NatGatewayOutboundType:
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "Azure Stack does not support NAT routing currently"))
+	if p.OutboundType != azure.LoadbalancerOutboundType {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("outboundType"), p.OutboundType, "Azure Stack does not support this routing currently"))
 	}
 	return allErrs
 }

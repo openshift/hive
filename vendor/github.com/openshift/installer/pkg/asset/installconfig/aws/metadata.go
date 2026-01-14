@@ -7,12 +7,9 @@ import (
 	"sync"
 
 	"github.com/IBM/ibm-cos-sdk-go/aws"
-	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/sirupsen/logrus"
 
 	typesaws "github.com/openshift/installer/pkg/types/aws"
 )
@@ -22,19 +19,17 @@ import (
 // from external APIs).
 type Metadata struct {
 	session           *session.Session
-	config            *awsv2.Config
 	availabilityZones []string
 	availableRegions  []string
 	edgeZones         []string
-	privateSubnets    Subnets
-	publicSubnets     Subnets
-	edgeSubnets       Subnets
-	vpc               string
+	subnets           SubnetGroups
+	vpcSubnets        SubnetGroups
+	vpc               VPC
 	instanceTypes     map[string]InstanceType
 
-	Region   string                     `json:"region,omitempty"`
-	Subnets  []typesaws.Subnet          `json:"subnets,omitempty"`
-	Services []typesaws.ServiceEndpoint `json:"services,omitempty"`
+	Region          string                     `json:"region,omitempty"`
+	ProvidedSubnets []typesaws.Subnet          `json:"subnets,omitempty"`
+	Services        []typesaws.ServiceEndpoint `json:"services,omitempty"`
 
 	ec2Client *ec2.Client
 
@@ -43,7 +38,7 @@ type Metadata struct {
 
 // NewMetadata initializes a new Metadata object.
 func NewMetadata(region string, subnets []typesaws.Subnet, services []typesaws.ServiceEndpoint) *Metadata {
-	return &Metadata{Region: region, Subnets: subnets, Services: services}
+	return &Metadata{Region: region, ProvidedSubnets: subnets, Services: services}
 }
 
 // Session holds an AWS session which can be used for AWS API calls
@@ -67,38 +62,18 @@ func (m *Metadata) unlockedSession(ctx context.Context) (*session.Session, error
 	return m.session, nil
 }
 
-func (m *Metadata) unlockedConfig(ctx context.Context) (*awsv2.Config, error) {
-	if m.config == nil {
-		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(m.Region))
-		if err != nil {
-			return nil, fmt.Errorf("creating AWS configuration: %w", err)
-		}
-		m.config = &cfg
-	}
-	return m.config, nil
-}
-
 // EC2Client initiates a new EC2 client when one does not already exist, otherwise the existing client
 // is returned.
 func (m *Metadata) EC2Client(ctx context.Context) (*ec2.Client, error) {
 	if m.ec2Client == nil {
-		cfg, err := m.unlockedConfig(ctx)
+		ec2Client, err := NewEC2Client(ctx, EndpointOptions{
+			Region:    m.Region,
+			Endpoints: m.Services,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("metadata failed to create config: %w", err)
+			return nil, fmt.Errorf("failed to create EC2 client: %w", err)
 		}
-
-		optFns := []func(*ec2.Options){}
-		for _, service := range m.Services {
-			if service.Name == "ec2" {
-				optFns = append(optFns, func(o *ec2.Options) {
-					o.BaseEndpoint = awssdk.String(service.URL)
-				})
-				logrus.Warnf("setting ec2 endpoint URL to %s", service.URL)
-				break
-			}
-		}
-
-		m.ec2Client = ec2.NewFromConfig(*cfg, optFns...)
+		m.ec2Client = ec2Client
 	}
 	return m.ec2Client, nil
 }
@@ -174,7 +149,7 @@ func (m *Metadata) EdgeSubnets(ctx context.Context) (Subnets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Edge Subnets: %w", err)
 	}
-	return m.edgeSubnets, nil
+	return m.subnets.Edge, nil
 }
 
 // SetZoneAttributes retrieves AWS Zone attributes and update required fields in zones.
@@ -239,7 +214,7 @@ func (m *Metadata) PrivateSubnets(ctx context.Context) (Subnets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Private Subnets: %w", err)
 	}
-	return m.privateSubnets, nil
+	return m.subnets.Private, nil
 }
 
 // PublicSubnets retrieves subnet metadata indexed by subnet ID, for
@@ -250,46 +225,149 @@ func (m *Metadata) PublicSubnets(ctx context.Context) (Subnets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Public Subnets: %w", err)
 	}
-	return m.publicSubnets, nil
+	return m.subnets.Public, nil
 }
 
-// VPC retrieves the VPC ID containing PublicSubnets and PrivateSubnets.
-func (m *Metadata) VPC(ctx context.Context) (string, error) {
+// Subnets retrieves a group of subnet metadata that is indexed by subnet ID for all provided subnets.
+// This includes private, public and edge subnets.
+func (m *Metadata) Subnets(ctx context.Context) (SubnetGroups, error) {
 	err := m.populateSubnets(ctx)
 	if err != nil {
-		return "", fmt.Errorf("error retrieving VPC: %w", err)
+		return m.subnets, fmt.Errorf("error retrieving all Subnets: %w", err)
+	}
+	return m.subnets, nil
+}
+
+// VPCSubnets retrieves a group of all subnet metadata that is indexed by subnet ID in the VPC of the provided subnets.
+// These include cluster subnets (i.e. provided in the installconfig) and potentially other non-cluster subnets in the VPC.
+//
+// This func is only used for validations. Use func Subnets to select only cluster subnets.
+func (m *Metadata) VPCSubnets(ctx context.Context) (SubnetGroups, error) {
+	err := m.populateVPCSubnets(ctx)
+	if err != nil {
+		return m.vpcSubnets, fmt.Errorf("error retrieving Subnets in VPC: %w", err)
+	}
+	return m.vpcSubnets, nil
+}
+
+// VPC retrieves the VPC containing provided subnets.
+func (m *Metadata) VPC(ctx context.Context) (VPC, error) {
+	err := m.populateVPC(ctx)
+	if err != nil {
+		return m.vpc, fmt.Errorf("error retrieving VPC: %w", err)
 	}
 	return m.vpc, nil
 }
 
+// VPCID retrieves the ID of the VPC containing provided subnets.
+func (m *Metadata) VPCID(ctx context.Context) (string, error) {
+	err := m.populateVPC(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error retrieving VPC: %w", err)
+	}
+	return m.vpc.ID, nil
+}
+
+// SubnetByID retrieves subnet metadata for a subnet ID.
+func (m *Metadata) SubnetByID(ctx context.Context, subnetID string) (subnet Subnet, err error) {
+	err = m.populateSubnets(ctx)
+	if err != nil {
+		return subnet, fmt.Errorf("error retrieving subnet for ID %s: %w", subnetID, err)
+	}
+
+	if subnet, ok := m.subnets.Private[subnetID]; ok {
+		return subnet, nil
+	}
+
+	if subnet, ok := m.subnets.Public[subnetID]; ok {
+		return subnet, nil
+	}
+
+	if subnet, ok := m.subnets.Edge[subnetID]; ok {
+		return subnet, nil
+	}
+
+	return subnet, fmt.Errorf("no subnet found for ID %s", subnetID)
+}
+
+// populateSubnets retrieves metadata for provided subnets.
 func (m *Metadata) populateSubnets(ctx context.Context) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if len(m.Subnets) == 0 {
+	if len(m.ProvidedSubnets) == 0 {
 		return errors.New("no subnets configured")
 	}
 
-	if m.vpc != "" || len(m.privateSubnets) > 0 || len(m.publicSubnets) > 0 || len(m.edgeSubnets) > 0 {
+	subnetGroups := m.subnets
+	if subnetGroups.VpcID != "" || len(subnetGroups.Private) > 0 || len(subnetGroups.Public) > 0 || len(subnetGroups.Edge) > 0 {
 		// Call to populate subnets has already happened
 		return nil
 	}
 
-	session, err := m.unlockedSession(ctx)
+	client, err := m.EC2Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	subnetIDs := make([]string, len(m.Subnets))
-	for i, subnet := range m.Subnets {
+	subnetIDs := make([]string, len(m.ProvidedSubnets))
+	for i, subnet := range m.ProvidedSubnets {
 		subnetIDs[i] = string(subnet.ID)
 	}
 
-	sb, err := subnets(ctx, session, m.Region, subnetIDs)
-	m.vpc = sb.VPC
-	m.privateSubnets = sb.Private
-	m.publicSubnets = sb.Public
-	m.edgeSubnets = sb.Edge
+	sb, err := subnets(ctx, client, subnetIDs, "")
+	m.subnets = sb
+	return err
+}
+
+// populateVPCSubnets retrieves metadata for all subnets in the VPC of provided subnets.
+func (m *Metadata) populateVPCSubnets(ctx context.Context) error {
+	// we need to populate provided subnets to get the VPC ID.
+	if err := m.populateVPC(ctx); err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	vpcSubnetGroups := m.vpcSubnets
+	if len(vpcSubnetGroups.Private) > 0 || len(vpcSubnetGroups.Public) > 0 || len(vpcSubnetGroups.Edge) > 0 {
+		// Call to populate subnets has already happened
+		return nil
+	}
+
+	client, err := m.EC2Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	sb, err := subnets(ctx, client, nil, m.vpc.ID)
+	m.vpcSubnets = sb
+	return err
+}
+
+// populateVPC retrieves metadata for the VPC of provided subnets.
+func (m *Metadata) populateVPC(ctx context.Context) error {
+	// we need to populate provided subnets to get the VPC ID.
+	if err := m.populateSubnets(ctx); err != nil {
+		return err
+	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if m.vpc.ID != "" {
+		// Call to populate vpc has already happened
+		return nil
+	}
+
+	client, err := m.EC2Client(ctx)
+	if err != nil {
+		return err
+	}
+
+	vpc, err := vpc(ctx, client, m.subnets.VpcID)
+	m.vpc = vpc
 	return err
 }
 

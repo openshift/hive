@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/openshift/installer/pkg/types/openstack"
 	"github.com/openshift/installer/pkg/types/ovirt"
+	"github.com/openshift/installer/pkg/types/powervc"
 	"github.com/openshift/installer/pkg/types/powervs"
 	"github.com/openshift/installer/pkg/types/vsphere"
 )
@@ -50,6 +51,45 @@ const (
 	ArchitectureARM64 = "arm64"
 )
 
+// DiskType is the string representation of the three types disk setups
+// +kubebuilder:validation:Enum=etcd;swap;user-defined
+type DiskType string
+
+const (
+	// Etcd indicates etcd disk setup.
+	Etcd DiskType = "etcd"
+	// Swap indicates swap disk setup.
+	Swap DiskType = "swap"
+	// UserDefined indicates user-defined disk setup.
+	UserDefined DiskType = "user-defined"
+)
+
+// Disk defines the type of disk (etcd, swap or user-defined) and the configuration
+// of each disk type.
+type Disk struct {
+	Type DiskType `json:"type,omitempty"`
+
+	UserDefined *DiskUserDefined `json:"userDefined,omitempty"`
+	Etcd        *DiskEtcd        `json:"etcd,omitempty"`
+	Swap        *DiskSwap        `json:"swap,omitempty"`
+}
+
+// DiskUserDefined defines a disk type of user-defined.
+type DiskUserDefined struct {
+	PlatformDiskID string `json:"platformDiskID,omitempty"`
+	MountPath      string `json:"mountPath,omitempty"`
+}
+
+// DiskSwap defines a disk type of swap.
+type DiskSwap struct {
+	PlatformDiskID string `json:"platformDiskID,omitempty"`
+}
+
+// DiskEtcd defines a disk type of etcd.
+type DiskEtcd struct {
+	PlatformDiskID string `json:"platformDiskID,omitempty"`
+}
+
 // MachinePool is a pool of machines to be installed.
 type MachinePool struct {
 	// Name is the name of the machine pool.
@@ -83,6 +123,11 @@ type MachinePool struct {
 	// Fencing may only be set for control plane nodes.
 	// +optional
 	Fencing *Fencing `json:"fencing,omitempty"`
+
+	// DiskSetup stores the type of disks that will be setup with MachineConfigs.
+	// The available types are etcd, swap and user-defined.
+	// +optional
+	DiskSetup []Disk `json:"diskSetup,omitempty"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine
@@ -111,6 +156,9 @@ type MachinePoolPlatform struct {
 
 	// Ovirt is the configuration used when installing on oVirt.
 	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
+
+	// PowerVC is the configuration used when installing on IBM Power VC.
+	PowerVC *powervc.MachinePool `json:"powervc,omitempty"`
 
 	// PowerVS is the configuration used when installing on IBM Power VS.
 	PowerVS *powervs.MachinePool `json:"powervs,omitempty"`
@@ -158,10 +206,26 @@ type Fencing struct {
 	Credentials []*Credential `json:"credentials,omitempty"`
 }
 
+// CertificateVerificationPolicy represents the options for CertificateVerification .
+type CertificateVerificationPolicy string
+
+const (
+	// CertificateVerificationEnabled enables ssl certificate verification.
+	CertificateVerificationEnabled CertificateVerificationPolicy = "Enabled"
+	// CertificateVerificationDisabled disables ssl certificate verification.
+	CertificateVerificationDisabled CertificateVerificationPolicy = "Disabled"
+)
+
 // Credential stores the information about a baremetal host's management controller.
 type Credential struct {
 	HostName string `json:"hostName,omitempty" validate:"required,uniqueField"`
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"`
 	Address  string `json:"address" validate:"required,uniqueField"`
+	// CertificateVerification Defines whether ssl certificate verification is required or not.
+	// If omitted, the platform chooses a default, that default is enabled.
+	// +kubebuilder:default:="Enabled"
+	// +kubebuilder:validation:Enum=Enabled;Disabled
+	// +optional
+	CertificateVerification CertificateVerificationPolicy `json:"certificateVerification,omitempty"`
 }

@@ -2,11 +2,8 @@ package machinepool
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
-
-	"github.com/blang/semver/v4"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -15,7 +12,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	capiazure "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
+	installconfig "github.com/openshift/installer/pkg/asset/installconfig"
 	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -25,8 +24,6 @@ import (
 	"github.com/openshift/hive/pkg/azureclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
-
-var versionsSupportingAzureImageGallery = semver.MustParseRange(">=4.12.0")
 
 // AzureActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
@@ -83,12 +80,21 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 				ResourceGroupName:        rg,
 				NetworkResourceGroupName: pool.Spec.Platform.Azure.NetworkResourceGroupName,
 				VirtualNetwork:           pool.Spec.Platform.Azure.VirtualNetwork,
-				ComputeSubnet:            pool.Spec.Platform.Azure.ComputeSubnet,
 				// This will be defaulted by the installer if empty
 				OutboundType: installertypesazure.OutboundType(pool.Spec.Platform.Azure.OutboundType),
 			},
 		},
 	}
+
+	if pool.Spec.Platform.Azure.ComputeSubnet != "" {
+		ic.Platform.Azure.Subnets = []installertypesazure.SubnetSpec{{
+			Name: pool.Spec.Platform.Azure.ComputeSubnet,
+			Role: capiazure.SubnetNode,
+		}}
+	}
+	// If ic.Platform.Azure.Subnets is NOT empty, this value is never read.
+	// It is only used to populate a default subnet when none is provided.
+	var subnetZones []string = nil
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.Azure = &installertypesazure.MachinePool{
@@ -120,7 +126,13 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	}
 
 	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
+		var plan = installertypesazure.ImageWithPurchasePlan // default value
+		if osImage.Plan != "" {
+			plan = installertypesazure.ImagePurchasePlan(osImage.Plan)
+		}
+
 		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
+			Plan:      plan,
 			Publisher: osImage.Publisher,
 			Offer:     osImage.Offer,
 			SKU:       osImage.SKU,
@@ -163,23 +175,18 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 	}
 
-	// The imageID parameter is not used. The image is determined by the infraID.
+	// If we leave the imageID, the image is determined by the installer
 	const imageID = ""
-
-	useImageGallery, err := shouldUseImageGallery(cd)
-	if err != nil {
-		return nil, false, err
-	}
 
 	installerMachineSets, err := installazure.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
-		ic,
+		installconfig.MakeAsset(ic),
 		computePool,
 		imageID,
 		workerRole,
 		workerUserDataName,
 		capabilities,
-		useImageGallery,
+		subnetZones,
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
@@ -232,18 +239,4 @@ func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) 
 		}
 	}
 	return false, nil
-}
-
-func shouldUseImageGallery(cd *hivev1.ClusterDeployment) (bool, error) {
-	versionString, err := getClusterVersion(cd)
-	if err != nil {
-		return true, fmt.Errorf("failed to get cluster semver: %w", err)
-	}
-
-	version, err := semver.ParseTolerant(versionString)
-	if err != nil {
-		return true, fmt.Errorf("failed to parse cluster semver: %w", err)
-	}
-
-	return versionsSupportingAzureImageGallery(version), nil
 }

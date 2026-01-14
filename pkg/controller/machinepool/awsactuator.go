@@ -392,14 +392,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 // spec matches the number of AZs, we will not check whether they are public or private. However, if there
 // are two subnets per AZ, we will filter out the public ones, leaving only the private ones. If the pool
 // specifies no subnets, an empty map is returned (this is a valid configuration, not an error).
-func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (icaws.SubnetsByZone, error) {
 	// Preflight
 	numZones := len(pool.Spec.Platform.AWS.Zones)
 	numSubnets := len(pool.Spec.Platform.AWS.Subnets)
 	switch numSubnets {
 	case 0:
 		// Zero subnets is legal.
-		return icaws.Subnets{}, nil
+		return icaws.SubnetsByZone{}, nil
 	case numZones, 2 * numZones:
 		// One per zone, or one public and one private per zone, is legal, and will be validated later.
 		break
@@ -576,9 +576,9 @@ func findTag(tags []ec2types.Tag, key string) (string, bool) {
 
 // validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
-func (a *AWSActuator) validateSubnets(subnets []ec2types.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) validateSubnets(subnets []ec2types.Subnet, pool *hivev1.MachinePool) (icaws.SubnetsByZone, error) {
 	conflictingSubnets := sets.NewString()
-	subnetsByAvailabilityZone := make(icaws.Subnets, len(subnets))
+	subnetsByAvailabilityZone := make(icaws.SubnetsByZone, len(subnets))
 	for _, subnet := range subnets {
 		if oldSubnet, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
 			conflictingSubnets.Insert(*subnet.SubnetId)

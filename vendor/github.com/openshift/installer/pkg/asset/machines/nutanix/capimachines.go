@@ -8,7 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	capv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	capv1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck //CORS-3563
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	"github.com/openshift/installer/pkg/asset"
@@ -152,7 +152,7 @@ func generateNutanixMachine(machineName string, providerSpec *machinev1.NutanixM
 			VCPUSockets:    providerSpec.VCPUSockets,
 			MemorySize:     providerSpec.MemorySize,
 			SystemDiskSize: providerSpec.SystemDiskSize,
-			Image: capnv1.NutanixResourceIdentifier{
+			Image: &capnv1.NutanixResourceIdentifier{
 				Type: capnv1.NutanixIdentifierType(providerSpec.Image.Type),
 				Name: providerSpec.Image.Name,
 				UUID: providerSpec.Image.UUID,

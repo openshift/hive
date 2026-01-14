@@ -18,19 +18,26 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
 const (
 	// ManagedClusterFinalizer allows Reconcile to clean up Azure resources associated with the AzureManagedControlPlane before
 	// removing it from the apiserver.
 	ManagedClusterFinalizer = "azuremanagedcontrolplane.infrastructure.cluster.x-k8s.io"
+)
 
-	// PrivateDNSZoneModeSystem represents mode System for azuremanagedcontrolplane.
-	PrivateDNSZoneModeSystem string = "System"
+// PrivateDNSZoneMode determines the creation of Private DNS Zones in a private cluster.
+// When unset or set to the default value of PrivateDNSZoneModeSystem, Private DNS Zones are created.
+// When set to PrivateDNSZoneModeNone, Private DNS Zones are not created in a private cluster.
+type PrivateDNSZoneMode string
 
-	// PrivateDNSZoneModeNone represents mode None for azuremanagedcontrolplane.
-	PrivateDNSZoneModeNone string = "None"
+const (
+	// PrivateDNSZoneModeSystem represents mode System for Private DNS Zones.
+	PrivateDNSZoneModeSystem PrivateDNSZoneMode = "System"
+
+	// PrivateDNSZoneModeNone represents mode None for Private DNS Zones.
+	PrivateDNSZoneModeNone PrivateDNSZoneMode = "None"
 )
 
 // UpgradeChannel determines the type of upgrade channel for automatically upgrading the cluster.
@@ -149,7 +156,7 @@ type AzureManagedControlPlaneSpec struct {
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// Immutable, populated by the AKS API at create.
 	// +optional
-	ControlPlaneEndpoint clusterv1.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
+	ControlPlaneEndpoint clusterv1beta1.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 
 	// SSHPublicKey is a string literal containing an ssh public key base64 encoded.
 	// Use empty string to autogenerate new key. Use null value to not set key.
@@ -327,6 +334,7 @@ const (
 // AKSSku - AKS SKU.
 type AKSSku struct {
 	// Tier - Tier of an AKS cluster.
+	// +kubebuilder:default:="Free"
 	Tier AzureManagedControlPlaneSkuTier `json:"tier"`
 }
 
@@ -383,7 +391,9 @@ type ManagedControlPlaneVirtualNetwork struct {
 
 // ManagedControlPlaneSubnet describes a subnet for an AKS cluster.
 type ManagedControlPlaneSubnet struct {
-	Name      string `json:"name"`
+	Name string `json:"name"`
+
+	// +kubebuilder:default:="10.240.0.0/16"
 	CIDRBlock string `json:"cidrBlock"`
 
 	// ServiceEndpoints is a slice of Virtual Network service endpoints to enable for the subnets.
@@ -414,7 +424,7 @@ type AzureManagedControlPlaneStatus struct {
 
 	// Conditions defines current service state of the AzureManagedControlPlane.
 	// +optional
-	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	Conditions clusterv1beta1.Conditions `json:"conditions,omitempty"`
 
 	// LongRunningOperationStates saves the states for Azure long-running operations so they can be continued on the
 	// next reconciliation loop.
@@ -442,72 +452,90 @@ type OIDCIssuerProfileStatus struct {
 //
 // [AKS doc]: https://learn.microsoft.com/azure/aks/cluster-autoscaler#use-the-cluster-autoscaler-profile
 // [K8s doc]: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#what-are-the-parameters-to-ca
+// Default values are from https://learn.microsoft.com/azure/aks/cluster-autoscaler#using-the-autoscaler-profile
 type AutoScalerProfile struct {
 	// BalanceSimilarNodeGroups - Valid values are 'true' and 'false'. The default is false.
 	// +kubebuilder:validation:Enum="true";"false"
+	// +kubebuilder:default:="false"
 	// +optional
 	BalanceSimilarNodeGroups *BalanceSimilarNodeGroups `json:"balanceSimilarNodeGroups,omitempty"`
 	// Expander - If not specified, the default is 'random'. See [expanders](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#what-are-expanders) for more information.
 	// +kubebuilder:validation:Enum=least-waste;most-pods;priority;random
+	// +kubebuilder:default:="random"
 	// +optional
 	Expander *Expander `json:"expander,omitempty"`
 	// MaxEmptyBulkDelete - The default is 10.
+	// +kubebuilder:default:="10"
 	// +optional
 	MaxEmptyBulkDelete *string `json:"maxEmptyBulkDelete,omitempty"`
 	// MaxGracefulTerminationSec - The default is 600.
 	// +kubebuilder:validation:Pattern=`^(\d+)$`
+	// +kubebuilder:default:="600"
 	// +optional
 	MaxGracefulTerminationSec *string `json:"maxGracefulTerminationSec,omitempty"`
 	// MaxNodeProvisionTime - The default is '15m'. Values must be an integer followed by an 'm'. No unit of time other than minutes (m) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)m$`
+	// +kubebuilder:default:="15m"
 	// +optional
 	MaxNodeProvisionTime *string `json:"maxNodeProvisionTime,omitempty"`
 	// MaxTotalUnreadyPercentage - The default is 45. The maximum is 100 and the minimum is 0.
 	// +kubebuilder:validation:Pattern=`^(\d+)$`
 	// +kubebuilder:validation:MaxLength=3
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:default:="45"
 	// +optional
 	MaxTotalUnreadyPercentage *string `json:"maxTotalUnreadyPercentage,omitempty"`
 	// NewPodScaleUpDelay - For scenarios like burst/batch scale where you don't want CA to act before the kubernetes scheduler could schedule all the pods, you can tell CA to ignore unscheduled pods before they're a certain age. The default is '0s'. Values must be an integer followed by a unit ('s' for seconds, 'm' for minutes, 'h' for hours, etc).
 	// +optional
+	// +kubebuilder:default:="0s"
 	NewPodScaleUpDelay *string `json:"newPodScaleUpDelay,omitempty"`
 	// OkTotalUnreadyCount - This must be an integer. The default is 3.
 	// +kubebuilder:validation:Pattern=`^(\d+)$`
+	// +kubebuilder:default:="3"
 	// +optional
 	OkTotalUnreadyCount *string `json:"okTotalUnreadyCount,omitempty"`
 	// ScanInterval - How often cluster is reevaluated for scale up or down. The default is '10s'.
 	// +kubebuilder:validation:Pattern=`^(\d+)s$`
+	// +kubebuilder:default:="10s"
 	// +optional
 	ScanInterval *string `json:"scanInterval,omitempty"`
 	// ScaleDownDelayAfterAdd - The default is '10m'. Values must be an integer followed by an 'm'. No unit of time other than minutes (m) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)m$`
+	// +kubebuilder:default:="10m"
 	// +optional
 	ScaleDownDelayAfterAdd *string `json:"scaleDownDelayAfterAdd,omitempty"`
 	// ScaleDownDelayAfterDelete - The default is the scan-interval. Values must be an integer followed by an 's'. No unit of time other than seconds (s) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)s$`
+	// +kubebuilder:default:="10s"
 	// +optional
 	ScaleDownDelayAfterDelete *string `json:"scaleDownDelayAfterDelete,omitempty"`
 	// ScaleDownDelayAfterFailure - The default is '3m'. Values must be an integer followed by an 'm'. No unit of time other than minutes (m) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)m$`
+	// +kubebuilder:default:="3m"
 	// +optional
 	ScaleDownDelayAfterFailure *string `json:"scaleDownDelayAfterFailure,omitempty"`
 	// ScaleDownUnneededTime - The default is '10m'. Values must be an integer followed by an 'm'. No unit of time other than minutes (m) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)m$`
+	// +kubebuilder:default:="10m"
 	// +optional
 	ScaleDownUnneededTime *string `json:"scaleDownUnneededTime,omitempty"`
 	// ScaleDownUnreadyTime - The default is '20m'. Values must be an integer followed by an 'm'. No unit of time other than minutes (m) is supported.
 	// +kubebuilder:validation:Pattern=`^(\d+)m$`
+	// +kubebuilder:default:="20m"
 	// +optional
 	ScaleDownUnreadyTime *string `json:"scaleDownUnreadyTime,omitempty"`
 	// ScaleDownUtilizationThreshold - The default is '0.5'.
+	// +kubebuilder:default:="0.5"
 	// +optional
 	ScaleDownUtilizationThreshold *string `json:"scaleDownUtilizationThreshold,omitempty"`
 	// SkipNodesWithLocalStorage - The default is false.
 	// +kubebuilder:validation:Enum="true";"false"
+	// +kubebuilder:default:="false"
 	// +optional
 	SkipNodesWithLocalStorage *SkipNodesWithLocalStorage `json:"skipNodesWithLocalStorage,omitempty"`
 	// SkipNodesWithSystemPods - The default is true.
 	// +kubebuilder:validation:Enum="true";"false"
+	// +kubebuilder:default:="true"
 	// +optional
 	SkipNodesWithSystemPods *SkipNodesWithSystemPods `json:"skipNodesWithSystemPods,omitempty"`
 }
@@ -563,6 +591,7 @@ const (
 type Identity struct {
 	// Type - The Identity type to use.
 	// +kubebuilder:validation:Enum=SystemAssigned;UserAssigned
+	// +kubebuilder:default:=SystemAssigned
 	// +optional
 	Type ManagedControlPlaneIdentityType `json:"type,omitempty"`
 
@@ -577,6 +606,7 @@ type Identity struct {
 // [AKS doc]: https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer
 type OIDCIssuerProfile struct {
 	// Enabled is whether the OIDC issuer is enabled.
+	// +kubebuilder:default:=false
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -638,6 +668,7 @@ type AKSExtension struct {
 // +kubebuilder:resource:path=azuremanagedcontrolplanes,scope=Namespaced,categories=cluster-api,shortName=amcp
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:deprecatedversion:warning="AzureManagedControlPlane and the AzureManaged API are deprecated. Please migrate to infrastructure.cluster.x-k8s.io/v1beta1 AzureASOManagedControlPlane and related AzureASOManaged resources instead."
 
 // AzureManagedControlPlane is the Schema for the azuremanagedcontrolplanes API.
 type AzureManagedControlPlane struct {
@@ -658,12 +689,12 @@ type AzureManagedControlPlaneList struct {
 }
 
 // GetConditions returns the list of conditions for an AzureManagedControlPlane API object.
-func (m *AzureManagedControlPlane) GetConditions() clusterv1.Conditions {
+func (m *AzureManagedControlPlane) GetConditions() clusterv1beta1.Conditions {
 	return m.Status.Conditions
 }
 
 // SetConditions will set the given conditions on an AzureManagedControlPlane object.
-func (m *AzureManagedControlPlane) SetConditions(conditions clusterv1.Conditions) {
+func (m *AzureManagedControlPlane) SetConditions(conditions clusterv1beta1.Conditions) {
 	m.Status.Conditions = conditions
 }
 

@@ -254,6 +254,21 @@ func TestGCPActuator(t *testing.T) {
 			},
 		},
 		{
+			name: "generate machinesets with custom (network) Tags",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				// These are deliberately unsorted: we honor the order given by the user.
+				pool.Spec.Platform.GCP.Tags = []string{"foo", "bar", "baz"}
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
+		{
 			name: "generate machinesets with custom UserTags",
 			pool: func() *hivev1.MachinePool {
 				pool := testGCPPool(testPoolName)
@@ -388,6 +403,14 @@ func TestGCPActuator(t *testing.T) {
 						} else {
 							assert.Equal(t, testInfraID+"-w@test-gcp-project-id.iam.gserviceaccount.com", gcpProvider.ServiceAccounts[0].Email, "unexpected custom service account")
 						}
+					}
+
+					// (Network) Tags
+					defaultTags := []string{testInfraID + "-" + testPoolName}
+					if tags := platform.Tags; len(tags) == 0 {
+						assert.Equal(t, defaultTags, gcpProvider.Tags, "Expected matching network tags")
+					} else {
+						assert.Equal(t, append(tags, defaultTags...), gcpProvider.Tags, "Expected matching network tags")
 					}
 
 					// UserTags

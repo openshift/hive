@@ -18,8 +18,20 @@
     - [vSphere](#vsphere)
     - [OpenStack](#openstack)
     - [Nutanix](#nutanix)
+    - [Required Credentials](#required-credentials)
+    - [Creating a Secret for Credentials](#creating-a-secret-for-credentials)
+    - [Additional Required Secrets](#additional-required-secrets)
+      - [Secret for OpenShift Machine API](#secret-for-openshift-machine-api)
+      - [Secret for OpenShift Cloud Controller Manager](#secret-for-openshift-cloud-controller-manager)
+    - [Why These Secrets Are Required](#why-these-secrets-are-required)
+    - [Using the Secret in Hive](#using-the-secret-in-hive)
+    - [Additional Considerations](#additional-considerations)
+    - [TLS and Certificate Trust Configuration](#tls-and-certificate-trust-configuration)
+    - [No Need to Specify Credentials in Install Config](#no-need-to-specify-credentials-in-install-config)
   - [SSH Key Pair](#ssh-key-pair)
   - [InstallConfig](#installconfig)
+    - [Required Secrets](#required-secrets)
+    - [Additional Considerations](#additional-considerations-1)
   - [ClusterDeployment](#clusterdeployment)
   - [Machine Pools](#machine-pools)
     - [Configuring Availability Zones](#configuring-availability-zones)
@@ -754,7 +766,9 @@ A MachinePool for the worker machinesets is not required. If the user creates a 
 
 MachinePool reconciliation is limited to updating MachineSet replicas to match the replicas configured for the MachinePool. Additionally, any existing `Labels` or `Taints` on the MachineSets will be overridden if they clash with those on the MachinePool. In case of duplicate taints, the taint encountered first will be preserved and the rest collapsed on the MachineSets.
 
-MachinePool platform is immutable and any changes made to `MachinePool.spec.platform` are blocked by a validating webhook. The Machine Config Operator does not support updating existing machines when platform details are changed in a MachineSet and consequently Hive does not support making such changes to MachinePool platform, see [HIVE-2024](https://issues.redhat.com/browse/HIVE-2024).
+When a MachineSet is managed by a Hive MachinePool, direct modifications to the MachineSet are not supported, even if such modifications may sometimes appear to work.
+
+MachinePool platform is immutable and any changes made to `MachinePool.spec.platform` are blocked by a validating webhook. The Machine API Operator does not support updating existing machines when platform details are changed in a MachineSet and consequently Hive does not support making such changes to MachinePool platform, see [HIVE-2024](https://issues.redhat.com/browse/HIVE-2024).
 
 The recommended workaround when platform details must be changed is to replace the MachinePool by creating an adjacent MachinePool with the desired configuration.
 * Create replacement MachinePool with desired configuration and `MachinePool.spec.replicas = 0`.

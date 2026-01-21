@@ -47,6 +47,12 @@ type MachinePool struct {
 	// tag key and tag value resource. Consumer is responsible for using this only for spokes
 	// where custom tags are supported.
 	UserTags []UserTag `json:"userTags,omitempty"`
+
+	// Tags defines a set of network tags which will be added to instances in the machineset.
+	// Not to be confused with UserTags.
+	//
+	// +optional
+	Tags []string `json:"tags,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.

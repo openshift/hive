@@ -9220,6 +9220,14 @@ objects:
 
                             provided in the install-config.'
                           type: string
+                        tags:
+                          description: 'Tags defines a set of network tags which will
+                            be added to instances in the machineset.
+
+                            Not to be confused with UserTags.'
+                          items:
+                            type: string
+                          type: array
                         type:
                           description: 'InstanceType defines the GCP instance type.
 

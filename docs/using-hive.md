@@ -2,57 +2,59 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Cluster Provisioning](#cluster-provisioning)
-  - [DNS](#dns)
-    - [Native](#native)
-      - [Managed DNS](#managed-dns)
-    - [Non-native](#non-native)
-  - [Pull Secret](#pull-secret)
-  - [OpenShift Version](#openshift-version)
-  - [Cloud credentials](#cloud-credentials)
-    - [AWS](#aws)
-    - [Azure](#azure)
-    - [GCP](#gcp)
-    - [IBM Cloud](#ibm-cloud)
-      - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
-    - [vSphere](#vsphere)
-    - [OpenStack](#openstack)
-    - [Nutanix](#nutanix)
-    - [Required Credentials](#required-credentials)
-    - [Creating a Secret for Credentials](#creating-a-secret-for-credentials)
-    - [Additional Required Secrets](#additional-required-secrets)
-      - [Secret for OpenShift Machine API](#secret-for-openshift-machine-api)
-      - [Secret for OpenShift Cloud Controller Manager](#secret-for-openshift-cloud-controller-manager)
-    - [Why These Secrets Are Required](#why-these-secrets-are-required)
-    - [Using the Secret in Hive](#using-the-secret-in-hive)
-    - [Additional Considerations](#additional-considerations)
-    - [TLS and Certificate Trust Configuration](#tls-and-certificate-trust-configuration)
-    - [No Need to Specify Credentials in Install Config](#no-need-to-specify-credentials-in-install-config)
-  - [SSH Key Pair](#ssh-key-pair)
-  - [InstallConfig](#installconfig)
-    - [Required Secrets](#required-secrets)
-    - [Additional Considerations](#additional-considerations-1)
-  - [ClusterDeployment](#clusterdeployment)
-  - [Machine Pools](#machine-pools)
-    - [Configuring Availability Zones](#configuring-availability-zones)
-    - [Auto-scaling](#auto-scaling)
-      - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
-  - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
-- [Monitor the Install Job](#monitor-the-install-job)
-  - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
-  - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
-  - [Access the Web Console](#access-the-web-console)
-- [Managed DNS](#managed-dns-1)
-- [Cluster Adoption](#cluster-adoption)
-  - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
-  - [Adopting with hiveutil](#adopting-with-hiveutil)
-  - [Transferring ownership](#transferring-ownership)
-- [Configuration Management](#configuration-management)
-  - [Vertical Scaling](#vertical-scaling)
-  - [SyncSet](#syncset)
-  - [Scaling ClusterSync and MachinePool](#scaling-clustersync-and-machinepool)
-  - [Identity Provider Management](#identity-provider-management)
-- [Cluster Deprovisioning](#cluster-deprovisioning)
+- [Using Hive](#using-hive)
+  - [Cluster Provisioning](#cluster-provisioning)
+    - [DNS](#dns)
+      - [Native](#native)
+        - [Managed DNS](#managed-dns)
+      - [Non-native](#non-native)
+    - [Pull Secret](#pull-secret)
+    - [OpenShift Version](#openshift-version)
+    - [Cloud credentials](#cloud-credentials)
+      - [AWS](#aws)
+      - [Azure](#azure)
+      - [GCP](#gcp)
+      - [IBM Cloud](#ibm-cloud)
+        - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
+      - [vSphere](#vsphere)
+      - [OpenStack](#openstack)
+      - [Nutanix](#nutanix)
+      - [Required Credentials](#required-credentials)
+      - [Creating a Secret for Credentials](#creating-a-secret-for-credentials)
+      - [Additional Required Secrets](#additional-required-secrets)
+        - [Secret for OpenShift Machine API](#secret-for-openshift-machine-api)
+        - [Secret for OpenShift Cloud Controller Manager](#secret-for-openshift-cloud-controller-manager)
+      - [Why These Secrets Are Required](#why-these-secrets-are-required)
+      - [Using the Secret in Hive](#using-the-secret-in-hive)
+      - [Additional Considerations](#additional-considerations)
+      - [TLS and Certificate Trust Configuration](#tls-and-certificate-trust-configuration)
+      - [No Need to Specify Credentials in Install Config](#no-need-to-specify-credentials-in-install-config)
+    - [SSH Key Pair](#ssh-key-pair)
+    - [InstallConfig](#installconfig)
+      - [Required Secrets](#required-secrets)
+      - [Additional Considerations](#additional-considerations-1)
+    - [ClusterDeployment](#clusterdeployment)
+    - [Machine Pools](#machine-pools)
+      - [Configuring Availability Zones](#configuring-availability-zones)
+      - [Auto-scaling](#auto-scaling)
+        - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
+      - [Detaching MachineSets from MachinePool Management](#detaching-machinesets-from-machinepool-management)
+    - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
+  - [Monitor the Install Job](#monitor-the-install-job)
+    - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
+    - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
+    - [Access the Web Console](#access-the-web-console)
+  - [Managed DNS](#managed-dns-1)
+  - [Cluster Adoption](#cluster-adoption)
+    - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
+    - [Adopting with hiveutil](#adopting-with-hiveutil)
+    - [Transferring ownership](#transferring-ownership)
+  - [Configuration Management](#configuration-management)
+    - [Vertical Scaling](#vertical-scaling)
+    - [SyncSet](#syncset)
+    - [Scaling ClusterSync and MachinePool](#scaling-clustersync-and-machinepool)
+    - [Identity Provider Management](#identity-provider-management)
+  - [Cluster Deprovisioning](#cluster-deprovisioning)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -929,6 +931,34 @@ The `spec.autoscaling.maxReplicas` is an optional field. If it is not configured
 A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on the deployed cluster. `ClusterAutoscalers` can co-exist and work with Horiztonal Pod Autoscalers to ensure that there are enough available nodes to meet the auto-scaled pod replica count requirements. See excerpt from OpenShift [documentation](https://docs.openshift.com/container-platform/4.8/machine_management/applying-autoscaling.html):
 
 > The horizontal pod autoscaler (HPA) and the cluster autoscaler modify cluster resources in different ways. The HPA changes the deployment’s or replica set’s number of replicas based on the current CPU load. If the load increases, the HPA creates new replicas, regardless of the amount of resources available to the cluster. If there are not enough resources, the cluster autoscaler adds resources so that the HPA-created pods can run. If the load decreases, the HPA stops some replicas. If this action causes some nodes to be underutilized or completely empty, the cluster autoscaler deletes the unnecessary nodes.
+
+#### Detaching MachineSets from MachinePool Management
+
+To manually detach MachineSets from MachinePool management:
+
+1. On hub cluster, pause reconciliation on the ClusterDeployment:
+   ```bash
+   oc annotate clusterdeployment <cd-name> -n <namespace> hive.openshift.io/reconcile-pause="true"
+   ```
+2. Remove the following labels from the MachineSet(s) in the spoke cluster:
+   - `hive.openshift.io/machine-pool = <machinepool.spec.name>`
+   - `hive.openshift.io/managed = true`
+   ```bash
+   oc label machineset <machineset-name> -n openshift-machine-api \
+     hive.openshift.io/machine-pool- \
+     hive.openshift.io/managed-
+   ```
+ 3. On hub cluster, delete the MachinePool:
+    ```bash
+    oc delete machinepool <machinepool-name> -n <namespace>
+    ```
+    Verify deletion: `oc get machinepool <machinepool-name> -n <namespace> -o jsonpath='{.metadata.deletionTimestamp}'` should show a timestamp (not empty).   
+    Note: Because reconciliation is paused, the MachinePool will not be deleted until reconciliation resumes in step 4. 
+
+4. Resume reconciliation on the ClusterDeployment:
+   ```bash
+   oc annotate clusterdeployment <cd-name> -n <namespace> hive.openshift.io/reconcile-pause-
+   ```
 
 ### Create Cluster on Bare Metal
 

@@ -107,7 +107,7 @@ func (p *AWSCloudBuilder) workerInstanceType() string {
 	return p.InstanceType
 }
 
-func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *AWSCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.AWS = &hivev1aws.MachinePoolPlatform{
 		InstanceType: p.workerInstanceType(),
 		EC2RootVolume: hivev1aws.EC2RootVolume{

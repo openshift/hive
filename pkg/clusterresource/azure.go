@@ -77,7 +77,7 @@ func (p *AzureCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	}
 }
 
-func (p *AzureCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *AzureCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.Azure = &hivev1azure.MachinePool{
 		InstanceType: azureInstanceType,
 		OSDisk: hivev1azure.OSDisk{

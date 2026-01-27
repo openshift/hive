@@ -88,6 +88,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 }
 
+// TODO: I would think we could get `src` from `T`, no?
 func mapToHiveConfig[T client.Object](r reconcile.Reconciler, src string) func(context.Context, T) []reconcile.Request {
 	return func(ctx context.Context, _ T) []reconcile.Request {
 		retval := []reconcile.Request{}
@@ -286,6 +287,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		})))
 	if err != nil {
 		return err
+	}
+
+	// APIServer is an OpenShift Kind
+	if r.(*ReconcileHiveConfig).isOpenShift {
+		// Watch the APIServer for TLS config changes
+		err = c.Watch(source.Kind(mgr.GetCache(), &configv1.APIServer{},
+			handler.TypedEnqueueRequestsFromMapFunc(mapToHiveConfig[*configv1.APIServer](r, "APIServer"))))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Fetch some common configuration from the hive-operator. All hive components should all be

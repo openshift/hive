@@ -3,6 +3,7 @@ package hive
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -12,13 +13,22 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/resource"
+	logrusutil "github.com/openshift/hive/pkg/util/logrus"
 
+	configv1 "github.com/openshift/api/config/v1"
+	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
+	"github.com/openshift/library-go/pkg/operator/configobserver/apiserver"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
 
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/cache"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -150,6 +160,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(hLog), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
+	if err := r.populateTLSConfig(hiveAdmContainer, hLog); err != nil {
+		return err
+	}
+
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
 		validatingWebhooks[i] = readRuntimeObjectOrDie[*admregv1.ValidatingWebhookConfiguration](
@@ -212,6 +226,91 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 
 	hLog.Info("hiveadmission components reconciled successfully")
+	return nil
+}
+
+// directAPIServerLister implements apiserver.APIServerLister by making direct API calls
+type directAPIServerLister struct {
+	reconciler *ReconcileHiveConfig
+}
+
+// PreRunHasSynced implements configobserver.Listers, minimally, because we're not caching.
+func (d *directAPIServerLister) PreRunHasSynced() []cache.InformerSynced {
+	return []cache.InformerSynced{}
+}
+
+// ResourceSyncer implements configobserver.Listers, but not really, because we're not caching.
+func (d *directAPIServerLister) ResourceSyncer() resourcesynccontroller.ResourceSyncer {
+	return nil
+}
+
+func (d *directAPIServerLister) APIServerLister() configlistersv1.APIServerLister {
+	return &directLister{reconciler: d.reconciler}
+}
+
+// directLister implements configlistersv1.APIServerLister with direct API calls via reconciler
+type directLister struct {
+	reconciler *ReconcileHiveConfig
+}
+
+func (d *directLister) List(selector labels.Selector) ([]*configv1.APIServer, error) {
+	list := &configv1.APIServerList{}
+	if err := d.reconciler.List(context.TODO(), list, "", metav1.ListOptions{}); err != nil {
+		return nil, err
+	}
+	result := make([]*configv1.APIServer, len(list.Items))
+	for i := range list.Items {
+		result[i] = &list.Items[i]
+	}
+	return result, nil
+}
+
+func (d *directLister) Get(name string) (*configv1.APIServer, error) {
+	apiServer := &configv1.APIServer{}
+	if err := d.reconciler.Get(context.TODO(), types.NamespacedName{Name: name}, apiServer); err != nil {
+		return nil, err
+	}
+	return apiServer, nil
+}
+
+func (r *ReconcileHiveConfig) populateTLSConfig(hiveAdmContainer *corev1.Container, hLog log.FieldLogger) error {
+	if !r.isOpenShift {
+		return nil
+	}
+	observedConfig, errs := apiserver.ObserveTLSSecurityProfileToArguments(
+		&directAPIServerLister{reconciler: r},
+		logrusutil.NewLoggingEventRecorder(hLog, "hiveadmission-tls-config"),
+		map[string]interface{}{})
+
+	if len(errs) > 0 {
+		return errors.Wrap(utilerrors.NewAggregate(errs), "failed to discover global TLS config from APIServer cluster")
+	}
+
+	hLog.WithField("config", observedConfig).Debug("observed TLS config")
+
+	if len(observedConfig) == 0 {
+		return errors.New("observed TLS config was empty")
+	}
+
+	asa, tlsmvk, tlscsk := "apiServerArguments", "tls-min-version", "tls-cipher-suites"
+
+	tlsmv, found, err := unstructured.NestedString(observedConfig, asa, tlsmvk)
+	if !found || err != nil {
+		return errors.Wrapf(err, "could not find %s.%s in observed TLS config %v", asa, tlsmvk, observedConfig)
+	}
+	tlscs, found, err := unstructured.NestedStringSlice(observedConfig, asa, tlscsk)
+	if !found || err != nil {
+		return errors.Wrapf(err, "could not find %s.%s in observed TLS config %v", asa, tlscsk, observedConfig)
+	}
+
+	// NOTE: These arguments (--tls-min-version, --tls-cipher-suites) are expected to be *absent*
+	// from the container we're given.
+	hiveAdmContainer.Command = append(
+		hiveAdmContainer.Command,
+		fmt.Sprintf("--%s=%s", tlsmvk, tlsmv),
+		fmt.Sprintf("--%s=%s", tlscsk, strings.Join(tlscs, ",")),
+	)
+
 	return nil
 }
 

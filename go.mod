@@ -156,6 +156,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 )
 
+require github.com/bombsimon/logrusr/v4 v4.1.0
+
 require (
 	4d63.com/gochecknoglobals v0.2.2 // indirect
 	cel.dev/expr v0.24.0 // indirect

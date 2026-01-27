@@ -278,6 +278,101 @@ Explanation:
 1) This command removes the AWS hub account credentials Secret created with `bin/hiveutil awsprivatelink enable` from Hive's namespace.
 2) It empties `HiveConfig.spec.awsPrivateLink`, restoring HiveConfig to its state before configuring PrivateLink.
 
+
+### MachinePool Management
+
+#### Adopt MachineSets
+
+Adopts existing MachineSets into Hive MachinePool management. This command follows the documented adoption procedure:
+1. Pauses ClusterDeployment reconciliation
+2. Labels MachineSets in the spoke cluster
+3. Creates MachinePool in the hub cluster
+4. Resumes ClusterDeployment reconciliation
+
+```bash
+# Preview adoption plan (dry-run)
+hiveutil machinepool adopt -c mycluster -n mynamespace --machine-sets ms1,ms2 --pool worker --dry-run
+
+# Preview adoption plan (output format)
+hiveutil machinepool adopt -c mycluster -n mynamespace --machine-sets ms1,ms2 --pool worker --output yaml
+
+# Apply adoption (default behavior)
+hiveutil machinepool adopt -c mycluster -n mynamespace --machine-sets ms1,ms2 --pool worker
+```
+
+**Required:** `-c, --cluster-deployment`, `-n, --namespace`, `--machine-sets`, `--pool`  
+**Optional:** `-o, --output` (yaml|json) to preview instead of applying, `--dry-run` (same as `--output yaml`)
+
+**Note:** The `--machine-sets` flag accepts a comma-separated list of MachineSet names and can be specified multiple times.
+
+#### Detach MachineSets
+
+Detaches MachineSets from Hive management and deletes the MachinePool. This command follows the documented detach procedure:
+1. Pauses ClusterDeployment reconciliation
+2. Removes Hive management labels from MachineSets in the spoke cluster
+3. Deletes the MachinePool resource from the hub cluster
+4. Resumes ClusterDeployment reconciliation
+
+After detaching, the MachineSets will continue to run but will no longer be managed by Hive.
+
+```bash
+# Preview detach plan (dry-run)
+hiveutil machinepool detach -c mycluster -n mynamespace --pool worker --dry-run
+
+# Apply detach (default behavior)
+hiveutil machinepool detach -c mycluster -n mynamespace --pool worker
+
+# Skip interactive confirmation
+hiveutil machinepool detach -c mycluster -n mynamespace --pool worker --force
+```
+
+**Required:** `-c, --cluster-deployment`, `-n, --namespace`, `--pool`  
+**Optional:** `--dry-run` to preview, `--force, -f` to skip confirmation
+
+#### Create MachinePool
+
+Creates a new MachinePool. Supports AWS, GCP, Azure, OpenStack, vSphere, Nutanix, and IBM Cloud.
+
+Use `--output` (yaml|json) to preview, or omit `--output` to apply to cluster.
+
+```bash
+# AWS (preview with additional options)
+hiveutil machinepool create -c mycluster -n mynamespace --pool worker --platform aws --aws-type m5.large --zones us-east-1a,us-east-1b --replicas 3 --aws-subnets subnet-1,subnet-2 --aws-ec2-root-volume-size 120 --aws-ec2-root-volume-type gp3 --output yaml
+
+# AWS (apply)
+hiveutil machinepool create -c mycluster -n mynamespace --pool worker --platform aws --aws-type m5.large --zones us-east-1a,us-east-1b --replicas 3
+
+# GCP (apply)
+hiveutil machinepool create -c mycluster -n mynamespace --pool worker --platform gcp --gcp-type n1-standard-4 --zones us-central1-a,us-central1-b --replicas 3 --gcp-os-disk-disk-size-gb 256 --gcp-os-disk-disk-type pd-ssd
+
+# Azure (apply)
+hiveutil machinepool create -c mycluster -n mynamespace --pool worker --platform azure --azure-type Standard_D2s_v3 --zones 1,2,3 --replicas 3 --azure-os-disk-disk-size-gb 128 --azure-os-disk-disk-type Premium_LRS --azure-compute-subnet subnet-1
+
+# With labels, machine labels, and taints
+hiveutil machinepool create -c mycluster -n mynamespace --pool worker --platform aws --aws-type m5.large --replicas 3 --labels "node-role.kubernetes.io/infra=" --machine-labels "machine.openshift.io/instance-type=m5.large" --taints "key1=value1:NoSchedule"
+```
+
+**Required:** `-c, --cluster-deployment`, `--pool`, `--platform`, and platform-specific instance type flag:
+- AWS: `--aws-type`
+- GCP: `--gcp-type`
+- Azure: `--azure-type`
+- OpenStack: `--openstack-flavor`
+- vSphere: `--vsphere-cpus`, `--vsphere-cores-per-socket`, `--vsphere-memory-mb`
+- Nutanix: `--nutanix-vcpu-sockets`, `--nutanix-vcpus-per-socket`, `--nutanix-memory-size`
+- IBM Cloud: `--ibmcloud-profile`
+
+**Common optional:**
+- `-n, --namespace` (defaults to current kubeconfig namespace)
+- `--zones` (comma-separated list)
+- `--replicas` (default: 1)
+- `--labels` (node labels, key=value format, can be specified multiple times)
+- `--machine-labels` (machine labels, key=value format, can be specified multiple times)
+- `--taints` (node taints, key=value:effect format where effect is NoSchedule, PreferNoSchedule, or NoExecute, can be specified multiple times)
+- `-o, --output` (yaml|json) to preview instead of applying
+- `--dry-run` (same as `--output yaml`)
+
+**Platform-specific options:** See `hiveutil machinepool create --help` for all platform-specific options (e.g., `--aws-subnets`, `--aws-ec2-root-volume-size`, `--gcp-os-disk-disk-size-gb`, `--azure-compute-subnet`, etc.)
+
 ### Other Commands
 
 To see other commands offered by `hiveutil`, run `hiveutil --help`.

@@ -37,6 +37,7 @@ import (
 	cpms "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
@@ -684,9 +685,23 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 	if gSpec.ProviderSpec.Value.Raw == nil {
 		gSpec.ProviderSpec.Value.Raw, err = json.Marshal(gMS.Spec.Template.Spec.ProviderSpec.Value.Object)
 		if err != nil {
-			logger.WithError(err).Error("unable to marshal generate ms provider spec object to raw value")
+			logger.WithError(err).Error("unable to marshal generated ms provider spec object to raw value")
 			return false, err
 		}
+	}
+
+	// SNOWFLAKE! CPMS does not support IBMCloud, so we have to roll our own matcher. HIVE-3002.
+	if infrastructure.Spec.PlatformSpec.Type == configv1.IBMCloudPlatformType {
+		rPS := &ibmcloudprovider.IBMCloudMachineProviderSpec{}
+		gPS := &ibmcloudprovider.IBMCloudMachineProviderSpec{}
+		// Non-strict
+		if err := json.Unmarshal(rSpec.ProviderSpec.Value.Raw, rPS); err != nil {
+			return false, errors.Wrap(err, "failed to unmarshal providerSpec for remote MachineSet")
+		}
+		if err := json.Unmarshal(gSpec.ProviderSpec.Value.Raw, gPS); err != nil {
+			return false, errors.Wrap(err, "failed to unmarshal providerSpec for generated MachineSet")
+		}
+		return rPS.Zone == gPS.Zone, nil
 	}
 
 	// - The provider config funcs take a different kind of logger. Convert.

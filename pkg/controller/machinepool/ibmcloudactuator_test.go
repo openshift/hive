@@ -10,7 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -165,6 +169,94 @@ func TestIBMCloudActuator(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestIBMCloudMatchMachineSets(t *testing.T) {
+	tests := []struct {
+		name        string
+		generated   *machinev1beta1.MachineSet
+		remote      *machinev1beta1.MachineSet
+		expectMatch bool
+		expectErr   bool
+	}{
+		{
+			name:        "Zones match",
+			generated:   testIBMCloudMachineSet("1"),
+			remote:      testIBMCloudMachineSet("1"),
+			expectMatch: true,
+		},
+		{
+			name:      "Zones do not match",
+			generated: testIBMCloudMachineSet("1"),
+			remote:    testIBMCloudMachineSet("2"),
+		},
+		{
+			name: "bogus generated mset",
+			generated: &machinev1beta1.MachineSet{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						machinePoolNameLabel: "a-pool",
+					},
+				},
+			},
+			remote:    testIBMCloudMachineSet("2"),
+			expectErr: true,
+		},
+		{
+			name:      "bogus remote mset",
+			generated: testIBMCloudMachineSet("2"),
+			remote: &machinev1beta1.MachineSet{
+				ObjectMeta: v1.ObjectMeta{
+					Labels: map[string]string{
+						machinePoolNameLabel: "a-pool",
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			infra := &configv1.Infrastructure{
+				Spec: configv1.InfrastructureSpec{
+					PlatformSpec: configv1.PlatformSpec{
+						Type: configv1.IBMCloudPlatformType,
+					},
+				},
+			}
+			match, err := matchMachineSets(test.generated, *test.remote, infra, log.New())
+			if test.expectErr {
+				assert.Error(t, err, "expected error for test case")
+			} else {
+				assert.NoError(t, err, "unexpected error for test case")
+				assert.Equal(t, test.expectMatch, match, "unexpected match result")
+			}
+		})
+	}
+}
+
+// This is super simple and fit-for-purpose right now.
+func testIBMCloudMachineSet(zone string) *machinev1beta1.MachineSet {
+	return &machinev1beta1.MachineSet{
+		ObjectMeta: v1.ObjectMeta{
+			Labels: map[string]string{
+				machinePoolNameLabel: "a-pool",
+			},
+		},
+		Spec: machinev1beta1.MachineSetSpec{
+			Template: machinev1beta1.MachineTemplateSpec{
+				Spec: machinev1beta1.MachineSpec{
+					ProviderSpec: machinev1beta1.ProviderSpec{
+						Value: &runtime.RawExtension{
+							Object: &ibmcloudprovider.IBMCloudMachineProviderSpec{
+								Zone: zone,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

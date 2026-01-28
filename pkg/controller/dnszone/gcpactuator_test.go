@@ -3,11 +3,11 @@ package dnszone
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/gcpclient/mock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	corev1 "k8s.io/api/core/v1"

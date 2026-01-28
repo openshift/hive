@@ -8,11 +8,11 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1071,7 +1071,7 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 				existing = append(existing, s)
 			}
 			rt := newReconcileTest(mockCtrl, existing...)
-			var resourceHelperCalls []*gomock.Call
+			var resourceHelperCalls []any
 			for i := 0; i < tc.successfulResources; i++ {
 				resourceHelperCalls = append(resourceHelperCalls,
 					rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourcesToApply[i])).
@@ -1204,7 +1204,7 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 					var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), clusterSync, syncSet, srcSecret}
 					return newReconcileTest(mockCtrl, existing...)
 				}()
-				var resourceHelperCalls []*gomock.Call
+				var resourceHelperCalls []any
 				for _, r := range resourcesToApply {
 					resourceHelperCalls = append(resourceHelperCalls,
 						rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(r)).

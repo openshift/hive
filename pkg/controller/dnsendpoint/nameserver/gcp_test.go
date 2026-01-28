@@ -3,8 +3,8 @@ package nameserver
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	dns "google.golang.org/api/dns/v1"
 
 	"k8s.io/apimachinery/pkg/util/sets"

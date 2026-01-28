@@ -16,7 +16,7 @@ import (
 	// Used to generate bindata
 	_ "github.com/go-bindata/go-bindata/go-bindata"
 	// Used to generate mocks
-	_ "github.com/golang/mock/mockgen"
+	_ "go.uber.org/mock/mockgen"
 	// Used to lint code
 	_ "golang.org/x/lint/golint"
 	// Used to lint code

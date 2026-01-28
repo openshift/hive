@@ -3,7 +3,7 @@ package nameserver
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	dns "google.golang.org/api/dns/v1"
 

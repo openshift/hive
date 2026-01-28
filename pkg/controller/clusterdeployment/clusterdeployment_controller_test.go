@@ -30,7 +30,7 @@ import (
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	"github.com/openshift/hive/pkg/util/scheme"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"

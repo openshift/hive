@@ -1107,11 +1107,6 @@ github.com/golang-jwt/jwt/v4
 # github.com/golang-jwt/jwt/v5 v5.3.0
 ## explicit; go 1.21
 github.com/golang-jwt/jwt/v5
-# github.com/golang/mock v1.7.0-rc.1
-## explicit; go 1.15
-github.com/golang/mock/gomock
-github.com/golang/mock/mockgen
-github.com/golang/mock/mockgen/model
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
 github.com/golang/protobuf/proto
@@ -2607,6 +2602,11 @@ go.opentelemetry.io/proto/otlp/trace/v1
 go.uber.org/automaxprocs/internal/cgroups
 go.uber.org/automaxprocs/internal/runtime
 go.uber.org/automaxprocs/maxprocs
+# go.uber.org/mock v0.6.0
+## explicit; go 1.23.0
+go.uber.org/mock/gomock
+go.uber.org/mock/mockgen
+go.uber.org/mock/mockgen/model
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr

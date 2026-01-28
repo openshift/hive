@@ -1065,13 +1065,21 @@ func mergeResources(a, b []hiveintv1alpha1.SyncResourceReference) []hiveintv1alp
 	return a
 }
 
+// ignoring version when comparing resource references
 func containsResource(resources []hiveintv1alpha1.SyncResourceReference, resource hiveintv1alpha1.SyncResourceReference) bool {
 	for _, r := range resources {
-		if r == resource {
+		if groupFromRef(resource) == groupFromRef(r) &&
+			resource.Kind == r.Kind &&
+			resource.Namespace == r.Namespace &&
+			resource.Name == r.Name {
 			return true
 		}
 	}
 	return false
+}
+
+func groupFromRef(r hiveintv1alpha1.SyncResourceReference) string {
+	return strings.SplitN(r.APIVersion, "/", 2)[0]
 }
 
 func orderResources(a, b hiveintv1alpha1.SyncResourceReference) bool {

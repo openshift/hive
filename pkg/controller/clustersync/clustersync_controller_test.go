@@ -20,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -2263,6 +2264,74 @@ spec:
 	}
 }
 
+func TestReconcileClusterSync_ApiVersionChange(t *testing.T) {
+
+	mockCtrl := gomock.NewController(t)
+	scheme := scheme.GetScheme()
+
+	ex := &unstructured.Unstructured{}
+	gvk := schema.GroupVersionKind{
+		Group:   "foo",
+		Version: "v1beta1",
+		Kind:    "Foo",
+	}
+	ex.SetGroupVersionKind(gvk)
+	ex.SetName("foo")
+	ex.SetNamespace("default")
+
+	labels := ex.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[constants.HiveManagedLabel] = "true"
+	ex.SetLabels(labels)
+
+	new := ex.DeepCopy()
+	new.SetAPIVersion("foo/v1")
+
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithUnstructuredResources(*new),
+		testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+	)
+	syncSetStatus := buildSyncStatus("test-syncset", withFirstSuccessTimeInThePast(), withResourcesToDelete(testUnstructuredToRef(ex)))
+	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+	)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{
+			cdBuilder(scheme).Build(),
+			clusterSyncBuilder(scheme).Build(
+				testcs.WithSyncSetStatus(syncSetStatus),
+			),
+			teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+				teststatefulset.WithCurrentReplicas(3),
+				teststatefulset.WithReplicas(3),
+			),
+			syncSet,
+			srcSecret,
+			ex,
+		}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
+	rt.mockResourceHelper.EXPECT().Apply(
+		newUnstructuredApplyMatcher(*new)).Return(resource.CreatedApplyResult, nil)
+
+	resourcesToDelete := []hiveintv1alpha1.SyncResourceReference{
+		testUnstructuredToRef(new),
+	}
+
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus(
+			"test-syncset",
+			withResourcesToDelete(resourcesToDelete...),
+			withFirstSuccessTimeInThePast(),
+		),
+	}
+
+	rt.run(t)
+}
 func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 	return testcd.FullBuilder(testNamespace, testCDName, scheme).
 		GenericOptions(
@@ -2367,6 +2436,10 @@ func newApplyMatcher(resource hivev1.MetaRuntimeObject) gomock.Matcher {
 	labels[constants.HiveManagedLabel] = "true"
 	u.SetLabels(labels)
 	return &applyMatcher{resource: u}
+}
+
+func newUnstructuredApplyMatcher(u unstructured.Unstructured) gomock.Matcher {
+	return &applyMatcher{&u}
 }
 
 func (m *applyMatcher) Matches(x any) bool {
@@ -2558,5 +2631,14 @@ func withFirstSuccessTimeInThePast() syncStatusOption {
 func withFirstSuccessTime(firstSuccessTime metav1.Time) syncStatusOption {
 	return func(syncStatus *hiveintv1alpha1.SyncStatus) {
 		syncStatus.FirstSuccessTime = &firstSuccessTime
+	}
+}
+
+func testUnstructuredToRef(u *unstructured.Unstructured) hiveintv1alpha1.SyncResourceReference {
+	return hiveintv1alpha1.SyncResourceReference{
+		APIVersion: u.GetAPIVersion(),
+		Kind:       u.GetKind(),
+		Namespace:  u.GetNamespace(),
+		Name:       u.GetName(),
 	}
 }

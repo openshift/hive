@@ -2331,6 +2331,10 @@ func TestReconcileClusterSync_ApiVersionChange(t *testing.T) {
 	}
 
 	rt.run(t)
+
+	err := rt.c.Get(context.TODO(), types.NamespacedName{Name: new.GetName(), Namespace: new.GetNamespace()}, new)
+
+	require.NoError(t, err, "expected to find new resource")
 }
 func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 	return testcd.FullBuilder(testNamespace, testCDName, scheme).

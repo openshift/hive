@@ -48,6 +48,10 @@
   - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
   - [Adopting with hiveutil](#adopting-with-hiveutil)
   - [Transferring ownership](#transferring-ownership)
+- [MachinePool Adoption](#machinepool-adoption)
+  - [Procedure](#procedure)
+  - [Field Requirements](#field-requirements)
+  - [Considerations](#considerations)
 - [Configuration Management](#configuration-management)
   - [Vertical Scaling](#vertical-scaling)
   - [SyncSet](#syncset)
@@ -369,7 +373,7 @@ stringData:
 ##### Secret for OpenShift Cloud Controller Manager
 This secret is required by the OpenShift Cloud Controller Manager to integrate OpenShift with Nutanix infrastructure:
 
-```yamlz
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -1258,7 +1262,7 @@ Hive will then:
 
 It is possible to adopt cluster deployments into Hive.
 This will allow you to manage the cluster as if it had been provisioned by Hive, including:
-- [MachinePools](#machine-pools)
+- [MachinePools](#machine-pools) - See [MachinePool Adoption](#machinepool-adoption) for how to adopt existing MachineSets when adopting a cluster
 - [SyncSets and SelectorSyncSets](syncset.md)
 - [Deprovisioning](#cluster-deprovisioning)
 
@@ -1391,8 +1395,9 @@ metadata.json sample for Azure cluster
 [hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:
 
 ```bash
-bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID] --adopt-metadata-json=/path/to/metadata.json
+bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID] --skip-machine-pools --adopt-metadata-json=/path/to/metadata.json
 ```
+**Note:** When using hiveutil to generate manifests for cluster adoption, the `--skip-machine-pools` option is required. To manage the MachineSets of the unmanaged cluster afterward, refer to [MachinePool Adoption](#machinepool-adoption).
 
 ### Transferring ownership
 
@@ -1406,6 +1411,121 @@ If you wish to transfer ownership of a cluster which is already managed by hive,
 1. Edit the `ClusterDeployment`, setting `spec.preserveOnDelete` to `true`. This ensures that the next step will only release the hive resources without destroying the cluster in the cloud infrastructure.
 1. Delete the `ClusterDeployment`
 1. From the hive instance that will adopt the cluster, `oc apply` the `ClusterDeployment`, creds and certs manifests you saved in the first step.
+
+## MachinePool Adoption
+
+You can adopt existing MachineSets by creating MachinePools that match the existing MachineSets configuration. 
+
+**Key Terms:**
+- **MachinePool resource name** (`metadata.name`): Must follow pattern `<clusterdeployment-name>-<pool-spec-name>`
+- **Pool spec name** (`spec.name`): Must match the `hive.openshift.io/machine-pool` label value when adopting
+
+### Procedure
+
+1. Inspect the existing MachineSets on the spoke cluster that you plan to adopt and capture the required fields from `spec.template.spec.providerSpec.value` that must match your MachinePool configuration (see [Field Requirements](#field-requirements) below).
+   ```bash
+   # On spoke cluster
+   oc get machinesets -n openshift-machine-api
+   oc get machineset <machineset-name> -n openshift-machine-api -o yaml
+   ```
+
+2. Pause reconciliation on the ClusterDeployment to prevent Hive from modifying MachineSets during adoption:
+   ```bash
+   # On hub cluster
+   oc annotate clusterdeployment <clusterdeployment-name> -n <namespace> hive.openshift.io/reconcile-pause=true
+   ```
+
+3. Label each MachineSet that you plan to adopt with both of the following labels:
+   ```bash
+   # On spoke cluster - Label each MachineSet in each zone
+   oc label machineset <machineset-name> -n openshift-machine-api \
+     hive.openshift.io/machine-pool=<pool-name> \
+     hive.openshift.io/managed=true
+   ```
+
+4. Create a MachinePool manifest on the hub cluster that matches the configuration of the MachineSets you plan to adopt, and save it as <your-machinepool-manifest>.yaml
+   - `spec.name` must match the `hive.openshift.io/machine-pool` label value from step 3
+   - `spec.platform` must exactly match instance type, zones, and other settings (see [Field Requirements](#field-requirements) below)
+   - `spec.replicas` should match the sum of replicas across all existing MachineSets you plan to adopt.
+  - `spec.platform.<cloud>.zones` must include all zones where the MachineSets you plan to adopt are located, and the zone order must match the current replica distribution (see [Considerations](#considerations) below)
+
+   Example (vSphere):
+   ```yaml
+   apiVersion: hive.openshift.io/v1
+   kind: MachinePool
+   metadata:
+     name: mycluster-vspadopt
+     namespace: mynamespace
+   spec:
+     clusterDeploymentRef:
+       name: mycluster
+     name: vspadopt
+     replicas: 3
+     platform:
+       vsphere:
+         cpus: 4
+         coresPerSocket: 4
+         memoryMB: 16384
+         osDisk:
+           diskSizeGB: 120
+         resourcePool: /cidatacenter-2/host/cicluster-3/Resources/ipi-ci-clusters
+   ```
+
+5. Apply the MachinePool manifest:
+   ```bash
+   # On hub cluster
+   oc apply -f <your-machinepool-manifest>.yaml
+   ```
+
+6. Resume Hive reconciliation on the ClusterDeployment:
+   ```bash
+   # On hub cluster
+   oc annotate clusterdeployment <clusterdeployment-name> -n <namespace> hive.openshift.io/reconcile-pause-
+   ```
+
+7. Verify that the MachinePool has successfully adopted and is now managing the existing MachineSets.
+   ```bash
+   # On hub cluster - Check MachinePool status
+   oc get machinepool mycluster-worker -n mynamespace -o yaml
+   
+   # On spoke cluster - Verify MachineSets were not recreated
+   oc get machinesets -n openshift-machine-api
+   ```
+
+### Field Requirements
+
+Verify these required fields in `providerSpec.value` match your MachinePool configuration:  
+- **AWS**: `instanceType`, `placement.availabilityZone`
+- **GCP**: `machineType`, `zone`
+- **Azure**: `vmSize`, `zone`
+- **vSphere**: `numCPUs`, `numCoresPerSocket`, `memoryMiB`, `diskGiB`, `workspace.resourcePool`
+- **Nutanix**: `vcpuSockets`, `vcpusPerSocket`, `memorySize`, `systemDiskSize`, `failureDomain.name`
+- **IBM Cloud**: `profile`, `zone`
+- **OpenStack**: `flavor`
+
+Also verify any optional fields present in your MachineSets (disk configuration, tags, security groups, etc.) are properly configured in the MachinePool.
+
+### Considerations
+- **Zone configuration**: When using fixed replicas (not autoscaling), the zone order in `spec.platform.<cloud>.zones` determines replica distribution. Hive distributes replicas using this algorithm:
+  ```go
+  replicas := int32(total / numOfAZs)
+  if int64(idx) < total % numOfAZs {
+      replicas++  
+  }
+  ```
+  Ensure the zone order matches your current replica distribution to avoid unnecessary Machine creation/deletion. 
+  Zones must match existing MachineSet zones. Mismatches will cause Hive to create new MachineSets and delete existing ones, leading to unexpected resource creation and potential service disruption.
+
+- **vSphere**: For adoption to succeed, Hive must be able to extract the **same FailureDomain** from both the existing MachineSet and the MachineSet it would generate from the MachinePool/ClusterDeployment (datacenter, datastore, folder, compute cluster, network, resourcePool, vCenter).   
+Adoption fails if Hive cannot parse the FailureDomain from either side, or if the extracted FailureDomains differ in any of these topology fields.   
+**Note**: Currently Hive only supports single zone and single network device configuration for vSphere. Multiple zones (including configurations with multiple network devices or multiple vCenters) are not yet officially supported. 
+
+- **AWS UserTags**: Merged from `ClusterDeployment.spec.platform.aws.userTags` and `MachinePool.spec.platform.aws.userTags` (MachinePool takes precedence). Newly created MachineSets receive merged tags immediately. For existing MachineSets matched during adoption, tags are only updated if `hive.openshift.io/override-machinepool-platform: "true"` is set on the MachinePool. When updated, MachineSets are completely replaced (tags present only on the existing MachineSet but not in CD/Pool are removed). Existing Machines retain their original tags; only newly created Machines receive the merged tags.   
+Note: `ClusterDeployment.spec.platform.aws.userTags` is immutable.
+
+- **Nutanix**: `MachinePool.spec.platform.nutanix.failureDomains` must only reference failure domains defined in `ClusterDeployment.spec.platform.nutanix.failureDomains`. MachineSets in failure domains not present in the ClusterDeployment cannot be matched during adoption.   
+The ClusterDeployment's failure domains are immutable.
+
 ## Configuration Management
 
 ### Vertical Scaling

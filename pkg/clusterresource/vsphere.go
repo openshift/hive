@@ -121,7 +121,7 @@ func (p *VSphereCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	}
 }
 
-func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *VSphereCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.VSphere = &hivev1vsphere.MachinePool{
 		NumCPUs:           2,
 		NumCoresPerSocket: 1,

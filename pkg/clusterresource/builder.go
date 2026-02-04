@@ -541,7 +541,7 @@ func (o *Builder) generateMachinePool() *hivev1.MachinePool {
 			Replicas: ptr.To(o.WorkerNodesCount),
 		},
 	}
-	o.CloudBuilder.addMachinePoolPlatform(o, mp)
+	o.CloudBuilder.AddMachinePoolPlatform(o, mp)
 	return mp
 }
 
@@ -706,9 +706,14 @@ func (o *Builder) getBoundServiceAccountSigningKeySecretName() string {
 	return o.Name + "-sa-signing-key"
 }
 
+// MachinePoolPlatformAdder fills MachinePool.Spec.Platform for a given cloud. Used by machinepoolresource.
+type MachinePoolPlatformAdder interface {
+	AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool)
+}
+
 // CloudBuilder interface exposes the functions we will use to set cloud specific portions of the cluster's resources.
 type CloudBuilder interface {
-	addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool)
+	MachinePoolPlatformAdder
 	addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig)
 
 	GetCloudPlatform(o *Builder) hivev1.Platform

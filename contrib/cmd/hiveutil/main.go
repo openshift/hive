@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/hive/contrib/pkg/clusterpool"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
 	"github.com/openshift/hive/contrib/pkg/deprovision"
+	"github.com/openshift/hive/contrib/pkg/machinepool"
 	"github.com/openshift/hive/contrib/pkg/report"
 	"github.com/openshift/hive/contrib/pkg/testresource"
 	"github.com/openshift/hive/contrib/pkg/verification"
@@ -56,6 +57,7 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(version.NewVersionCommand())
 	cmd.AddCommand(clusterpool.NewClusterPoolCommand())
 	cmd.AddCommand(awsprivatelink.NewAWSPrivateLinkCommand())
+	cmd.AddCommand(machinepool.NewMachinePoolCommand())
 
 	return cmd
 }

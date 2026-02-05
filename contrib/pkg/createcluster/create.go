@@ -31,8 +31,10 @@ import (
 	openstackcreds "github.com/openshift/hive/pkg/creds/openstack"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/util/scheme"
+
 	installertypes "github.com/openshift/installer/pkg/types"
 	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
+	"github.com/openshift/installer/pkg/types/vsphere/conversion"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -346,6 +348,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.OpenStackIngressFloatingIP, "openstack-ingress-floating-ip", "", "Floating IP address to use for cluster's Ingress service")
 
 	// vSphere flags
+	// TODO: This needs a full rewrite for zonal.
 	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
 	flags.StringVar(&opt.VSphereDatacenter, "vsphere-datacenter", "", "Datacenter to use in the vCenter")
 	flags.StringVar(&opt.VSphereDefaultDataStore, "vsphere-default-datastore", "", "Default datastore to use for provisioning volumes")
@@ -731,15 +734,23 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = openStackProvider
 	case constants.PlatformVSphere:
+		// Little DRYer to set a username or password string (which one should be indicated via `label`)
+		// to `value` iff not already set in `receiver`.
+		// If the `receiver` and `value` are both unset, generate an error.
+		// This is for convenience as various paths need to do this conditionally, and the values could
+		// come from multiple places (env vars, json blob).
+		setCredValue := func(label string, receiver *string, value string) error {
+			if *receiver != "" {
+				return nil
+			}
+			if value == "" {
+				return fmt.Errorf("Missing VSphere %s: must be provided either via env var or platform spec.", label)
+			}
+			*receiver = value
+			return nil
+		}
 		vsphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
-		if vsphereUsername == "" {
-			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
-		}
-
 		vspherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
-		if vspherePassword == "" {
-			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
-		}
 
 		vsphereCACerts := os.Getenv(constants.VSphereTLSCACertsEnvVar)
 		if o.VSphereCACerts != "" {
@@ -767,16 +778,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			if err != nil {
 				return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
 			}
-
-			// Set credentials on VCenters if using new structure
-			for i := range platform.VCenters {
-				if platform.VCenters[i].Username == "" {
-					platform.VCenters[i].Username = vsphereUsername
-				}
-				if platform.VCenters[i].Password == "" {
-					platform.VCenters[i].Password = vspherePassword
-				}
-			}
+			// We'll inject credentials from env vars later, if unset in the json blob
 		} else {
 			o.log.Info("Platform spec not provided, trying legacy flags")
 			// Try legacy flags
@@ -810,39 +812,74 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 				return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
 			}
 
-			platform.DeprecatedUsername = vsphereUsername
-			platform.DeprecatedPassword = vspherePassword
+			if err := setCredValue("username", &platform.DeprecatedUsername, vsphereUsername); err != nil {
+				return nil, err
+			}
+			if err := setCredValue("password", &platform.DeprecatedPassword, vspherePassword); err != nil {
+				return nil, err
+			}
 			platform.DeprecatedNetwork = vSphereNetwork
 			platform.DeprecatedDatacenter = vSphereDatacenter
 			platform.DeprecatedDefaultDatastore = vSphereDatastore
 			platform.DeprecatedVCenter = vSphereVCenter
 			platform.DeprecatedFolder = o.VSphereFolder
 			platform.DeprecatedCluster = o.VSphereCluster
+			dummyInstallConfig := &installertypes.InstallConfig{
+				Platform: installertypes.Platform{
+					VSphere: &platform,
+				},
+			}
+			if err := conversion.ConvertInstallConfig(dummyInstallConfig); err != nil {
+				return nil, fmt.Errorf("failed to update deprecated vSphere fields")
+			}
 		}
 
+		// Build a new-style creds object
+		vcenterCreds := []installervsphere.VCenters{}
 		for i := range platform.VCenters {
-			if platform.VCenters[i].Username == "" {
-				platform.VCenters[i].Username = vsphereUsername
+			// Allow a hybrid input style: creds can be included in the json blob OR individually
+			// via env vars. The former takes precedence.
+			for i := range platform.VCenters {
+				if err := setCredValue("username", &platform.VCenters[i].Username, vsphereUsername); err != nil {
+					return nil, err
+				}
+				if err := setCredValue("password", &platform.VCenters[i].Password, vspherePassword); err != nil {
+					return nil, err
+				}
 			}
-			if platform.VCenters[i].Password == "" {
-				platform.VCenters[i].Password = vspherePassword
-			}
+			vcenterCreds = append(vcenterCreds, installervsphere.VCenters{
+				VCenter:  platform.VCenters[i].Server,
+				Username: platform.VCenters[i].Username,
+				Password: platform.VCenters[i].Password,
+			})
+		}
+		vcenterCredsb, err := json.Marshal(vcenterCreds)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to marhsal vcenter creds list")
 		}
 
 		if len(platform.APIVIPs) == 0 {
+			if o.VSphereAPIVIP == "" {
+				return nil, fmt.Errorf("Must supply an API VIP")
+			}
 			platform.APIVIPs = []string{o.VSphereAPIVIP}
 		}
 		if len(platform.IngressVIPs) == 0 {
+			if o.VSphereIngressVIP == "" {
+				return nil, fmt.Errorf("Must supply an Ingress VIP")
+			}
 			platform.IngressVIPs = []string{o.VSphereIngressVIP}
 		}
 
-		vsphereProvider := &clusterresource.VSphereCloudBuilder{
-			Username:       vsphereUsername,
-			Password:       vspherePassword,
-			CACert:         bytes.Join(caCerts, []byte("\n")),
-			Infrastructure: &platform,
-		}
-		builder.CloudBuilder = vsphereProvider
+		builder.CloudBuilder = clusterresource.NewVSphereCloudBuilder(
+			map[string][]byte{
+				constants.UsernameSecretKey:        []byte(vsphereUsername),
+				constants.PasswordSecretKey:        []byte(vspherePassword),
+				constants.VSphereVCentersSecretKey: vcenterCredsb,
+			},
+			bytes.Join(caCerts, []byte("\n")),
+			&platform,
+		)
 	case constants.PlatformIBMCloud:
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {

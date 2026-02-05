@@ -33,7 +33,6 @@ import (
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
-	"github.com/openshift/hive/pkg/controller/utils/vsphereutils"
 	"github.com/openshift/hive/pkg/manageddns"
 	"github.com/openshift/hive/pkg/util/contracts"
 )
@@ -527,8 +526,27 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		vsphere = vsphere.DeepCopy()
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
-		if err := vsphereutils.ConvertDeprecatedFields(vsphere); err != nil {
-			allErrs = append(allErrs, field.InternalError(vspherePath, fmt.Errorf("error converting deprecated vsphere fields: %e", err)))
+		// Confusingly, credentials fields exist in four objects:
+		// - The install-config Secret. This is where installer expects to find them for day 0.
+		// - The credentials Secret. This is where we pull them from when destroying. (We can't
+		//   count on the install-config still existing, or the creds therein being current.)
+		// - The metadata.json Secret. We scrub this when we get it from the installer, so it
+		//   should be clean in etcd.
+		// - The ClusterDeployment/ClusterPool, since we're inheriting the install-config's VSphere
+		//   Platform as our Infrastructure schema. We prevent the user from populating credentials
+		//   in the CD/CP:
+		//   a) we don't use them; and
+		//   b) this is a potential security hole, as users with read access to CD/CP shouldn't
+		//      necessarily have access to credentials.
+		if vsphere.Infrastructure != nil {
+			if vsphere.Infrastructure.DeprecatedPassword != "" {
+				allErrs = append(allErrs, field.Forbidden(vspherePath.Child("infrastructure", "password"), "credentials must only be provided in Secrets"))
+			}
+			for i, v := range vsphere.Infrastructure.VCenters {
+				if v.Password != "" {
+					allErrs = append(allErrs, field.Forbidden(vspherePath.Child("infrastructure", "vcenters").Index(i).Child("password"), "credentials must only be provided in Secrets"))
+				}
+			}
 		}
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
@@ -536,8 +554,11 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if len(vsphere.Infrastructure.VCenters) == 0 {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vSphere").Child("vcenters").Index(0), "must specify at least one vSphere vCenter"))
+		// We need to have at least one VCenter; but we have to allow both the legacy
+		// (pre-zonal) and new shapes. We'll upconvert the former, but only after the CR
+		// has alreday been accepted and stored in etcd once.
+		if vsphere.DeprecatedVCenter == "" && (vsphere.Infrastructure == nil || len(vsphere.Infrastructure.VCenters) == 0) {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("infrastructure", "vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
@@ -669,15 +690,21 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	// HIVE-2391
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
 	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
-		// Moving from a non-zonal to a zonal shape is permitted.
-		// This check is faster than checking all the fields individually
+		// HIVE-2391: Moving from a non-zonal to a zonal shape is permitted.
+		// NOTE: Existing deprecated fields may be left populated, but will be ignored.
+		// NOTE: We're allowing the creds/certs secret refs to be changed in this operation as well.
+		// In both cases the user could just update the contents of the existing Secret, but may wish
+		// to replace them instead.
 		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
-			contextLogger.Debug("Passed validation: HIVE-2391")
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-			}
+			contextLogger.Debug("Allowing vsphere zonal conversion")
+			// copy over the value to spoof the immutability checker
+			oldObject.Spec.Platform.VSphere = cd.Spec.Platform.VSphere
+			// We've stealthily allowed replacement of secret refs. This will at least make sure they're not empty.
+			allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
 		}
 	}
 
@@ -714,9 +741,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			},
 		}
 	}
-
-	allErrs := field.ErrorList{}
-	specPath := field.NewPath("spec")
 
 	if cd.Spec.Installed {
 		if cd.Spec.ClusterMetadata != nil {

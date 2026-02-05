@@ -728,31 +728,32 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			return err
 		}
 	case cd.Spec.Platform.VSphere != nil:
-		vSphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
-		if vSphereUsername == "" {
-			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
-		}
-		vSpherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
-		if vSpherePassword == "" {
-			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
-		}
-
-		vcenters := make([]installertypesvsphere.VCenters, 0, len(cd.Spec.Platform.VSphere.Infrastructure.VCenters))
-		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
-			vcenters = append(vcenters, installertypesvsphere.VCenters{
-				VCenter:  vcenter.Server,
-				Username: vcenter.Username,
-				Password: vcenter.Password,
-			})
-		}
+		// SNOWFLAKE! For VSphere, the credentials for the provision path come from the
+		// install-config, so we effectively don't use the creds secret when we set that up.
+		// Use it here to populate the ClusterMetadata needed for cleanup, which we pre-seed
+		// with the list of VCenters from the CD.
+		// (We could have also peeled this information out of the install-config.)
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
-				VSphere: &installertypesvsphere.Metadata{
-					VCenters: vcenters,
-				},
+				VSphere: &installertypesvsphere.Metadata{},
 			},
 		}
+		if cd.Spec.Platform.VSphere.Infrastructure == nil {
+			// This shouldn't happen, but just in case we have a CD we somehow didn't upconvert...
+			metadata.VSphere.VCenters = []installertypesvsphere.VCenters{{
+				VCenter: cd.Spec.Platform.VSphere.DeprecatedVCenter,
+			}}
+		} else {
+			vcenters := make([]installertypesvsphere.VCenters, 0, len(cd.Spec.Platform.VSphere.Infrastructure.VCenters))
+			for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+				vcenters = append(vcenters, installertypesvsphere.VCenters{
+					VCenter: vcenter.Server,
+				})
+			}
+			metadata.VSphere.VCenters = vcenters
+		}
+		creds.ConfigureCreds[utils.GetClusterPlatform(cd)](dynClient, metadata)
 		var err error
 		uninstaller, err = vsphere.New(logger, metadata)
 		if err != nil {
@@ -1901,7 +1902,7 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+// injectProviderCredentials Add the credentials from a given secret into the ic if not present
 func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:

@@ -53,6 +53,12 @@ func validAzureClusterPool() *hivev1.ClusterPool {
 	return cp
 }
 
+func validVSphereClusterPool() *hivev1.ClusterPool {
+	cp := clusterPoolTemplate()
+	cp.Spec.Platform.VSphere = validVSphereClusterDeployment().Spec.Platform.VSphere
+	return cp
+}
+
 func invalidOpenStackClusterPool() *hivev1.ClusterPool {
 	cp := clusterPoolTemplate()
 	cp.Spec.Platform.OpenStack = &hivev1openstack.Platform{
@@ -221,6 +227,24 @@ func TestClusterPoolValidate(t *testing.T) {
 			oldObject:       validAWSClusterPool(),
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
+		},
+		{
+			name:      "VSphere credentials forbidden: deprecated shape",
+			operation: admissionv1beta1.Create,
+			newObject: func() *hivev1.ClusterPool {
+				cp := validVSphereClusterPool()
+				cp.Spec.Platform.VSphere.Infrastructure.DeprecatedPassword = "verboten"
+				return cp
+			}(),
+		},
+		{
+			name:      "VSphere credentials forbidden: zonal shape",
+			operation: admissionv1beta1.Create,
+			newObject: func() *hivev1.ClusterPool {
+				cp := validVSphereClusterPool()
+				cp.Spec.Platform.VSphere.Infrastructure.VCenters[0].Password = "verboten"
+				return cp
+			}(),
 		},
 	}
 

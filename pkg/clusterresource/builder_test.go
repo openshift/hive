@@ -8,6 +8,7 @@ import (
 	"github.com/ghodss/yaml"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/stretchr/testify/assert"
@@ -142,10 +143,12 @@ func createOpenStackClusterBuilder() *Builder {
 func createVSphereClusterBuilder() *Builder {
 	b := createTestBuilder()
 	b.CloudBuilder = &VSphereCloudBuilder{
-		Username: "test",
-		Password: "test",
-		CACert:   []byte{},
-		Infrastructure: &vsphere.Platform{
+		CredsSecretData: map[string][]byte{
+			constants.UsernameSecretKey: []byte("test"),
+			constants.PasswordSecretKey: []byte("test"),
+		},
+		CACert: []byte{},
+		infrastructure: &vsphere.Platform{
 			VCenters: []vsphere.VCenter{
 				{
 					Server:      "test",

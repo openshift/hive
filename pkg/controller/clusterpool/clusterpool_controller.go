@@ -1342,10 +1342,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 			return nil, err
 		}
 
-		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
-		cloudBuilder.Infrastructure = platform.VSphere.Infrastructure
-
-		return cloudBuilder, nil
+		return clusterresource.NewVSphereCloudBuilder(credsSecret.Data, certsSecret.Data[".cacert"], platform.VSphere.Infrastructure), nil
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

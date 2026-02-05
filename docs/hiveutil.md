@@ -116,7 +116,7 @@ The following parameters are required and must be provided via environment varia
 
 
 ```bash
-bin/hiveutil create-cluster --cloud=vsphere --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-ca-certs="/tmp/cert1.crt:/tmp/cert2.crt" --base-domain vmware.hive.example.com mycluster
+bin/hiveutil create-cluster --cloud=vsphere --vsphere-ca-certs="/tmp/f" --base-domain vmware.hive.example.com --vsphere-platform-spec-json '{"apiVIPs": ["192.168.10.10"], "ingressVIPs": ["192.168.10.11", "192.168.10.12"], "vCenters": [{"server": "vcenter.hive.example.com", "datacenters": ["/some/datacenter"]}]}' mycluster
 ```
 
 #### Create Cluster on OpenStack

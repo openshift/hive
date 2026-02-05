@@ -1901,7 +1901,7 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+// injectProviderCredentials Add the credentials from a given secret into the ic if not present
 func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:

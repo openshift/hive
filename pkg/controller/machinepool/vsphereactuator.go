@@ -1,8 +1,6 @@
 package machinepool
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -11,7 +9,6 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installvspheremachines "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
-	installvsphere "github.com/openshift/installer/pkg/types/vsphere"
 	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -28,7 +25,7 @@ var _ Actuator = &VSphereActuator{}
 
 // NewVSphereActuator is the constructor for building a VSphereActuator
 func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
-	osImage, err := getVSphereOSImage(masterMachine, scheme, logger)
+	osImage, err := getVSphereOSImage(masterMachine, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
 		return nil, err
@@ -70,19 +67,11 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		if a.osImage != "" {
 			failureDomain.Topology.Template = a.osImage
 		}
-		if pool.Spec.Platform.VSphere.Topology != nil {
-			newTopo, err := applyTopologyTemplate(failureDomain.Topology, *pool.Spec.Platform.VSphere.Topology, a.logger)
-			if err != nil {
-				return nil, false, err
-			}
-
-			failureDomain.Topology = newTopo
+		if pool.Spec.Platform.VSphere.ResourcePool != "" {
+			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.ResourcePool
 		}
-		if pool.Spec.Platform.VSphere.DeprecatedResourcePool != "" {
-			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.DeprecatedResourcePool
-		}
-		if len(pool.Spec.Platform.VSphere.DeprecatedTagIDs) > 0 {
-			failureDomain.Topology.TagIDs = pool.Spec.Platform.VSphere.DeprecatedTagIDs
+		if len(pool.Spec.Platform.VSphere.TagIDs) > 0 {
+			failureDomain.Topology.TagIDs = pool.Spec.Platform.VSphere.TagIDs
 		}
 	}
 
@@ -101,7 +90,7 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 }
 
 // Get the OS image from an existing master machine.
-func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+func getVSphereOSImage(masterMachine *machineapi.Machine, logger log.FieldLogger) (string, error) {
 	providerSpec, err := vsphereutil.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode VSphereMachineProviderSpec from master machine")
@@ -110,50 +99,4 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	osImage := providerSpec.Template
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
-}
-
-func applyTopologyTemplate(base installvsphere.Topology, template installvsphere.Topology, logger log.FieldLogger) (out installvsphere.Topology, err error) {
-	var ubase map[string]interface{}
-	var utemplate map[string]interface{}
-
-	ubase, err = runtime.DefaultUnstructuredConverter.ToUnstructured(&base)
-	if err != nil {
-		return
-	}
-
-	utemplate, err = runtime.DefaultUnstructuredConverter.ToUnstructured(&template)
-	if err != nil {
-		return
-	}
-
-	for k, i := range utemplate {
-		switch v := i.(type) {
-		case string:
-			if v != "" {
-				ubase[k] = v
-			}
-		case []interface{}:
-			switch v[0].(type) {
-			case string:
-				if len(v) > 0 {
-					ubase[k] = v
-				}
-			default:
-				logger.
-					WithField("field-name", k).
-					WithField("field-value", v).
-					WithField("field-type", fmt.Sprintf("%T", v)).
-					Warn("unexpected value on vsphere machinepool topology, please report this to the Hive maintainers")
-			}
-		default:
-			logger.
-				WithField("field-name", k).
-				WithField("field-value", v).
-				WithField("field-type", fmt.Sprintf("%T", v)).
-				Warn("unexpected value on vsphere machinepool topology, please report this to the Hive maintainers")
-		}
-	}
-
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(ubase, &out)
-	return
 }

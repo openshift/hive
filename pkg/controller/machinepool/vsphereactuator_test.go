@@ -81,7 +81,7 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 			assert.Equal(t, int32(4), vsphereProvider.NumCPUs, "unexpected NumCPUs")
 			assert.Equal(t, int32(4), vsphereProvider.NumCoresPerSocket, "unexpected NumCoresPerSocket")
 			assert.Equal(t, int32(512), vsphereProvider.DiskGiB, "unexpected DiskGiB")
-			assert.Equal(t, "good-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
+			assert.Equal(t, "default-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
 			assert.Equal(t, "good-pool", vsphereProvider.Workspace.ResourcePool, "unexpected ResourcePool")
 			if assert.Len(t, vsphereProvider.TagIDs, 1, "missing tag IDs") {
 				assert.Equal(t, vsphereProvider.TagIDs[0], "vsphere-tag")
@@ -93,6 +93,8 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 func testVSpherePool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
+		// Observation: when constructing this way, we have to use hive.MachinePool{installer.MachinePool{}}
+		// whereas when accessing it, we can (optionally) skip the intermediate (e.g. ...Platform.VSphere.MemoryMiB)
 		VSphere: &hivev1vsphere.MachinePool{
 			MachinePool: vsphere.MachinePool{
 				MemoryMiB:         32 * 1024,
@@ -102,11 +104,8 @@ func testVSpherePool() *hivev1.MachinePool {
 					DiskSizeGB: 512,
 				},
 			},
-			Topology: &vsphere.Topology{
-				ResourcePool: "good-pool",
-				Folder:       "good-folder",
-				TagIDs:       []string{"vsphere-tag"},
-			},
+			ResourcePool: "good-pool",
+			TagIDs:       []string{"vsphere-tag"},
 		},
 	}
 	return p

@@ -893,17 +893,17 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 		if len(req.Spec.Platform.VSphere.VCenters) == 0 && req.Spec.Platform.VSphere.DeprecatedVCenter != "" {
 			joinedVCenters = req.Spec.Platform.VSphere.DeprecatedVCenter
 		} else {
-			joinedVCenters = strings.Join(req.Spec.Platform.VSphere.VCenters, "::")
+			// StringSliceVar accepts comma-delimited
+			joinedVCenters = strings.Join(req.Spec.Platform.VSphere.VCenters, ",")
 		}
 
 		args = []string{
 			"deprovision", "vsphere",
-			"--vsphere-vcenter", joinedVCenters,
+			"--vsphere-vcenters", joinedVCenters,
 		}
 	}
 	args = append(args,
 		"--loglevel", "debug",
-		"--creds-dir", constants.VSphereCredentialsDir,
 	)
 	if legacy {
 		args = append(args, req.Spec.InfraID)

@@ -2,6 +2,8 @@ package utils
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -11,8 +13,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vim25"
@@ -20,6 +24,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/installer/pkg/types/vsphere"
 )
 
 // ValidateCredentialsForClusterDeployment will attempt to verify that the platform/cloud credentials
@@ -77,12 +82,54 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 			}
 		}
 
-		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
-			valid, err := validateVSphereCredentials(vcenter.Server,
-				string(secret.Data[constants.UsernameSecretKey]),
-				string(secret.Data[constants.PasswordSecretKey]),
-				rootCAFiles,
-				logger)
+		// This should never happen -- we should have upconverted by now -- but...
+		if cd.Spec.Platform.VSphere.Infrastructure == nil {
+			return false, fmt.Errorf("missing Infrastructure section in ClusterDeployment.Spec.Platform.VSphere")
+		}
+
+		// Account for both possible shapes of the creds Secret
+		vcenters := []vsphere.VCenters{}
+		if b, ok := secret.Data[constants.VSphereVCentersSecretKey]; ok && len(b) > 0 {
+			// New shape: ["vCenters"] contains a yaml blob with a slice of metadata VCenters
+			logger.Info("validating vsphere credentials with vcenters list")
+			if err := yaml.Unmarshal(b, &vcenters); err != nil {
+				logger.WithError(err).Error("failed to unmarshal vcenters from credentials Secret")
+				return false, err
+			}
+			if len(vcenters) < 1 {
+				return false, errors.New("empty or invalid vcenters list in credentials Secret")
+			}
+			// Validate that the creds cover at least all of the VCenters listed in the CD.
+			// (It's okay if they cover more -- at some point in the future it may be possible
+			// for an existing cluster to grow infra in a new VCenter.)
+			credsVCenters := sets.Set[string]{}
+			cdVCenters := sets.Set[string]{}
+			for _, vcenter := range vcenters {
+				credsVCenters.Insert(vcenter.VCenter)
+			}
+			for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+				cdVCenters.Insert(vcenter.Server)
+			}
+			if !credsVCenters.IsSuperset(cdVCenters) {
+				return false, fmt.Errorf("missing VSphere credentials for some configured VCenters: %q", sets.List(cdVCenters.Difference(credsVCenters)))
+			}
+		} else {
+			// Legacy shape: flat username & password. Project those same creds out to all configured VCenters.
+			logger.Info("validating vsphere credentials with username/password")
+			for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+				vcenters = append(vcenters, vsphere.VCenters{
+					VCenter:  vcenter.Server,
+					Username: string(secret.Data[constants.UsernameSecretKey]),
+					Password: string(secret.Data[constants.PasswordSecretKey]),
+				})
+			}
+		}
+		for i, vcenter := range vcenters {
+			if vcenter.VCenter == "" {
+				return false, fmt.Errorf("missing or invalid vCenter in index %d of vcenter list", i)
+			}
+
+			valid, err := validateVSphereCredentials(vcenter.VCenter, vcenter.Username, vcenter.Password, rootCAFiles, logger)
 			if err != nil || valid == false {
 				return false, err
 			}

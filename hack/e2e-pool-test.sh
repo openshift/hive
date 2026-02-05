@@ -249,6 +249,9 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
 NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
+# Set the legacy deprovision annotation to true. This annotation will be propagated to the created cluster.
+# This is to ensure the legacy destroy path continues to work post AWK SDK v2 migration.
+oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"annotations": {"hive.openshift.io/legacy-deprovision": "true"}}}'
 # Now we can scale up the pool so it starts creating clusters
 oc scale cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --replicas=$POOL_SIZE
 

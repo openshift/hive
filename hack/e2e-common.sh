@@ -349,6 +349,7 @@ function capture_manifests() {
         clusterdeployment \
         clusterimageset \
         clusterprovision \
+        clusterdeprovision \
         clusterstate \
         dnszone \
         machinepool \

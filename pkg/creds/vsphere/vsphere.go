@@ -1,10 +1,12 @@
 package vsphere
 
 import (
-	"os"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
@@ -17,43 +19,29 @@ import (
 // CREDS_SECRET_NAME, and CERTS_SECRET_NAME and configures VSphere credential environment variables
 // and config files accordingly.
 func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata) {
-	// Spoof metadata for legacy code paths
-	if metadata == nil {
-		metadata = &installertypes.ClusterMetadata{
-			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
-				VSphere: &vsphere.Metadata{},
-			},
-		}
-	}
-	if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
-		var username, password string
-		if username = strings.TrimSpace(string(credsSecret.Data[constants.UsernameSecretKey])); username != "" {
-			os.Setenv(constants.VSphereUsernameEnvVar, username)
-		}
-		if password = strings.TrimSpace(string(credsSecret.Data[constants.PasswordSecretKey])); password != "" {
-			os.Setenv(constants.VSpherePasswordEnvVar, password)
-		}
-		// Snowflake! We need to (re)inject the creds into the metadata.
-		// (They were there originally, but we scrubbed them for security.)
-		// If they are unset, the destroyer will fail organically.
-		// Accommodate both pre- and post-zonal formats
-		if metadata.VSphere.Username != "" {
-			metadata.VSphere.Username = username
-		}
-		if metadata.VSphere.Password != "" {
-			metadata.VSphere.Password = password
-		}
-		for i := range metadata.VSphere.VCenters {
-			if metadata.VSphere.VCenters[i].Username != "" {
-				metadata.VSphere.VCenters[i].Username = username
-			}
-			if metadata.VSphere.VCenters[i].Password != "" {
-				metadata.VSphere.VCenters[i].Password = password
+	// Snowflake: installmanager doesn't need the creds secret, as the creds are embedded in
+	// the install-config. It signifies this by passing a nil metadata.
+	if metadata != nil {
+		if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
+			if bVCenters := credsSecret.Data["vcenters"]; len(bVCenters) > 0 {
+				// Post-zonal: array of vcenters in json format.
+				if metadata.VSphere == nil { // should never happen
+					metadata.VSphere = &vsphere.Metadata{}
+				}
+				if err := yaml.Unmarshal(bVCenters, &metadata.VSphere.VCenters); err != nil {
+					log.WithError(err).Fatal("failed to unmarshal vcenters from credentials secret")
+				}
+			} else {
+				// Old style creds Secret with flat username/password: copy the creds across all vcenters
+				username := strings.TrimSpace(string(credsSecret.Data[constants.UsernameSecretKey]))
+				password := strings.TrimSpace(string(credsSecret.Data[constants.PasswordSecretKey]))
+				// Caller pre-populated this with just the VCenter names
+				for i := range metadata.VSphere.VCenters {
+					metadata.VSphere.VCenters[i].Username = username
+					metadata.VSphere.VCenters[i].Password = password
+				}
 			}
 		}
-		// NOTE: I think this is only used for terminateWhenFilesChange(), which we don't really
-		// care about anymore. Can we get rid of it?
-		utils.ProjectToDir(credsSecret, constants.VSphereCredentialsDir, nil)
 	}
 	if certsSecret := utils.LoadSecretOrDie(c, "CERTS_SECRET_NAME"); certsSecret != nil {
 		utils.ProjectToDir(certsSecret, constants.VSphereCertificatesDir, nil)

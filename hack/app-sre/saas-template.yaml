@@ -4958,7 +4958,7 @@ objects:
                         vCenter:
                           description: 'DeprecatedVCenter is the vSphere vCenter hostname.
 
-                            Deprecated: use VCenters instead'
+                            Deprecated: use VCenters instead.'
                           type: string
                         vCenters:
                           description: VCenters are potentially multiple vCenter hostnames.
@@ -4969,7 +4969,6 @@ objects:
                       required:
                       - certificatesSecretRef
                       - credentialsSecretRef
-                      - vCenter
                       - vCenters
                       type: object
                   type: object
@@ -11325,108 +11324,15 @@ objects:
                           description: 'ResourcePool is the name of the resource pool
                             that will be used for virtual machines.
 
-                            If it is not present, a default value will be used.
-
-                            Deprecated: use Topology instead'
+                            If it is not present, a default value will be used.'
                           type: string
                         tagIDs:
-                          description: 'TagIDs is a list of up to 10 tags to add to
+                          description: TagIDs is a list of up to 10 tags to add to
                             the VMs that this machine set provisions in vSphere.
-
-                            Deprecated: use Topology instead'
                           items:
                             type: string
                           maxItems: 10
                           type: array
-                        topology:
-                          description: 'Topology is the vSphere topology that will
-                            be used for virtual machines.
-
-                            If it is not present, a default value will be used.'
-                          properties:
-                            computeCluster:
-                              description: 'computeCluster as the failure domain
-
-                                This is required to be a path'
-                              maxLength: 2048
-                              minLength: 1
-                              type: string
-                            datacenter:
-                              description: 'datacenter is the vCenter datacenter in
-                                which virtual machines will be located
-
-                                and defined as the failure domain.'
-                              maxLength: 80
-                              minLength: 1
-                              type: string
-                            datastore:
-                              description: 'datastore is the name or inventory path
-                                of the datastore in which the
-
-                                virtual machine is created/located.'
-                              maxLength: 2048
-                              minLength: 1
-                              type: string
-                            folder:
-                              description: 'folder is the inventory path of the folder
-                                in which the
-
-                                virtual machine is created/located.'
-                              maxLength: 2048
-                              minLength: 1
-                              pattern: ^/.*?/vm/.*?
-                              type: string
-                            hostGroup:
-                              description: 'hostGroup is the name of the vm-host group
-                                of type host within vCenter for this failure domain.
-
-                                hostGroup is limited to 80 characters.
-
-                                This field is required when the ZoneType is HostGroup'
-                              maxLength: 80
-                              type: string
-                            networks:
-                              description: networks is the list of networks within
-                                this failure domain
-                              items:
-                                type: string
-                              maxItems: 10
-                              minItems: 1
-                              type: array
-                            resourcePool:
-                              description: 'resourcePool is the absolute path of the
-                                resource pool where virtual machines will be
-
-                                created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.'
-                              maxLength: 2048
-                              minLength: 1
-                              pattern: ^/.*?/host/.*?/Resources.*
-                              type: string
-                            tagIDs:
-                              description: 'tagIDs is an optional set of tags to add
-                                to an instance. Specified tagIDs
-
-                                must use URN-notation instead of display names. A
-                                maximum of 10 tag IDs may be specified.'
-                              example: urn:vmomi:InventoryServiceTag:5736bf56-49f5-4667-b38c-b97e09dc9578:GLOBAL
-                              items:
-                                type: string
-                              type: array
-                            template:
-                              description: 'template is the inventory path of the
-                                virtual machine or template
-
-                                that will be used for cloning.'
-                              maxLength: 2048
-                              minLength: 1
-                              pattern: ^/.*?/vm/.*?
-                              type: string
-                          required:
-                          - computeCluster
-                          - datacenter
-                          - datastore
-                          - networks
-                          type: object
                         zones:
                           description: 'Zones defines available zones
 

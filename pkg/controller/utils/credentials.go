@@ -8,6 +8,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -20,6 +21,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/installer/pkg/types/vsphere"
 )
 
 // ValidateCredentialsForClusterDeployment will attempt to verify that the platform/cloud credentials
@@ -77,12 +79,26 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 			}
 		}
 
-		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
-			valid, err := validateVSphereCredentials(vcenter.Server,
-				string(secret.Data[constants.UsernameSecretKey]),
-				string(secret.Data[constants.PasswordSecretKey]),
-				rootCAFiles,
-				logger)
+		// Account for both possible shapes of the creds Secret
+		vcenters := []vsphere.VCenters{}
+		if b, ok := secret.Data["vcenters"]; ok && len(b) > 0 {
+			// New shape: ["vcenters"] contains a yaml blob with a slice of metadata VCenters
+			if err := yaml.Unmarshal(b, &vcenters); err != nil {
+				logger.WithError(err).Error("failed to unmarshal vcenters from credentials Secret")
+				return false, err
+			}
+		} else {
+			// Legacy shape: flat username & password. Project those same creds out to all configured VCenters.
+			for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+				vcenters = append(vcenters, vsphere.VCenters{
+					VCenter:  vcenter.Server,
+					Username: string(secret.Data[constants.UsernameSecretKey]),
+					Password: string(secret.Data[constants.PasswordSecretKey]),
+				})
+			}
+		}
+		for _, vcenter := range vcenters {
+			valid, err := validateVSphereCredentials(vcenter.VCenter, vcenter.Username, vcenter.Password, rootCAFiles, logger)
 			if err != nil || valid == false {
 				return false, err
 			}

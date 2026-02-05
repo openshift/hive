@@ -355,7 +355,7 @@ spec:
                         vCenter:
                           description: |-
                             DeprecatedVCenter is the vSphere vCenter hostname.
-                            Deprecated: use VCenters instead
+                            Deprecated: use VCenters instead.
                           type: string
                         vCenters:
                           description: VCenters are potentially multiple vCenter hostnames. Prefer this field over VCenter.
@@ -365,7 +365,6 @@ spec:
                       required:
                         - certificatesSecretRef
                         - credentialsSecretRef
-                        - vCenter
                         - vCenters
                       type: object
                   type: object

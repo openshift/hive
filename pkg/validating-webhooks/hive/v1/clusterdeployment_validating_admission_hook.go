@@ -33,7 +33,6 @@ import (
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
-	"github.com/openshift/hive/pkg/controller/utils/vsphereutils"
 	"github.com/openshift/hive/pkg/manageddns"
 	"github.com/openshift/hive/pkg/util/contracts"
 )
@@ -527,9 +526,6 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		vsphere = vsphere.DeepCopy()
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
-		if err := vsphereutils.ConvertDeprecatedFields(vsphere); err != nil {
-			allErrs = append(allErrs, field.InternalError(vspherePath, fmt.Errorf("error converting deprecated vsphere fields: %e", err)))
-		}
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
 		}
@@ -669,15 +665,13 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	// HIVE-2391
 	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
-		// Moving from a non-zonal to a zonal shape is permitted.
-		// This check is faster than checking all the fields individually
+		// HIVE-2391: Moving from a non-zonal to a zonal shape is permitted.
+		// NOTE: Existing deprecated fields may be left populated, but will be ignored.
 		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
-			contextLogger.Debug("Passed validation: HIVE-2391")
-			return &admissionv1beta1.AdmissionResponse{
-				Allowed: true,
-			}
+			contextLogger.Debug("Allowing vsphere zonal conversion")
+			// copy over the value to spoof the immutability checker
+			oldObject.Spec.Platform.VSphere = cd.Spec.Platform.VSphere
 		}
 	}
 

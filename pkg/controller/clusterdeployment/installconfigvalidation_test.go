@@ -285,6 +285,169 @@ func TestInstallConfigValidation(t *testing.T) {
 			expectedError: missingvSphereCredentialsErr,
 		},
 		{
+			name: "test install config vSphere legacy credentials",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vCenter: 10.0.0.1
+    username: foo
+    password: bar
+pullSecret: ""
+`,
+		},
+		{
+			name: "test install config vSphere legacy credentials no username",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vCenter: 10.0.0.1
+    password: bar
+pullSecret: ""
+`,
+			expectedError: missingvSphereCredentialsErr,
+		},
+		{
+			name: "test install config vSphere legacy credentials no password",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vCenter: 10.0.0.1
+    username: foo
+pullSecret: ""
+`,
+			expectedError: missingvSphereCredentialsErr,
+		},
+		{
+			name: "test install config vSphere credentials",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vcenters:
+    - user: foo
+      password: bar
+    - user: one
+      password: two
+pullSecret: ""
+`,
+		},
+		{
+			name: "test install config vSphere credentials only in some vcenters",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vcenters:
+    - user: foo
+      password: bar
+    - {}
+pullSecret: ""
+`,
+			expectedError: missingvSphereCredentialsErr,
+		},
+		{
+			name: "test install config vSphere credentials only in some vcenters, upconvertable",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						Infrastructure: &installervsphere.Platform{},
+					}
+				},
+			),
+			ic: `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    username: foo
+    password: bar
+    vcenters:
+    - user: foo
+      password: bar
+    - {}
+pullSecret: ""
+`,
+		},
+		{
 			name: "test install-config mismatch nutanix pc address",
 			cd: cdBuilder.Build(
 				func(cd *hivev1.ClusterDeployment) {

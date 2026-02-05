@@ -1981,6 +1981,7 @@ func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.Cl
 func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 	tests := []struct {
 		name                   string
+		cd                     *hivev1.ClusterDeployment
 		pool                   *hivev1.MachinePool
 		existingConditions     []hivev1.MachinePoolCondition
 		generatedMachineSets   []*machineapi.MachineSet
@@ -2013,6 +2014,13 @@ func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 		},
 		{
 			name: "Set NotEnoughReplicas condition true for autoscaling with insufficient minReplicas",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					Nutanix: &hivev1nutanix.Platform{},
+				}
+				return cd
+			}(),
 			pool: func() *hivev1.MachinePool {
 				mp := testMachinePool(testmp.WithAutoscaling(1, 5)) // Autoscaling with minReplicas < 3 failure domains
 				// Use Nutanix platform which doesn't allow zero autoscaling min replicas
@@ -2032,6 +2040,26 @@ func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 			expectedConditionState: corev1.ConditionTrue,
 			expectedReason:         "MinReplicasTooSmall",
 			expectedMessage:        "When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least 3",
+		},
+		{
+			name: "VSphere not subject to minimum 1 replica per mset when autoscaling",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					VSphere: &vsphere.Platform{},
+				}
+				return cd
+			}(),
+			pool:               testMachinePool(testmp.WithAutoscaling(1, 5)), // Autoscaling with minReplicas < 3 failure domains
+			existingConditions: []hivev1.MachinePoolCondition{},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("test-worker-b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("test-worker-c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedConditionState: corev1.ConditionFalse,
+			expectedReason:         "EnoughReplicas",
+			expectedMessage:        "The MachinePool has sufficient replicas for each MachineSet",
 		},
 		{
 			name: "Clear NotEnoughReplicas condition for autoscaling with sufficient minReplicas",
@@ -2094,16 +2122,10 @@ func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 			test.pool.Status.Conditions = test.existingConditions
 
 			fakeClient := fake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+
 			cd := testClusterDeployment()
-			// Use Nutanix cluster deployment for tests that need platforms that don't allow zero autoscaling min replicas
-			if test.name == "Set NotEnoughReplicas condition true for autoscaling with insufficient minReplicas" {
-				cd = func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Spec.Platform = hivev1.Platform{
-						Nutanix: &hivev1nutanix.Platform{},
-					}
-					return cd
-				}()
+			if test.cd != nil {
+				cd = test.cd
 			}
 
 			logger := log.WithField("controller", "machinepool_test")

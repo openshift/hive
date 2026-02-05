@@ -447,7 +447,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 
 	// HIVE-2391: remove this once we fully deprecate the old vSphere method (4.12 sunset)
 	if getClusterPlatform(cd) == constants.PlatformVSphere {
-		if cd.Spec.Platform.VSphere.Infrastructure == nil {
+		if p := cd.Spec.Platform.VSphere; (p.Infrastructure == nil || len(p.Infrastructure.VCenters) == 0) && p.DeprecatedVCenter != "" {
 			r.logger.WithField("gvk", cd.GroupVersionKind().String()).WithField("name", cd.Name).WithField("namespace", cd.Namespace).Info("Updating deprecated vSphere fields on ClusterDeployment object")
 			cd = cd.DeepCopy()
 			if err := vsphereutils.ConvertDeprecatedFields(cd.Spec.Platform.VSphere); err != nil {

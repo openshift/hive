@@ -129,6 +129,21 @@ func validOpenStackClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func deprecatedVSphereClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
+		DeprecatedVCenter:          "somevcenter.com",
+		CredentialsSecretRef:       corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		CertificatesSecretRef:      corev1.LocalObjectReference{Name: "fake-cert-secret"},
+		DeprecatedDatacenter:       "dc1",
+		DeprecatedDefaultDatastore: "vmse-test",
+		DeprecatedFolder:           "/dc1/vm/test",
+		DeprecatedCluster:          "test",
+		DeprecatedNetwork:          "Network",
+	}
+	return cd
+}
+
 func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
@@ -1086,7 +1101,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		// 		}
 		// 		return cd
 		// 	}(),
-		// 	operation:       admissionv1beta1.Create,
+		// 	operation:       admissionv1.Create,
 		// 	expectedAllowed: false,
 		// },
 		{
@@ -1666,6 +1681,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:            "vSphere create valid with legacy (pre-zonal) shape",
+			newObject:       deprecatedVSphereClusterDeployment(),
+			operation:       admissionv1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "Nutanix create valid",
 			newObject:       validNutanixClusterDeployment(),
 			operation:       admissionv1.Create,
@@ -1862,6 +1883,75 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					},
 				}},
 			},
+		},
+		{
+			name:      "vsphere creds forbidden: deprecated field",
+			operation: admissionv1.Create,
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.DeprecatedPassword = "verboten"
+				return cd
+			}(),
+		},
+		{
+			name:      "vsphere creds forbidden: zonal field",
+			operation: admissionv1.Create,
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.VCenters[0].Password = "verboten"
+				return cd
+			}(),
+		},
+		{
+			name:            "vsphere platform can remain legacy (pre-zonal) shape",
+			oldObject:       deprecatedVSphereClusterDeployment(),
+			newObject:       deprecatedVSphereClusterDeployment(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:            "vsphere platform can be zonal-ified",
+			oldObject:       deprecatedVSphereClusterDeployment(),
+			newObject:       validVSphereClusterDeployment(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:      "vsphere platform can be zonal-ified but creds/certs refs still required",
+			oldObject: deprecatedVSphereClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.CredentialsSecretRef.Name = ""
+				cd.Spec.Platform.VSphere.CertificatesSecretRef.Name = ""
+				return cd
+			}(),
+			operation: admissionv1.Update,
+		},
+		{
+			name:      "vsphere platform cannot be de-zonal-ified",
+			oldObject: validVSphereClusterDeployment(),
+			newObject: deprecatedVSphereClusterDeployment(),
+			operation: admissionv1.Update,
+		},
+		{
+			name: "vsphere platform immutable if not being zonal-ified (deprecated shape)",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := deprecatedVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.CredentialsSecretRef.Name = "changed"
+				return cd
+			}(),
+			newObject: deprecatedVSphereClusterDeployment(),
+			operation: admissionv1.Update,
+		},
+		{
+			name: "vsphere platform immutable if not being zonal-ified (zonal shape)",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.ClusterOSImage = "changed"
+				return cd
+			}(),
+			newObject: validVSphereClusterDeployment(),
+			operation: admissionv1.Update,
 		},
 	}
 

@@ -64,12 +64,16 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfigSecret *co
 			return ic, errors.New(novSpherePlatformErr)
 		}
 
-		hasCreds := ic.Platform.VSphere.DeprecatedUsername != "" || ic.Platform.VSphere.DeprecatedPassword != ""
+		hasCreds := ic.Platform.VSphere.DeprecatedUsername != "" && ic.Platform.VSphere.DeprecatedPassword != ""
+		// Our upconvert will spray the deprecated creds into all the vcenters if present.
+		// Otherwise, every vcenters entry must have creds set.
+		vcentersWithCreds := 0
 		for _, vcenter := range ic.Platform.VSphere.VCenters {
 			if vcenter.Username != "" && vcenter.Password != "" {
-				hasCreds = true
+				vcentersWithCreds++
 			}
 		}
+		hasCreds = hasCreds || (vcentersWithCreds > 0 && vcentersWithCreds == len(ic.Platform.VSphere.VCenters))
 
 		if !hasCreds {
 			return ic, errors.New(missingvSphereCredentialsErr)

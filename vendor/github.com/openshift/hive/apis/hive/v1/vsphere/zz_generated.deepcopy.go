@@ -13,15 +13,10 @@ import (
 func (in *MachinePool) DeepCopyInto(out *MachinePool) {
 	*out = *in
 	in.MachinePool.DeepCopyInto(&out.MachinePool)
-	if in.DeprecatedTagIDs != nil {
-		in, out := &in.DeprecatedTagIDs, &out.DeprecatedTagIDs
+	if in.TagIDs != nil {
+		in, out := &in.TagIDs, &out.TagIDs
 		*out = make([]string, len(*in))
 		copy(*out, *in)
-	}
-	if in.Topology != nil {
-		in, out := &in.Topology, &out.Topology
-		*out = new(typesvsphere.Topology)
-		(*in).DeepCopyInto(*out)
 	}
 	return
 }

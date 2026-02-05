@@ -1439,19 +1439,17 @@ func getMinMaxReplicasForMachineSet(pool *hivev1.MachinePool, machineSets []*mac
 	return
 }
 
-func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
-	version, versionPresent := cd.Labels[constants.VersionLabel]
-	if !versionPresent {
-		return "", errors.New("cluster version not set in clusterdeployment")
-	}
-	return version, nil
-}
-
 func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool {
 	// Zero-sized minReplicas for autoscaling are allowed since OCP:
 	// - 4.5 for AWS, Azure, and GCP
 	// - 4.7 for OpenStack
-	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil || cd.Spec.Platform.OpenStack != nil {
+	// - 4.8 for VSphere
+	if cd.Spec.Platform.AWS != nil ||
+		cd.Spec.Platform.Azure != nil ||
+		cd.Spec.Platform.GCP != nil ||
+		cd.Spec.Platform.OpenStack != nil ||
+		cd.Spec.Platform.VSphere != nil {
+
 		return true
 	}
 

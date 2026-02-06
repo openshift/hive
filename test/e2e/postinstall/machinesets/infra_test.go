@@ -15,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
@@ -35,6 +36,10 @@ import (
 const (
 	workerMachinePoolName = "worker"
 	infraMachinePoolName  = "infra"
+
+	capiMachineTypeKey  = "machine.openshift.io/cluster-api-machine-type"
+	hiveMachinePoolKey  = "hive.openshift.io/machine-pool"
+	openshiftMachineAPI = "openshift-machine-api"
 )
 
 func TestScaleMachinePool(t *testing.T) {
@@ -52,27 +57,23 @@ func TestScaleMachinePool(t *testing.T) {
 	}
 
 	c := common.MustGetClient()
-	machinePrefix, err := machineNamePrefix(cd, workerMachinePoolName)
-	require.NoError(t, err, "cannot determine machine name prefix")
 
 	// Scale down
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pool := common.GetMachinePool(c, cd, workerMachinePoolName)
 		require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
 
 		logger = logger.WithField("pool", pool.Name)
-		logger.Infof("expected Machine name prefix: %s", machinePrefix)
-
 		logger.Info("scaling pool to 1 replicas")
 		pool.Spec.Replicas = ptr.To(int64(1))
 		return c.Update(context.TODO(), pool)
 	})
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 
-	err = waitForMachines(logger, cfg, cd, machinePrefix, 1)
+	err = waitForMachines(logger, cfg, cd, workerMachinePoolName, 1)
 	require.NoError(t, err, "timed out waiting for machines to be scaled down")
 
-	err = waitForNodes(logger, cfg, cd, machinePrefix, 1)
+	err = waitForNodes(logger, cfg, cd, workerMachinePoolName, 1)
 	require.NoError(t, err, "timed out waiting for nodes to be scaled down")
 
 	// Scale up
@@ -86,10 +87,10 @@ func TestScaleMachinePool(t *testing.T) {
 	})
 	require.NoError(t, err, "cannot update worker machine pool to increase replicas")
 
-	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
+	err = waitForMachines(logger, cfg, cd, workerMachinePoolName, 3)
 	require.NoError(t, err, "timed out waiting for machines to be scaled up")
 
-	err = waitForNodes(logger, cfg, cd, machinePrefix, 3)
+	err = waitForNodes(logger, cfg, cd, workerMachinePoolName, 3)
 	require.NoError(t, err, "timed out waiting for nodes to be scaled up")
 }
 
@@ -162,17 +163,11 @@ func TestNewMachinePool(t *testing.T) {
 	err := c.Create(context.TODO(), infraMachinePool)
 	require.NoError(t, err, "cannot create infra machine pool")
 
-	machinePrefix, err := machineNamePrefix(cd, infraMachinePoolName)
-	require.NoError(t, err, "cannot find/calculate machine name prefix")
-	logger.Infof("expected Machine name prefix: %s", machinePrefix)
-
-	// Wait for machines to be created
 	t.Logf("Waiting for 3 infra machines to be created")
-	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
+	err = waitForMachines(logger, cfg, cd, infraMachinePoolName, 3)
 	require.NoError(t, err, "timed out waiting for machines to be created")
 
-	err = waitForNodes(logger, cfg, cd, machinePrefix, 3,
-		// Ensure that labels were applied to the nodes
+	err = waitForNodes(logger, cfg, cd, infraMachinePoolName, 3,
 		func(node *corev1.Node) bool {
 			if machineType := node.Labels["openshift.io/machine-type"]; machineType != infraMachinePoolName {
 				t.Logf("Did not find expected label in node")
@@ -205,7 +200,7 @@ func TestNewMachinePool(t *testing.T) {
 		cfg,
 		func(machineSets []*machinev1.MachineSet) bool {
 			for _, ms := range machineSets {
-				if strings.HasPrefix(ms.Name, machinePrefix) {
+				if ms.Labels[hiveMachinePoolKey] == infraMachinePoolName {
 					return false
 				}
 			}
@@ -277,9 +272,6 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 	logger = logger.WithField("pool", pool.Name)
 
-	machinePrefix, err := machineNamePrefix(cd, workerMachinePoolName)
-	require.NoError(t, err, "cannot find/calculate machine name prefix")
-
 	logger.Info("lowering autoscaler delay so scaling down happens faster")
 	clusterAutoscaler := &autoscalingv1.ClusterAutoscaler{}
 poll:
@@ -298,14 +290,12 @@ poll:
 	machineSetList := &machinev1.MachineSetList{}
 	rc.List(context.Background(), machineSetList)
 	for _, machineSet := range machineSetList.Items {
-		// Only check machinesets that belong to this worker pool
-		poolLabel, hasPoolLabel := machineSet.Labels["hive.openshift.io/machine-pool"]
+		poolLabel, hasPoolLabel := machineSet.Labels[hiveMachinePoolKey]
 		if !hasPoolLabel || poolLabel != pool.Spec.Name {
 			continue
 		}
-		// Check labels
 		require.Equal(t, "true", machineSet.Labels[constants.HiveManagedLabel], "Incorrect hive managed label on machineset")
-		require.Equal(t, pool.Spec.Name, machineSet.Labels["hive.openshift.io/machine-pool"], "Incorrect machine pool label on machineset")
+		require.Equal(t, pool.Spec.Name, machineSet.Labels[hiveMachinePoolKey], "Incorrect machine pool label on machineset")
 	}
 
 	if clusterAutoscaler.Name == "" {
@@ -380,9 +370,9 @@ poll:
 	err = rc.Create(context.TODO(), busyboxDeployment)
 	require.NoError(t, err, "cannot create busybox deployment")
 
-	err = waitForMachines(logger, cfg, cd, machinePrefix, maxReplicas)
+	err = waitForMachines(logger, cfg, cd, workerMachinePoolName, maxReplicas)
 	require.NoError(t, err, "timed out waiting for machines to be created")
-	err = waitForNodes(logger, cfg, cd, machinePrefix, maxReplicas)
+	err = waitForNodes(logger, cfg, cd, workerMachinePoolName, maxReplicas)
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
 	// Scale down
@@ -392,9 +382,9 @@ poll:
 	logger.Info("deleting busybox deployment to relieve cpu pressure and scale down machines")
 	err = rc.Delete(context.TODO(), busyboxDeployment, client.PropagationPolicy(metav1.DeletePropagationForeground))
 	require.NoError(t, err, "could not delete busybox deployment")
-	err = waitForMachines(logger, cfg, cd, machinePrefix, minReplicas)
+	err = waitForMachines(logger, cfg, cd, workerMachinePoolName, minReplicas)
 	require.NoError(t, err, "timed out waiting for machine count")
-	err = waitForNodes(logger, cfg, cd, machinePrefix, minReplicas)
+	err = waitForNodes(logger, cfg, cd, workerMachinePoolName, minReplicas)
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
 	logger.Info("disabling autoscaling")
@@ -407,45 +397,57 @@ poll:
 		return c.Update(context.TODO(), pool)
 	})
 	require.NoError(t, err, "cannot update worker machine pool to turn off auto-scaling")
-	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
+	err = waitForMachines(logger, cfg, cd, workerMachinePoolName, 3)
 	require.NoError(t, err, "timed out waiting for machines to be created")
-	err = waitForNodes(logger, cfg, cd, machinePrefix, 3)
+	err = waitForNodes(logger, cfg, cd, workerMachinePoolName, 3)
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 }
 
-func waitForMachines(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, machinePrefix string, expectedReplicas int) error {
-	logger.Infof("waiting for %d machines with prefix '%s'", expectedReplicas, machinePrefix)
+func waitForMachines(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int) error {
+	infraID := cd.Spec.ClusterMetadata.InfraID
+	logger.Infof("waiting for %d machines (pool %s, infraID %s)", expectedReplicas, poolName, infraID)
 	lastCount := 0
 	return common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
 		count := 0
 		for _, m := range machines {
-			if strings.HasPrefix(m.Name, machinePrefix) {
+			if m.Labels[machinev1.MachineClusterIDLabel] == infraID && m.Labels[capiMachineTypeKey] == poolName {
 				count++
 			}
 		}
 		if count != lastCount {
-			logger.Infof("found %d machines with prefix '%s'", count, machinePrefix)
+			logger.Infof("found %d machines for pool %s", count, poolName)
 			lastCount = count
 		}
 		return count == expectedReplicas
 	}, 20*time.Minute)
 }
 
-func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, machinePrefix string, expectedReplicas int, extraChecks ...func(node *corev1.Node) bool) error {
-	logger.Infof("waiting for %d nodes with machine annotation prefix '%s'", expectedReplicas, machinePrefix)
+func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string, expectedReplicas int, extraChecks ...func(node *corev1.Node) bool) error {
+	infraID := cd.Spec.ClusterMetadata.InfraID
+	logger.Infof("waiting for %d nodes (pool %s)", expectedReplicas, poolName)
+	rc := common.MustGetClientFromConfig(cfg)
 	return common.WaitForNodes(cfg, func(nodes []*corev1.Node) bool {
+		machineList := &machinev1.MachineList{}
+		err := rc.List(context.TODO(), machineList, client.InNamespace(openshiftMachineAPI),
+			client.MatchingLabels{machinev1.MachineClusterIDLabel: infraID, capiMachineTypeKey: poolName})
+		if err != nil {
+			return false
+		}
+		poolMachineNames := sets.New[string]()
+		for i := range machineList.Items {
+			poolMachineNames.Insert(machineList.Items[i].Name)
+		}
 		poolNodes := []*corev1.Node{}
 		for _, n := range nodes {
 			if n.Annotations == nil {
 				continue
 			}
 			machineAnnotation := n.Annotations["machine.openshift.io/machine"]
-			name := strings.Split(machineAnnotation, "/")
-			if len(name) < 2 {
+			parts := strings.Split(machineAnnotation, "/")
+			if len(parts) < 2 {
 				continue
 			}
-			machineName := name[1]
-			if strings.HasPrefix(machineName, machinePrefix) {
+			if poolMachineNames.Has(parts[1]) {
 				poolNodes = append(poolNodes, n)
 			}
 		}
@@ -464,8 +466,4 @@ func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDe
 
 		return true
 	}, 15*time.Minute)
-}
-
-func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, error) {
-	return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName), nil
 }

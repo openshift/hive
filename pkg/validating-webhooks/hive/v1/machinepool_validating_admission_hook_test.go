@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/stretchr/testify/assert"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -702,8 +703,10 @@ func validAzureMachinePoolPlatform() *hivev1azure.MachinePool {
 
 func validvSphereMachinePoolPlatform() *hivev1vsphere.MachinePool {
 	return &hivev1vsphere.MachinePool{
-		OSDisk: hivev1vsphere.OSDisk{
-			DiskSizeGB: 1,
+		MachinePool: installervsphere.MachinePool{
+			OSDisk: installervsphere.OSDisk{
+				DiskSizeGB: 1,
+			},
 		},
 	}
 }

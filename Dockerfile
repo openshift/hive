@@ -12,7 +12,7 @@ COPY . .
 
 RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
 
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then dnf install -y subscription-manager && dnf clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
 ENV GO=${GO}
 RUN make build-hiveutil
@@ -28,7 +28,7 @@ COPY . .
 RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
 
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then dnf install -y subscription-manager && dnf clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
 ENV GO=${GO}
 RUN make build-hiveadmission build-manager build-operator && \
@@ -39,7 +39,7 @@ ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 ARG DNF=${DNF:-microdnf}
 
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then ${DNF} install -y subscription-manager && ${DNF} clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 
 ##

@@ -177,6 +177,16 @@ test-e2e:
 test-e2e-pool:
 	hack/e2e-pool-test.sh
 
+# Local e2e test targets - easier to run locally with sensible defaults
+# Usage:
+#   make test-e2e-local                    # Will prompt for cloud platform
+.PHONY: test-e2e-local
+test-e2e-local:
+	@echo "Running local e2e test..."
+	@echo "Note: KUBECONFIG will be auto-detected if not set (defaults to ~/.kube/config)"
+	@echo "Note: Set CLOUD environment variable to specify cloud platform, or it will prompt interactively"
+	hack/local-e2e-test.sh
+
 .PHONY: test-e2e-postdeploy
 test-e2e-postdeploy:
 	go test $(GO_MOD_FLAGS) -v -timeout 0 -count=1 ./test/e2e/postdeploy/...

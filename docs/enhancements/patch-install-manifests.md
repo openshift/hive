@@ -63,7 +63,7 @@ a hive-owned CRD corresponding to an
 
 **Example:**
 ```yaml
-apiVersion: v1
+apiVersion: hive.openshift.io/v1
 kind: ClusterDeploymentCustomization
 metadata:
   name: foo-cluster-deployment-customization
@@ -105,7 +105,7 @@ spec:
 
 **Example:**
 ```yaml
-apiVersion: v1
+apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
 metadata:
   name: foo-cluster-deployment
@@ -144,7 +144,7 @@ install-config Secret in memory before it was created in the target namespace.)
 
 **Example:**
 ```yaml
-apiVersion: v1
+apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
   name: foo-cluster-pool

@@ -533,9 +533,6 @@ replace golang.org/x/crypto/ssh/agent => golang.org/x/crypto/ssh/agent v0.45.0
 // CVE-2025-30204: Some transitive deps are still using older v4. Safe to remove once go.sum shows only 4.5.2 or higher.
 replace github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
 
-// CVE-2025-22872: Some transitive deps are still using older versions. Safe to remove once go.sum shows only 0.38.0 or higher.
-replace golang.org/x/net => golang.org/x/net v0.38.0
-
 // From installer: This is to force capi back for the older provider version
 replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.19.3
 

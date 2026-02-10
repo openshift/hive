@@ -5,14 +5,20 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	ctrl "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"k8s.io/client-go/dynamic"
 	kclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	apiregv1client "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
+	"github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
+
+func init() {
+	ctrl.SetLogger(logrus.NewLogr(log.StandardLogger()))
+}
 
 func MustGetClient() client.WithWatch {
 	return MustGetClientFromConfig(MustGetConfig())

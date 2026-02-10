@@ -177,7 +177,7 @@ INSTALL_RESULT=""
 i=1
 while [ $i -le ${max_cluster_deployment_status_checks} ]; do
   CD_JSON=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json)
-  if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]] ; then
+  if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]] && [[ $(jq -r .status.powerState <<<"${CD_JSON}") == "Running" ]] ; then
     INSTALL_RESULT="success"
     break
   fi

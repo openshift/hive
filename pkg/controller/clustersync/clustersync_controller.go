@@ -1066,12 +1066,28 @@ func mergeResources(a, b []hiveintv1alpha1.SyncResourceReference) []hiveintv1alp
 }
 
 func containsResource(resources []hiveintv1alpha1.SyncResourceReference, resource hiveintv1alpha1.SyncResourceReference) bool {
+	resourceGroup := groupFromAPIVersion(resource.APIVersion)
 	for _, r := range resources {
+		// From kubernetes' point of view a resource that differs
+		// by version only (eg. v1beta1 -> v1) is the same underlying resource
+		// in storage.
+		if resourceGroup != groupFromAPIVersion(r.APIVersion) {
+			continue
+		}
+		r.APIVersion = resource.APIVersion
 		if r == resource {
 			return true
 		}
 	}
 	return false
+}
+
+func groupFromAPIVersion(apiVersion string) string {
+	i := strings.LastIndex(apiVersion, "/")
+	if i < 0 {
+		return ""
+	}
+	return apiVersion[:i]
 }
 
 func orderResources(a, b hiveintv1alpha1.SyncResourceReference) bool {

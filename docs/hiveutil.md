@@ -278,6 +278,80 @@ Explanation:
 1) This command removes the AWS hub account credentials Secret created with `bin/hiveutil awsprivatelink enable` from Hive's namespace.
 2) It empties `HiveConfig.spec.awsPrivateLink`, restoring HiveConfig to its state before configuring PrivateLink.
 
+
+### MachinePool Management
+
+#### Adopt MachineSets
+
+Adopts existing spoke MachineSets into a Hive MachinePool. Connects to the spoke cluster, reads the specified MachineSets, extracts platform config and replicas, and creates the MachinePool. Automatically pauses ClusterDeployment reconciliation before applying and resumes after. No manual platform flags needed.
+
+Flow:
+1. Pauses ClusterDeployment reconciliation
+2. Labels MachineSets in the spoke cluster (`hive.openshift.io/machine-pool`, `hive.openshift.io/managed`)
+3. Creates MachinePool in the hub cluster
+4. Resumes ClusterDeployment reconciliation
+
+**Preconditions:** ClusterDeployment must be installed, not being deleted, and not relocating. ClusterDeployment must have `ClusterMetadata.AdminKubeconfigSecretRef` (spoke kubeconfig).
+
+```bash
+# Preview
+hiveutil machinepool adopt mycluster worker --machinesets ms1,ms2 -n mynamespace -o yaml
+
+# Apply adoption
+hiveutil machinepool adopt mycluster worker --machinesets ms1,ms2 -n mynamespace
+```
+
+**Arguments:** `CLUSTER_DEPLOYMENT_NAME` `POOL_NAME` (positional)  
+**Required:** `--machinesets` (MachineSet names in `openshift-machine-api`, comma-separated or repeated)  
+**Optional:** `-n, --namespace` (default from kubeconfig), `-o, --output` (yaml|json to preview instead of applying)
+
+#### Detach MachineSets
+
+Detaches MachineSets from Hive MachinePool management and deletes the MachinePool. MachineSets are discovered by label `hive.openshift.io/machine-pool=<POOL_NAME>` in `openshift-machine-api`.
+
+Flow:
+1. Pauses ClusterDeployment reconciliation
+2. Removes Hive labels from spoke MachineSets
+3. Deletes the MachinePool on the hub
+4. Resumes ClusterDeployment reconciliation
+
+After detaching, the MachineSets remain on the spoke but are no longer managed by Hive.
+
+**Preconditions:** Same as adopt (CD installed, not deleted, not relocating).
+
+```bash
+hiveutil machinepool detach mycluster worker -n mynamespace
+```
+
+**Arguments:** `CLUSTER_DEPLOYMENT_NAME` `POOL_NAME` (positional)  
+**Optional:** `-n, --namespace` (default from kubeconfig)
+
+#### Create MachinePool
+
+Creates a new MachinePool for an existing ClusterDeployment. Platform is inferred from the ClusterDeployment. Supports AWS, GCP, Azure, OpenStack, vSphere, Nutanix, and IBM Cloud.
+
+Use `-o yaml` or `-o json` to preview; omit `--output` to apply.
+
+```bash
+# AWS
+hiveutil machinepool create mycluster worker -n mynamespace --replicas 3 --aws-instance-type m5.large --aws-zones us-east-1a,us-east-1b
+
+# GCP
+hiveutil machinepool create mycluster worker -n mynamespace --replicas 3 --gcp-instance-type n1-standard-4 --gcp-zones us-central1-a,us-central1-b --gcp-os-disk-size 256 --gcp-os-disk-type pd-ssd
+
+# Azure
+hiveutil machinepool create mycluster worker -n mynamespace --replicas 3 --azure-instance-type Standard_D2s_v3 --azure-zones 1,2,3 --azure-os-disk-size-gb 128 --azure-os-disk-type Premium_LRS --azure-compute-subnet subnet-1
+
+# With labels and taints
+hiveutil machinepool create mycluster worker -n mynamespace --replicas 3 --aws-instance-type m5.large --labels "node-role.kubernetes.io/infra=" --machine-labels "machine.openshift.io/instance-type=m5.large" --taints "key1=value1:NoSchedule"
+```
+
+**Arguments:** `CLUSTER_DEPLOYMENT_NAME` `POOL_NAME` (positional)  
+**Required:** Platform-specific instance/VM options (inferred from CD; see `hiveutil machinepool create --help`), e.g. `--aws-instance-type`, `--gcp-instance-type`, `--azure-instance-type`, vSphere/Nutanix/OpenStack/IBM flags.  
+**Optional:** `-n, --namespace`, `--replicas` (default 1), `--aws-zones`, `--gcp-zones`, `--azure-zones`, `--labels`, `--machine-labels`, `--taints`, `-o, --output`
+
+**Platform-specific options:** See `hiveutil machinepool create --help` (e.g. `--aws-subnets`, `--aws-root-volume-size`, `--gcp-os-disk-size`, `--azure-compute-subnet`, etc.)
+
 ### Other Commands
 
 To see other commands offered by `hiveutil`, run `hiveutil --help`.

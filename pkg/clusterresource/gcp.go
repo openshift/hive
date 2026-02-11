@@ -88,7 +88,7 @@ func (p *GCPCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	}
 }
 
-func (p *GCPCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *GCPCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.GCP = &hivev1gcp.MachinePool{
 		InstanceType: gcpInstanceType,
 	}

@@ -63,7 +63,7 @@ func (p *IBMCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	}
 }
 
-func (p *IBMCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *IBMCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.IBMCloud = &hivev1ibmcloud.MachinePool{
 		InstanceType: p.InstanceType,
 	}

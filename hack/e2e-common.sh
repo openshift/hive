@@ -148,6 +148,7 @@ function get_osp_resources() {
 }
 
 function save_hive_logs() {
+  set -x
   tmpf=$(mktemp)
   for x in  "deploy  hive-controllers  ${HIVE_NS}" \
             "deploy  hiveadmission     ${HIVE_NS}" \
@@ -189,6 +190,21 @@ function save_hive_logs() {
   if oc get apiservice v1.admission.hive.openshift.io -o yaml > $tmpf; then
     mv $tmpf $ARTIFACT_DIR/apiservice-hiveadmission.yaml
   fi
+  # Save spoke info
+  tmpd=$(mktemp -d)
+  # Get spoke kubeconfig
+  oc get cd -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.spec.clusterMetadata.adminKubeconfigSecretRef.name}{"\n"}{end}' | while read ns cd s; do
+    [[ -n "$s" ]] || continue
+    oc extract secret/$s -n $ns --to=$tmpd || continue
+    KUBECONFIG=$tmpd/kubeconfig oc get no -o yaml > $tmpf
+    if [[ $? -eq 0 ]]; then
+      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_nodes.yaml
+    fi
+    KUBECONFIG=$tmpd/kubeconfig oc get po -A -o yaml > $tmpf
+    if [[ $? -eq 0 ]]; then
+      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_pods.yaml
+    fi
+  done
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.

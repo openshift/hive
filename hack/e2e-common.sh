@@ -192,17 +192,22 @@ function save_hive_logs() {
   fi
   # Save spoke info
   tmpd=$(mktemp -d)
-  # Get spoke kubeconfig
+  # Iterate over spoke namespace, CD, and kubeconfig secret
   oc get cd -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.spec.clusterMetadata.adminKubeconfigSecretRef.name}{"\n"}{end}' | while read ns cd s; do
+    # Skip CDs with no kubeconfig Secret ref set
     [[ -n "$s" ]] || continue
     oc extract secret/$s -n $ns --to=$tmpd || continue
-    KUBECONFIG=$tmpd/kubeconfig oc get no -o yaml > $tmpf
-    if [[ $? -eq 0 ]]; then
+    # Nodes
+    if oc --kubeconfig=$tmpd/kubeconfig get no -o yaml > $tmpf; then
       mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_nodes.yaml
     fi
-    KUBECONFIG=$tmpd/kubeconfig oc get po -A -o yaml > $tmpf
-    if [[ $? -eq 0 ]]; then
+    # Pods
+    if oc --kubeconfig=$tmpd/kubeconfig get po -A -o yaml > $tmpf; then
       mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_pods.yaml
+    fi
+    # Autoscaler logs
+    if oc --kubeconfig=$tmpd/kubeconfig logs -n openshift-machine-api -l k8s-app=cluster-autoscaler-operator > $tmpf; then
+      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_autoscaler.log
     fi
   done
 }

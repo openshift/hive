@@ -344,6 +344,7 @@ function capture_manifests() {
         clusterdeployment \
         clusterimageset \
         clusterprovision \
+        clusterdeprovision \
         clusterstate \
         dnszone \
         machinepool \
@@ -377,6 +378,16 @@ function capture_cluster_logs() {
         cat "${ARTIFACT_DIR}/hive_install_console.log"
     else
         cat "${ARTIFACT_DIR}/hive_install_job.log"
+    fi
+
+     # Capture deprovision logs
+    if [[ -z "$(oc get cdr -n ${CLUSTER_NAMESPACE} -o jsonpath='{.status.completed}')" ]]
+    then 
+      if UNINSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/uninstall=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${UNINSTALL_JOB_NAME}" ]
+      then
+        oc logs -n ${CLUSTER_NAMESPACE} ${UNINSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_uninstall_job.log" || true
+        oc get ${UNINSTALL_JOB_NAME} -n ${CLUSTER_NAMESPACE} -o yaml &> "${ARTIFACT_DIR}/hive_uninstall_job.yaml" || true
+      fi
     fi
 
     if [[ "${INSTALL_RESULT}" != "success" ]]

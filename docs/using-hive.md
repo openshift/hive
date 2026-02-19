@@ -225,18 +225,24 @@ oc create secret generic mycluster-manifests -n mynamespace --from-file=<manifes
 ```
 
 #### vSphere
-Create a `secret` containing your vSphere credentials information:
+Create a `secret` containing your vSphere credentials information.
+The Secret should contain the key `vcenters` whose value is a YAML (or JSON) document listing each VCenter's server, username, and password.
+The values should match those in your install-config.yaml.
+For example:
 
 ```yaml
-apiVersion: v1
-stringData:
-  password: vsphereuser
-  username: secretpassword
-kind: Secret
-metadata:
-  name: mycluster-vsphere-creds
-  namespace: mynamespace
-type: Opaque
+- vCenter: myvcenter1.devcluster.openshift.com
+  username: vsphereuser1
+  password: secretpassword1
+- vCenter: myvcenter2.devcluster.openshift.com
+  username: vsphereuser2
+  password: secretpassword2
+```
+
+Assuming the above is in a file called `/home/me/vsphere/vcenters.yaml`, create the Secret via:
+
+```bash
+oc create secret generic mycluster-vsphere-creds -n mynamespace --from-file=vcenters=/home/me/vsphere/vcenters.yaml
 ```
 
 Create a `secret` containing your vSphere CA certificate.
@@ -575,26 +581,46 @@ and ensure that the top-level `credentialsMode` field has been set to `Manual`.
 credentialsMode: Manual
 ```
 
-For vSphere, ensure the `compute` and `controlPlane` fields are empty.
-```yaml
-controlPlane:
-compute:
-```
-
-and populate the top-level `platform` fields with the appropriate information:
+For vSphere, populate the top-level `platform` field with the appropriate information:
 ```yaml
 platform:
   vsphere:
-    apiVIP: 192.168.1.10
-    cluster: devel
-    datacenter: dc1
-    defaultDatastore: ds1
-    folder: /dc1/vm/CLUSTER_NAME
-    ingressVIP: 192.168.1.11
-    network: "VM Network"
-    password: secretpassword
-    username: vsphereuser
-    vCenter: vcenter.example.com
+    apiVIPs:
+    - 192.168.1.10
+    ingressVIPs:
+    - 192.168.1.11
+    vcenters:
+    - server: myvcenter1.devcluster.openshift.com
+      username: vsphereuser1
+      password: secretpassword1
+      datacenters:
+      - datacenter1
+    - server: myvcenter2.devcluster.openshift.com
+      username: vsphereuser2
+      password: secretpassword2
+      datacenters:
+      - datacenter2
+    failureDomains:
+      - name: dc-east-1
+        region: dc-east
+        zone: east-1a
+        server: myvcenter1.devcluster.openshift.com
+        topology:
+          datacenter: datacenter1
+          computeCluster: /datacenter1/cluster1
+          networks:
+          - my-port-group-in-dc1
+          datastore: /datacenter1/datastore/share1
+      - name: dc-west-1
+        region: dc-west
+        zone: west-1a
+        server: myvcenter2.devcluster.openshift.com
+        topology:
+          datacenter: datacenter2
+          computeCluster: /datacenter2/cluster1
+          networks:
+          - my-port-group-in-dc2
+          datastore: /datacenter2/datastore/share1
 ```
 
 For Openstack, replace the contents of `compute.platform` with:

@@ -728,13 +728,20 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if vSpherePassword == "" {
 			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 		}
+
+		vcenters := make([]installertypesvsphere.VCenters, 0, len(cd.Spec.Platform.VSphere.Infrastructure.VCenters))
+		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+			vcenters = append(vcenters, installertypesvsphere.VCenters{
+				VCenter:  vcenter.Server,
+				Username: vcenter.Username,
+				Password: vcenter.Password,
+			})
+		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				VSphere: &installertypesvsphere.Metadata{
-					VCenter:  cd.Spec.Platform.VSphere.VCenter,
-					Username: vSphereUsername,
-					Password: vSpherePassword,
+					VCenters: vcenters,
 				},
 			},
 		}

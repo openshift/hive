@@ -31,33 +31,50 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 
 	switch GetClusterPlatform(cd) {
 	case constants.PlatformVSphere:
-		secretKey := types.NamespacedName{Name: cd.Spec.Platform.VSphere.CredentialsSecretRef.Name, Namespace: cd.Namespace}
-		if err := kubeClient.Get(context.TODO(), secretKey, secret); err != nil {
+		key := types.NamespacedName{Name: cd.Spec.Platform.VSphere.CredentialsSecretRef.Name, Namespace: cd.Namespace}
+		if err := kubeClient.Get(context.TODO(), key, secret); err != nil {
 			logger.WithError(err).Error("failed to read in ClusterDeployment's platform creds")
 			return false, err
 		}
 
-		var rootCAFiles []string
+		// We need to install certs for our client to be able to talk to the vcenter.
+		// First load up the standard trusted CA bundle.
+		cabCM := &corev1.ConfigMap{}
+		key = types.NamespacedName{Namespace: cd.Namespace, Name: constants.TrustedCAConfigMapName}
+		if err := kubeClient.Get(context.TODO(), key, cabCM); err != nil {
+			logger.WithError(err).Error("failed to load trusted CA bundle ConfigMap")
+			return false, err
+		}
+		trustedCABundlePath, err := createCAFile(([]byte)(cabCM.Data[constants.TrustedCABundleFile]))
+		if trustedCABundlePath != "" {
+			defer os.Remove(trustedCABundlePath)
+		}
+		if err != nil {
+			logger.WithError(err).Error("failed to create trusted CA bundle file from ConfigMap")
+			return false, err
+		}
+		rootCAFiles := []string{trustedCABundlePath}
+
+		// Now load up configured certs.
 		if cd.Spec.Platform.VSphere.CertificatesSecretRef.Name != "" {
 			certificatesSecret := &corev1.Secret{}
-			certificatesKey := types.NamespacedName{Name: cd.Spec.Platform.VSphere.CertificatesSecretRef.Name, Namespace: cd.Namespace}
-			err := kubeClient.Get(context.TODO(), certificatesKey, certificatesSecret)
-			if err != nil {
+			key = types.NamespacedName{Name: cd.Spec.Platform.VSphere.CertificatesSecretRef.Name, Namespace: cd.Namespace}
+			if err := kubeClient.Get(context.TODO(), key, certificatesSecret); err != nil {
 				logger.WithError(err).Error("failed to read in vSphere certificates")
 				return false, err
 			}
 
-			rootCAFiles, err = createRootCAFiles(certificatesSecret)
-			defer func() {
-				for _, filename := range rootCAFiles {
-					os.Remove(filename)
+			for k, pem := range certificatesSecret.Data {
+				path, err := createCAFile(pem)
+				if path != "" {
+					defer os.Remove(path)
 				}
-			}()
-			if err != nil {
-				logger.WithError(err).Error("failed to create root CA files")
-				return false, err
+				if err != nil {
+					logger.WithError(err).WithField("fileKey", k).Error("failed to create CA file")
+					return false, err
+				}
+				rootCAFiles = append(rootCAFiles, path)
 			}
-
 		}
 
 		return validateVSphereCredentials(cd.Spec.Platform.VSphere.VCenter,
@@ -73,25 +90,18 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 	}
 }
 
-// createRootCAFiles creates a temporary file for each key/value pair in the Secret's Data.
-// Caller is responsible for cleaning up the created files.
-func createRootCAFiles(certificateSecret *corev1.Secret) ([]string, error) {
-	fileList := []string{}
-	for _, fileContent := range certificateSecret.Data {
-		tmpFile, err := os.CreateTemp("", "rootcacerts")
-		if err != nil {
-			return fileList, err
-		}
-		defer tmpFile.Close()
-
-		fileList = append(fileList, tmpFile.Name())
-
-		if _, err := tmpFile.Write(fileContent); err != nil {
-			return fileList, err
-		}
+// createCAFile writes pem to a temporary file and returns its path.
+// Caller is responsible for cleaning up the file.
+func createCAFile(pem []byte) (string, error) {
+	tmpFile, err := os.CreateTemp("", "rootcacerts")
+	if err != nil {
+		return "", err
 	}
-
-	return fileList, nil
+	defer tmpFile.Close()
+	if _, err := tmpFile.Write(pem); err != nil {
+		return tmpFile.Name(), err
+	}
+	return tmpFile.Name(), nil
 }
 
 func validateVSphereCredentials(vcenter, username, password string, rootCAFiles []string, logger log.FieldLogger) (bool, error) {

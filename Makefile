@@ -381,7 +381,7 @@ modfix:
 
 .PHONY: install-tools
 install-tools:
-	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen
+	go install $(GO_MOD_FLAGS) go.uber.org/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
 

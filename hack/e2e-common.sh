@@ -206,7 +206,7 @@ function save_hive_logs() {
       mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_pods.yaml
     fi
     # Autoscaler logs
-    if oc --kubeconfig=$tmpd/kubeconfig logs -n openshift-machine-api -l k8s-app=cluster-autoscaler-operator > $tmpf; then
+    if oc --kubeconfig=$tmpd/kubeconfig logs -n openshift-machine-api deploy/cluster-autoscaler-default > $tmpf; then
       mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_autoscaler.log
     fi
   done

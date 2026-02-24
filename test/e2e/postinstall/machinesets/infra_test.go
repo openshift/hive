@@ -318,6 +318,7 @@ poll:
 	clusterAutoscaler.Spec.ScaleDown.DelayAfterDelete = ptr.To("10s")
 	clusterAutoscaler.Spec.ScaleDown.DelayAfterFailure = ptr.To("10s")
 	clusterAutoscaler.Spec.ScaleDown.UnneededTime = ptr.To("10s")
+	clusterAutoscaler.Spec.LogVerbosity = ptr.To[int32](4)
 	err = rc.Update(context.Background(), clusterAutoscaler)
 	require.NoError(t, err, "could not update the cluster autoscaler")
 

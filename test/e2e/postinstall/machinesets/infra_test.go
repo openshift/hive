@@ -3,6 +3,8 @@ package machinesets
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
@@ -322,6 +325,10 @@ poll:
 	err = rc.Update(context.Background(), clusterAutoscaler)
 	require.NoError(t, err, "could not update the cluster autoscaler")
 
+	err = waitForMachines(logger, cfg, cd, machinePrefix, minReplicas)
+	require.NoError(t, err, "timed out waiting for machines to scale up to %d", minReplicas)
+	captureManifests(t, rc, fmt.Sprintf("2min_%s_%s", cd.Namespace, cd.Name))
+
 	// busyboxDeployment creates a large number of pods to place CPU pressure
 	// on the machine pool. With 100 replicas and a CPU request for each pod of
 	// 1, the total CPU request from the deployment is 100. For AWS using m6a.xlarge,
@@ -382,9 +389,10 @@ poll:
 	require.NoError(t, err, "cannot create busybox deployment")
 
 	err = waitForMachines(logger, cfg, cd, machinePrefix, maxReplicas)
-	require.NoError(t, err, "timed out waiting for machines to be created")
+	require.NoError(t, err, "timed out waiting for machines to scale up to %d", maxReplicas)
 	err = waitForNodes(logger, cfg, cd, machinePrefix, maxReplicas)
-	require.NoError(t, err, "timed out waiting for nodes to be created")
+	require.NoError(t, err, "timed out waiting for nodes to scale up to %d", maxReplicas)
+	captureManifests(t, rc, fmt.Sprintf("4max_%s_%s", cd.Namespace, cd.Name))
 
 	// Scale down
 	err = rc.Get(context.TODO(), client.ObjectKey{Namespace: "default", Name: "busybox"}, busyboxDeployment)
@@ -394,9 +402,10 @@ poll:
 	err = rc.Delete(context.TODO(), busyboxDeployment, client.PropagationPolicy(metav1.DeletePropagationForeground))
 	require.NoError(t, err, "could not delete busybox deployment")
 	err = waitForMachines(logger, cfg, cd, machinePrefix, minReplicas)
-	require.NoError(t, err, "timed out waiting for machine count")
+	require.NoError(t, err, "timed out waiting for machines to scale down to %d", minReplicas)
 	err = waitForNodes(logger, cfg, cd, machinePrefix, minReplicas)
-	require.NoError(t, err, "timed out waiting for nodes to be created")
+	require.NoError(t, err, "timed out waiting for nodes to scale down to %d", minReplicas)
+	captureManifests(t, rc, fmt.Sprintf("6min_%s_%s", cd.Namespace, cd.Name))
 
 	logger.Info("disabling autoscaling")
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -409,9 +418,10 @@ poll:
 	})
 	require.NoError(t, err, "cannot update worker machine pool to turn off auto-scaling")
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
-	require.NoError(t, err, "timed out waiting for machines to be created")
+	require.NoError(t, err, "timed out waiting for machine count to reach 3")
 	err = waitForNodes(logger, cfg, cd, machinePrefix, 3)
-	require.NoError(t, err, "timed out waiting for nodes to be created")
+	require.NoError(t, err, "timed out waiting for node count to reach 3")
+	captureManifests(t, rc, fmt.Sprintf("6fixed_%s_%s", cd.Namespace, cd.Name))
 }
 
 func waitForMachines(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, machinePrefix string, expectedReplicas int) error {
@@ -469,4 +479,23 @@ func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDe
 
 func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, error) {
 	return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName), nil
+}
+
+func captureManifests(t *testing.T, rc client.WithWatch, infix string) {
+	pods := &corev1.PodList{}
+	require.NoError(t,
+		rc.List(context.TODO(), pods), "failed to retrieve pods")
+	b, err := yaml.Marshal(pods)
+	require.NoError(t, err, "failed to marshal pod list")
+	require.NoError(t,
+		os.WriteFile(filepath.Join(os.Getenv("ARTIFACT_DIR"), fmt.Sprintf("SPOKE_%s_pods.yaml", infix)), b, 0644), "failed to write pod dump")
+
+	nodes := &corev1.NodeList{}
+	require.NoError(t,
+		rc.List(context.TODO(), nodes), "failed to retrieve nodes")
+	b, err = yaml.Marshal(nodes)
+	require.NoError(t, err, "failed to marshal node list")
+	require.NoError(t,
+		os.WriteFile(filepath.Join(os.Getenv("ARTIFACT_DIR"), fmt.Sprintf("SPOKE_%s_nodes.yaml", infix)), b, 0644), "failed to write node dump")
+
 }

@@ -199,15 +199,15 @@ function save_hive_logs() {
     oc extract secret/$s -n $ns --to=$tmpd || continue
     # Nodes
     if oc --kubeconfig=$tmpd/kubeconfig get no -o yaml > $tmpf; then
-      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_nodes.yaml
+      mv $tmpf $ARTIFACT_DIR/SPOKE_9exit_${ns}_${cd}_nodes.yaml
     fi
     # Pods
     if oc --kubeconfig=$tmpd/kubeconfig get po -A -o yaml > $tmpf; then
-      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_pods.yaml
+      mv $tmpf $ARTIFACT_DIR/SPOKE_9exit_${ns}_${cd}_pods.yaml
     fi
     # Autoscaler logs
     if oc --kubeconfig=$tmpd/kubeconfig logs -n openshift-machine-api deploy/cluster-autoscaler-default > $tmpf; then
-      mv $tmpf $ARTIFACT_DIR/SPOKE_${ns}_${cd}_autoscaler.log
+      mv $tmpf $ARTIFACT_DIR/SPOKE_9exit_${ns}_${cd}_autoscaler.log
     fi
   done
 }

@@ -4,12 +4,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
 	awscreds "github.com/openshift/hive/pkg/creds/aws"
+
 	"github.com/openshift/installer/pkg/destroy/aws"
+	"github.com/openshift/installer/pkg/destroy/providers"
+	"github.com/openshift/installer/pkg/types"
+	awstypes "github.com/openshift/installer/pkg/types/aws"
 )
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
@@ -22,14 +27,15 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 		Short: "Deprovision AWS assets (as created by openshift-installer) with the given tag(s)",
 		Long:  "Deprovision AWS assets (as created by openshift-installer) with the given tag(s).  A resource matches the filter if any of the key/value pairs are in its tags.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := completeAWSUninstaller(opt, logLevel, args); err != nil {
-				log.WithError(err).Error("Cannot complete command")
+			destroyer, err := createAWSDestroyer(opt, logLevel, args)
+			if err != nil {
+				log.WithError(err).Error("failed to create destroyer")
 				return
 			}
 
-			log.Infof("Running destroyer with ClusterUninstall %#v", *opt)
+			log.Infof("Running destroyer %#v", destroyer)
 			// ClusterQuota stomped in return
-			if _, err := opt.Run(); err != nil {
+			if _, err := destroyer.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},
@@ -43,40 +49,43 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	return cmd
 }
 
-func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []string) error {
-
-	for _, arg := range args {
-		filter := aws.Filter{}
-		err := parseFilter(filter, arg)
-		if err != nil {
-			return fmt.Errorf("cannot parse filter %s: %v", arg, err)
-		}
-		o.Filters = append(o.Filters, filter)
+func createAWSDestroyer(o *aws.ClusterUninstaller, logLevel string, args []string) (providers.Destroyer, error) {
+	metadata := &types.ClusterMetadata{
+		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
+			AWS: &awstypes.Metadata{
+				Region:         o.Region,
+				ClusterDomain:  o.ClusterDomain,
+				HostedZoneRole: o.HostedZoneRole,
+			},
+		},
 	}
 
-	var err error
-	if o.Logger, err = utils.NewLogger(logLevel); err != nil {
-		return err
+	for _, arg := range args {
+		parts := strings.SplitN(arg, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("incorrectly formatted filter: %q", arg)
+		}
+		// HACK: we need to populate the InfraID in the metadata, but we don't receive it directly.
+		// Get it from the filter.
+		keyParts := strings.Split(parts[0], "/")
+		if len(keyParts) == 3 && keyParts[0] == "kubernetes.io" && keyParts[1] == "cluster" {
+			metadata.InfraID = keyParts[2]
+		}
+		metadata.AWS.Identifier = append(metadata.AWS.Identifier, map[string]string{parts[0]: parts[1]})
+	}
+
+	logger, err := utils.NewLogger(logLevel)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create logger")
 	}
 
 	client, err := utils.GetClient("hiveutil-aws-tag-deprovision")
 	if err != nil {
-		o.Logger.Warnf("Failed to get client: %v\n"+
+		logger.Warnf("Failed to get client: %v\n"+
 			"This is expected when in standalone mode. "+
 			"We expect to find your AWS credentials in one of the usual places.", err)
 	}
-	awscreds.ConfigureCreds(client, nil)
+	awscreds.ConfigureCreds(client, metadata)
 
-	return nil
-}
-
-func parseFilter(filterMap aws.Filter, str string) error {
-	parts := strings.SplitN(str, "=", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("incorrectly formatted filter")
-	}
-
-	filterMap[parts[0]] = parts[1]
-
-	return nil
+	return providers.Registry[awstypes.Name](logger, metadata)
 }

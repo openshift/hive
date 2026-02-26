@@ -50,6 +50,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesaws "github.com/openshift/installer/pkg/types/aws"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
@@ -655,15 +656,22 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 	logger.Info("starting a cleanup failed provision for ClusterDeployment with infraID: ", infraID)
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		// run the uninstaller to clean up any cloud resources previously created
-		filters := []aws.Filter{
-			{kubernetesKeyPrefix + infraID: "owned"},
-			{capaKeyPrefix + infraID: "owned"},
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				AWS: &installertypesaws.Metadata{
+					Region: cd.Spec.Platform.AWS.Region,
+					Identifier: []map[string]string{
+						{kubernetesKeyPrefix + infraID: "owned"},
+						{capaKeyPrefix + infraID: "owned"},
+					},
+				},
+			},
 		}
-		uninstaller = &aws.ClusterUninstaller{
-			Filters: filters,
-			Region:  cd.Spec.Platform.AWS.Region,
-			Logger:  logger,
+		var err error
+		uninstaller, err = aws.New(logger, metadata)
+		if err != nil {
+			return err
 		}
 	case cd.Spec.Platform.Azure != nil:
 		cloudName := installertypesazure.PublicCloud.Name()

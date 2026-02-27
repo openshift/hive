@@ -63,9 +63,15 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfigSecret *co
 		if ic.Platform.VSphere == nil {
 			return ic, errors.New(novSpherePlatformErr)
 		}
-		if (ic.Platform.VSphere.DeprecatedUsername == "" || ic.Platform.VSphere.DeprecatedPassword == "") &&
-			(len(ic.Platform.VSphere.VCenters) == 0 || ic.Platform.VSphere.VCenters[0].Username == "" ||
-				ic.Platform.VSphere.VCenters[0].Password == "") {
+
+		hasCreds := ic.Platform.VSphere.DeprecatedUsername != "" || ic.Platform.VSphere.DeprecatedPassword != ""
+		for _, vcenter := range ic.Platform.VSphere.VCenters {
+			if vcenter.Username != "" && vcenter.Password != "" {
+				hasCreds = true
+			}
+		}
+
+		if !hasCreds {
 			return ic, errors.New(missingvSphereCredentialsErr)
 		}
 	case platform.Nutanix != nil:

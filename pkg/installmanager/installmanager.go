@@ -736,13 +736,20 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if vSpherePassword == "" {
 			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 		}
+
+		vcenters := make([]installertypesvsphere.VCenters, 0, len(cd.Spec.Platform.VSphere.Infrastructure.VCenters))
+		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+			vcenters = append(vcenters, installertypesvsphere.VCenters{
+				VCenter:  vcenter.Server,
+				Username: vcenter.Username,
+				Password: vcenter.Password,
+			})
+		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				VSphere: &installertypesvsphere.Metadata{
-					VCenter:  cd.Spec.Platform.VSphere.VCenter,
-					Username: vSphereUsername,
-					Password: vSpherePassword,
+					VCenters: vcenters,
 				},
 			},
 		}
@@ -1894,7 +1901,7 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+// injectProviderCredentials Add the credentials from a given secret into the ic if not present
 func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:

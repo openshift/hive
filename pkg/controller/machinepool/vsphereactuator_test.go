@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/openshift/installer/pkg/types/vsphere"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,13 +30,20 @@ func TestVSphereActuator(t *testing.T) {
 		expectedErr                bool
 	}{
 		{
+			name:              "deprecated vsphere fields",
+			clusterDeployment: testDeprecatedVSphereClusterDeployment(),
+			pool:              testVSpherePool(),
+			masterMachine:     testVSphereMachine("master0", "master"),
+			expectedErr:       true,
+		},
+		{
 			name:              "generate machineset",
 			clusterDeployment: testVSphereClusterDeployment(),
 			pool:              testVSpherePool(),
+			masterMachine:     testVSphereMachine("master0", "master"),
 			expectedMachineSetReplicas: map[string]int64{
 				fmt.Sprintf("%s-worker-0", testInfraID): 3,
 			},
-			masterMachine: testVSphereMachine("master0", "master"),
 		},
 	}
 
@@ -73,8 +81,8 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 			assert.Equal(t, int32(4), vsphereProvider.NumCPUs, "unexpected NumCPUs")
 			assert.Equal(t, int32(4), vsphereProvider.NumCoresPerSocket, "unexpected NumCoresPerSocket")
 			assert.Equal(t, int32(512), vsphereProvider.DiskGiB, "unexpected DiskGiB")
-			assert.Equal(t, "/vsphere-datacenter/vm/vsphere-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
-			assert.Equal(t, "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool", vsphereProvider.Workspace.ResourcePool, "unexpected ResourcePool")
+			assert.Equal(t, "default-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
+			assert.Equal(t, "good-pool", vsphereProvider.Workspace.ResourcePool, "unexpected ResourcePool")
 			if assert.Len(t, vsphereProvider.TagIDs, 1, "missing tag IDs") {
 				assert.Equal(t, vsphereProvider.TagIDs[0], "vsphere-tag")
 			}
@@ -85,18 +93,35 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 func testVSpherePool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
+		// Observation: when constructing this way, we have to use hive.MachinePool{installer.MachinePool{}}
+		// whereas when accessing it, we can (optionally) skip the intermediate (e.g. ...Platform.VSphere.MemoryMiB)
 		VSphere: &hivev1vsphere.MachinePool{
-			ResourcePool:      "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool",
-			MemoryMiB:         32 * 1024,
-			NumCPUs:           4,
-			NumCoresPerSocket: 4,
-			OSDisk: hivev1vsphere.OSDisk{
-				DiskSizeGB: 512,
+			MachinePool: vsphere.MachinePool{
+				MemoryMiB:         32 * 1024,
+				NumCPUs:           4,
+				NumCoresPerSocket: 4,
+				OSDisk: vsphere.OSDisk{
+					DiskSizeGB: 512,
+				},
 			},
-			TagIDs: []string{"vsphere-tag"},
+			ResourcePool: "good-pool",
+			TagIDs:       []string{"vsphere-tag"},
 		},
 	}
 	return p
+}
+
+func testDeprecatedVSphereClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Platform = hivev1.Platform{
+		VSphere: &hivev1vsphere.Platform{
+			CredentialsSecretRef: corev1.LocalObjectReference{
+				Name: "vsphere-credentials",
+			},
+			DeprecatedFolder: "/vsphere-datacenter/vm/vsphere-folder",
+		},
+	}
+	return cd
 }
 
 func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
@@ -106,7 +131,22 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: "vsphere-credentials",
 			},
-			Folder: "/vsphere-datacenter/vm/vsphere-folder",
+			Infrastructure: &vsphere.Platform{
+				VCenters: []vsphere.VCenter{
+					{
+						Server: "test-server",
+					},
+				},
+				FailureDomains: []vsphere.FailureDomain{
+					{
+						Server: "test-server",
+						Topology: vsphere.Topology{
+							ResourcePool: "default-pool",
+							Folder:       "default-folder",
+						},
+					},
+				},
+			},
 		},
 	}
 	return cd

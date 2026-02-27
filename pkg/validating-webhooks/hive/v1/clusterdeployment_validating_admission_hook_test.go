@@ -24,6 +24,7 @@ import (
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/util/contracts"
@@ -128,17 +129,46 @@ func validOpenStackClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func deprecatedVSphereClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
+		DeprecatedVCenter:          "somevcenter.com",
+		CredentialsSecretRef:       corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		CertificatesSecretRef:      corev1.LocalObjectReference{Name: "fake-cert-secret"},
+		DeprecatedDatacenter:       "dc1",
+		DeprecatedDefaultDatastore: "vmse-test",
+		DeprecatedFolder:           "/dc1/vm/test",
+		DeprecatedCluster:          "test",
+		DeprecatedNetwork:          "Network",
+	}
+	return cd
+}
+
 func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
-		VCenter:               "somevcenter.com",
 		CredentialsSecretRef:  corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
-		Datacenter:            "dc1",
-		DefaultDatastore:      "vmse-test",
-		Folder:                "/dc1/vm/test",
-		Cluster:               "test",
-		Network:               "Network",
+		Infrastructure: &installervsphere.Platform{
+			VCenters: []installervsphere.VCenter{
+				{
+					Server:      "somevcenter.com",
+					Datacenters: []string{"dc1"},
+				},
+			},
+			FailureDomains: []installervsphere.FailureDomain{
+				{
+					Server: "somevcenter.com",
+					Topology: installervsphere.Topology{
+						Datacenter:     "dc1",
+						Datastore:      "vmse-test",
+						Folder:         "/dc1/vm/test",
+						ComputeCluster: "test",
+						Networks:       []string{"Network"},
+					},
+				},
+			},
+		},
 	}
 	return cd
 }
@@ -1651,6 +1681,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:            "vSphere create valid with legacy (pre-zonal) shape",
+			newObject:       deprecatedVSphereClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "Nutanix create valid",
 			newObject:       validNutanixClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -1847,6 +1883,46 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					},
 				}},
 			},
+		},
+		{
+			name:            "vsphere platform can remain legacy (pre-zonal) shape",
+			oldObject:       deprecatedVSphereClusterDeployment(),
+			newObject:       deprecatedVSphereClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:            "vsphere platform can be zonal-ified",
+			oldObject:       deprecatedVSphereClusterDeployment(),
+			newObject:       validVSphereClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name:      "vsphere platform cannot be de-zonal-ified",
+			oldObject: validVSphereClusterDeployment(),
+			newObject: deprecatedVSphereClusterDeployment(),
+			operation: admissionv1beta1.Update,
+		},
+		{
+			name: "vsphere platform immutable if not being zonal-ified (deprecated shape)",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := deprecatedVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.CredentialsSecretRef.Name = "changed"
+				return cd
+			}(),
+			newObject: deprecatedVSphereClusterDeployment(),
+			operation: admissionv1beta1.Update,
+		},
+		{
+			name: "vsphere platform immutable if not being zonal-ified (zonal shape)",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.ClusterOSImage = "changed"
+				return cd
+			}(),
+			newObject: validVSphereClusterDeployment(),
+			operation: admissionv1beta1.Update,
 		},
 	}
 

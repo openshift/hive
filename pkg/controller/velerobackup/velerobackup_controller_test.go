@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 

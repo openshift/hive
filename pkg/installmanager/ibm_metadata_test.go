@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/IBM/platform-services-go-sdk/iamidentityv1"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/openshift/hive/pkg/ibmclient"
 	mockibm "github.com/openshift/hive/pkg/ibmclient/mock"
 	"github.com/stretchr/testify/assert"

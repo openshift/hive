@@ -78,7 +78,7 @@ func (p *OpenStackCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	}
 }
 
-func (p *OpenStackCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *OpenStackCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.OpenStack = &hivev1openstack.MachinePool{
 		Flavor: p.ComputeFlavor,
 	}

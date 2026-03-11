@@ -102,7 +102,7 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	return platform
 }
 
-func (p *NutanixCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
+func (p *NutanixCloudBuilder) AddMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.Nutanix = &hivev1nutanix.MachinePool{
 		NumCPUs:           4,
 		NumCoresPerSocket: 2,

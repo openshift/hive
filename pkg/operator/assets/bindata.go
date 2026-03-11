@@ -1458,6 +1458,7 @@ rules:
   - get
   - list
   - watch
+  - delete
 `)
 
 func configRbacHive_frontend_roleYamlBytes() ([]byte, error) {

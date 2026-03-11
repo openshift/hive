@@ -82,7 +82,7 @@ endif
 # Note that building against a local commit may result in {major}.{minor} being rendered as
 # 0.0.x-y if it is an `UnknownBranch`. However, the {commitcount} and {sha}
 # should still be accurate.
-SOURCE_GIT_TAG := v$(shell hack/version2.sh)
+SOURCE_GIT_TAG := $(shell hack/version2.sh)
 
 BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)

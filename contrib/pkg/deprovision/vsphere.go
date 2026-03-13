@@ -1,9 +1,6 @@
 package deprovision
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -13,17 +10,15 @@ import (
 	typesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	"github.com/openshift/hive/pkg/constants"
 	vspherecreds "github.com/openshift/hive/pkg/creds/vsphere"
 )
 
 // vSphereOptions is the set of options to deprovision an vSphere cluster
 type vSphereOptions struct {
 	logLevel string
-	infraID  string
-	vCenter  string
-	username string
-	password string
+	// Only used when creds uses deprecated/legacy format (username/password with no vcenters)
+	vCenters []string
+	metadata *types.ClusterMetadata
 }
 
 // NewDeprovisionvSphereCommand is the entrypoint to create the vSphere deprovision subcommand
@@ -39,48 +34,43 @@ func NewDeprovisionvSphereCommand(logLevel string) *cobra.Command {
 			if err := opt.Complete(cmd, args); err != nil {
 				log.WithError(err).Fatal("failed to complete options")
 			}
-			if err := opt.Validate(cmd); err != nil {
-				log.WithError(err).Fatal("validation failed")
-			}
 			if err := opt.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.vCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
+	// Only used when creds uses deprecated/legacy format (username/password with no vcenters)
+	flags.StringSliceVar(&opt.vCenters, "vsphere-vcenters", []string{}, "Domain name(s) of the vCenter(s)")
 	return cmd
 }
 
 // Complete finishes parsing arguments for the command
 func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
-	o.infraID = args[0]
+	o.metadata = &types.ClusterMetadata{
+		InfraID: args[0],
+		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
+			VSphere: &typesvsphere.Metadata{
+				// This entire slice will be replaced via Unmarshal() if new-style creds Secret is in play.
+				// Otherwise it will be populated with copies of the single username/password from the
+				// old-style creds Secret.
+				VCenters: make([]typesvsphere.VCenters, len(o.vCenters)),
+			},
+		},
+	}
+	for i, vCenter := range o.vCenters {
+		o.metadata.VSphere.VCenters[i] = typesvsphere.VCenters{
+			VCenter: vCenter,
+		}
+	}
 
 	client, err := utils.GetClient("hiveutil-deprovision-vsphere")
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	vspherecreds.ConfigureCreds(client, nil)
 
-	return nil
-}
+	vspherecreds.ConfigureCreds(client, o.metadata)
 
-// Validate ensures that option values make sense
-func (o *vSphereOptions) Validate(cmd *cobra.Command) error {
-	if o.vCenter == "" {
-		o.vCenter = os.Getenv(constants.VSphereVCenterEnvVar)
-		if o.vCenter == "" {
-			return fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
-		}
-	}
-	o.username = os.Getenv(constants.VSphereUsernameEnvVar)
-	if o.username == "" {
-		return fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
-	}
-	o.password = os.Getenv(constants.VSpherePasswordEnvVar)
-	if o.password == "" {
-		return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
-	}
 	return nil
 }
 
@@ -91,18 +81,7 @@ func (o *vSphereOptions) Run() error {
 		return err
 	}
 
-	metadata := &types.ClusterMetadata{
-		InfraID: o.infraID,
-		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
-			VSphere: &typesvsphere.Metadata{
-				VCenter:  o.vCenter,
-				Username: o.username,
-				Password: o.password,
-			},
-		},
-	}
-
-	destroyer, err := vsphere.New(logger, metadata)
+	destroyer, err := vsphere.New(logger, o.metadata)
 	if err != nil {
 		return err
 	}

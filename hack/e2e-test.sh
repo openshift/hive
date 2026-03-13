@@ -95,9 +95,10 @@ else
 fi
 
 echo "Creating cluster deployment"
+# - For cost savings, use two workers instead of three.
 # - Add a bogus API URL override to validate that our unreachable controller correctly
 #   falls back to the default API URL when the override is unreachable.
-# - For cost savings, use two workers instead of three.
+# - Skip image signature verification for nightlies in CI.
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
 	${CREDS_FILE_ARG} \
@@ -114,7 +115,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS} \
   -o json \
-  | jq '.items[0].spec.controlPlaneConfig.apiURLOverride = "bogus-url.example.com"' \
+  | jq '.items[0].spec.controlPlaneConfig.apiURLOverride = "bogus-url.example.com" | .items[0].spec.provisioning.installerEnv = [{"name": "OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY", "value": "true"}]' \
   | oc apply -f -
 
 echo "Creating fake clusterinstall artifacts"

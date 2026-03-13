@@ -221,6 +221,7 @@ POOL_SIZE=1
 # stale, BUT it doesn't get purged until it's done provisioning. (Intentional
 # architectural decision to prefer presenting a stale claimable cluster early vs.
 # delaying until a non-stale one is available.)
+# Skip image signature verification for nightlies in CI.
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   -n "${CLUSTER_NAMESPACE}" \
   --cloud="${CLOUD}" \
@@ -231,7 +232,9 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --image-set "${IMAGESET_NAME}" \
   --region us-east-1 \
   --size 0 \
-  ${REAL_POOL_NAME}
+  ${REAL_POOL_NAME} -o json \
+  | jq '.items[0].spec.installerEnv = [{"name": "OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY", "value": "true"}]' \
+  | oc apply -f -
 
 ### INTERLUDE: FAKE POOL
 # The real cluster pool is going to take a while to become ready. While that

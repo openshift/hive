@@ -302,6 +302,7 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	if p := spec.Platform.VSphere; p != nil {
 		platforms = append(platforms, "vsphere")
 		allErrs = append(allErrs, validateVSphereMachinePoolPlatformInvariants(p, platformPath.Child("vsphere"))...)
+		validZeroSizeAutoscalingMinReplicas = true
 	}
 	if p := spec.Platform.IBMCloud; p != nil {
 		platforms = append(platforms, "ibmcloud")

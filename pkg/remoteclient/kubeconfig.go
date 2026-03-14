@@ -9,7 +9,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -39,7 +38,7 @@ func (b *kubeconfigBuilder) Build() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = restmapper.GetAPIGroupResources(dc)
+	_, err = dc.ServerVersion()
 	if err != nil {
 		return nil, err
 	}

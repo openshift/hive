@@ -16,7 +16,7 @@ import (
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"

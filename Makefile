@@ -235,13 +235,13 @@ verify-vendor: vendor
 verify: verify-vendor
 
 # Build the template file used for direct (OLM-less) deploy by app-sre
-build-app-sre-template: ensure-kustomize
+build-app-sre-template: ensure-kustomize ensure-yq
 	# Sync CRDs into kustomize resources
 	cd hack/app-sre && ../../$(KUSTOMIZE) edit add resource ../../config/crds/*.yaml
 	# Generate temporary saas object file
 	$(KUSTOMIZE) build --load-restrictor=LoadRestrictionsNone hack/app-sre --output hack/app-sre/saas-objects.yaml
 	# Generate saas template
-	./hack/app-sre/generate-saas-template.py hack/app-sre/saas-template-stub.yaml hack/app-sre/saas-objects.yaml hack/app-sre/saas-template.yaml
+	YQ=$(YQ) ./hack/app-sre/generate-saas-template.sh hack/app-sre/saas-template-stub.yaml hack/app-sre/saas-objects.yaml hack/app-sre/saas-template.yaml
 	# Remove temporary saas object file
 	rm hack/app-sre/saas-objects.yaml
 

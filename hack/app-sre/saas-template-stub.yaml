@@ -1,4 +1,4 @@
-# This is used by generate-saas-template.py to generate saas-template.yaml.
+# This is used by generate-saas-template.sh to generate saas-template.yaml.
 # Edit this file only to manage parameters.
 apiVersion: v1
 kind: Template
@@ -11,5 +11,5 @@ parameters:
   - name: IMAGE_DIGEST
     required: true
 
-# Populated by generate-saas-template.py with the objects in saas-objects.yaml
+# Populated by generate-saas-template.sh with the objects in saas-objects.yaml
 objects: []

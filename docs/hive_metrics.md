@@ -25,6 +25,8 @@
 
 Hive publishes metrics, which can help admins to monitor the Hive operations. Most of these metrics are always published; a few are [optional](#optional-metrics).
 
+Please refer to [Viewing Metrics with Prometheus](./developing.md#viewing-metrics-with-prometheus) for deploying a stateless prometheus pod in the hive namespace.
+
 ### Optional Metrics
 
 #### Duration-based Metrics

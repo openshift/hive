@@ -3,7 +3,7 @@ package resource
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,11 +51,6 @@ func (r *helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 }
 
 func (r *helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
-	// This is bizarre and I don't know why it works, but it's the only way I could figure out
-	// to set the `manager` properly. HIVE-1744.
-	os.Args = []string{
-		"hive7-" + string(r.controllerName),
-	}
 	cmd := kcmdpatch.NewCmdPatch(f, ioStreams)
 	cmd.Flags().Parse([]string{})
 
@@ -77,6 +72,20 @@ func (r *helper) setupPatchCommand(name, kind, apiVersion, patchType string, f c
 	}
 	o.PatchType = patchType
 	o.Patch = patch
+	setPrivateFieldManagerHACK(o, "hive7-"+string(r.controllerName))
 
 	return o, nil
+}
+
+// setPrivateFieldManagerHACK sets the private fieldManager field on PatchOptions via reflection.
+// This is necessary because PatchOptions.fieldManager is private, and o.Complete() does not read the
+// field manager value from the cobra command. Without this, the API server falls back to the
+// User-Agent (the binary name) as the field manager, which is why the old os.Args hack worked.
+// This isn't necessary in Apply and friends because the options FieldManager field is public.
+// HIVE-3099, HIVE-1744
+func setPrivateFieldManagerHACK(o *kcmdpatch.PatchOptions, manager string) {
+	v := reflect.ValueOf(o).Elem()
+	f := v.FieldByName("fieldManager")
+	p := reflect.NewAt(f.Type(), f.Addr().UnsafePointer()).Elem()
+	p.SetString(manager)
 }

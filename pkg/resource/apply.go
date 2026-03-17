@@ -48,11 +48,8 @@ func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 		r.logger.WithError(err).Error("failed to obtain factory for apply")
 		return "", err
 	}
-	ioStreams := genericclioptions.IOStreams{
-		In:     &bytes.Buffer{},
-		Out:    &bytes.Buffer{},
-		ErrOut: &bytes.Buffer{},
-	}
+	ioStreams := getIOStreams()
+	defer returnIOStreams(ioStreams)
 	applyOptions, changeTracker, err := r.setupApplyCommand(factory, obj, ioStreams)
 	if err != nil {
 		r.logger.WithError(err).Error("failed to setup apply command")
@@ -86,7 +83,8 @@ func (r *helper) CreateOrUpdate(obj []byte) (ApplyResult, error) {
 		return "", err
 	}
 
-	errOut := &bytes.Buffer{}
+	errOut := getBuffer()
+	defer returnBuffer(errOut)
 	result, err := r.createOrUpdate(factory, obj, errOut)
 	if err != nil {
 		r.logger.WithError(err).

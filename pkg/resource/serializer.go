@@ -75,7 +75,7 @@ func (p *jsonPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // `timeCreated: null` which always causes a mismatch with whatever's already in the server.
 func Serialize(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
 	printer := printers.NewTypeSetter(scheme).ToPrinter(&jsonPrinter{})
-	buf := &bytes.Buffer{}
+	buf := &bytes.Buffer{} // do not use a buffer from the pool: the bytes returned point to this buffer
 	if err := printer.PrintObj(obj, buf); err != nil {
 		return nil, err
 	}

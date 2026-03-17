@@ -23,11 +23,8 @@ var (
 // Patch invokes the kubectl patch command with the given resource, patch and patch type
 func (r *helper) Patch(name types.NamespacedName, kind, apiVersion string, patch []byte, patchType string) error {
 
-	ioStreams := genericclioptions.IOStreams{
-		In:     &bytes.Buffer{},
-		Out:    &bytes.Buffer{},
-		ErrOut: &bytes.Buffer{},
-	}
+	ioStreams := getIOStreams()
+	defer returnIOStreams(ioStreams)
 	factory, err := r.getFactory(name.Namespace)
 	if err != nil {
 		return err

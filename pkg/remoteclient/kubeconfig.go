@@ -13,11 +13,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func NewBuilderFromKubeconfig(c client.Client, secret *corev1.Secret, controllerName hivev1.ControllerName) Builder {
+func NewBuilderFromKubeconfig(c client.Client, secret *corev1.Secret, controllerName hivev1.ControllerName, opts ...BuilderOption) Builder {
+	var bo builderOptions
+	for _, o := range opts {
+		o(&bo)
+	}
 	return &kubeconfigBuilder{
 		c:            c,
 		secret:       secret,
 		fieldManager: "hive3-" + string(controllerName),
+		opts:         bo,
 	}
 }
 
@@ -25,6 +30,7 @@ type kubeconfigBuilder struct {
 	c            client.Client
 	secret       *corev1.Secret
 	fieldManager string
+	opts         builderOptions
 }
 
 // Build is also responsible for verifying reachability of client
@@ -89,5 +95,12 @@ func (b *kubeconfigBuilder) UseSecondaryAPIURL() Builder {
 }
 
 func (b *kubeconfigBuilder) RESTConfig() (*rest.Config, error) {
-	return utils.RestConfigFromSecret(b.secret, false)
+	cfg, err := utils.RestConfigFromSecret(b.secret, false)
+	if err != nil {
+		return nil, err
+	}
+	if b.opts.transportWrapper != nil {
+		cfg.Wrap(b.opts.transportWrapper)
+	}
+	return cfg, nil
 }

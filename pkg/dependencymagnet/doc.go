@@ -25,4 +25,10 @@ import (
 	// TODO: remove this patch with kube bump to 1.34, which will carry the fix (https://github.com/kubernetes/kubernetes/pull/132378)
 	// Work around for https://github.com/kubernetes/kubernetes/issues/132377
 	_ "k8s.io/code-generator/cmd/validation-gen"
+
+	// Used for envtest
+	_ "sigs.k8s.io/controller-runtime/tools/setup-envtest"
+
+	// Used for benchmark result comparison (see hack/benchmark-comparison.sh)
+	_ "golang.org/x/perf/cmd/benchstat"
 )

@@ -23,3 +23,12 @@ reviews:
       copied into vendor directories for generation. These are the ones we care about. So when I say
       "skip inherited definitions from vendored type files" I mean those with `vendor/` in the path
       *unless* it's `vendor/github.com/openshift/hive/...`.)
+  - path: vendor/**
+    instructions: |-
+      These files are dependency files vendored in our codebase. We have automated testing to ensure
+      that this directory is properly kept up to date with changes made to go.mod etc. Do not review
+      dependency code changes, as they are out of scope for the hive repo. For example, if we upgrade
+      kubernetes versions, there will be significant changes in the vendor folder. You should skip all
+      of these files entirely, as reviewing code changes in kubernetes would be wildly out of scope.
+      The one exception to this is `vendor/github.com/openshift/hive/**`, which should be a direct copy
+      of the `apis` folder found in the root of the repo, referenced by the CRD generation guidance above.

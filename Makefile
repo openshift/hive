@@ -80,8 +80,9 @@ endif
 # we don't tag versions. Override using the same versioning we apply to OperatorHub builds:
 # v{major}.{minor}.{commitcount}-{sha}
 # Note that building against a local commit may result in {major}.{minor} being rendered as
-# `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
-SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3 -mpip --no-cache install --user gitpython pyyaml >&2; hack/version2.py)
+# 0.0.x-y if it is an `UnknownBranch`. However, the {commitcount} and {sha}
+# should still be accurate.
+SOURCE_GIT_TAG := $(shell hack/version2.sh)
 
 BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
@@ -234,13 +235,13 @@ verify-vendor: vendor
 verify: verify-vendor
 
 # Build the template file used for direct (OLM-less) deploy by app-sre
-build-app-sre-template: ensure-kustomize
+build-app-sre-template: ensure-kustomize ensure-yq
 	# Sync CRDs into kustomize resources
 	cd hack/app-sre && ../../$(KUSTOMIZE) edit add resource ../../config/crds/*.yaml
 	# Generate temporary saas object file
 	$(KUSTOMIZE) build --load-restrictor=LoadRestrictionsNone hack/app-sre --output hack/app-sre/saas-objects.yaml
 	# Generate saas template
-	./hack/app-sre/generate-saas-template.py hack/app-sre/saas-template-stub.yaml hack/app-sre/saas-objects.yaml hack/app-sre/saas-template.yaml
+	YQ=$(YQ) ./hack/app-sre/generate-saas-template.sh hack/app-sre/saas-template-stub.yaml hack/app-sre/saas-objects.yaml hack/app-sre/saas-template.yaml
 	# Remove temporary saas object file
 	rm hack/app-sre/saas-objects.yaml
 

@@ -215,7 +215,7 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 }
 
 func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]compute.Image, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Minute)
 	defer cancel()
 
 	var images []compute.Image

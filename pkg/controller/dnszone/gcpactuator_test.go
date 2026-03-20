@@ -3,7 +3,7 @@ package dnszone
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/gcpclient/mock"
 	log "github.com/sirupsen/logrus"

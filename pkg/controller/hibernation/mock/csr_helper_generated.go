@@ -8,7 +8,7 @@ import (
 	x509 "crypto/x509"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1 "k8s.io/api/certificates/v1"
 	kubernetes "k8s.io/client-go/kubernetes"

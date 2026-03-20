@@ -3,7 +3,7 @@ package installmanager
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	corev1 "k8s.io/api/core/v1"

@@ -12,56 +12,50 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
-	"github.com/openshift/hive/pkg/constants"
 )
 
 var _ CloudBuilder = (*VSphereCloudBuilder)(nil)
 
 // VSphereCloudBuilder encapsulates cluster artifact generation logic specific to vSphere.
 type VSphereCloudBuilder struct {
-	// VCenter is the domain name or IP address of the vCenter.
-	VCenter string
-
-	// Username is the name of the user to use to connect to the vCenter.
-	Username string
-
-	// Password is the password for the user to use to connect to the vCenter.
-	Password string
-
-	// Datacenter is the name of the datacenter to use in the vCenter.
-	Datacenter string
-
-	// DefaultDatastore is the default datastore to use for provisioning volumes.
-	DefaultDatastore string
-
-	// Folder is the name of the folder that will be used and/or created for
-	// virtual machines.
-	Folder string
-
-	// Cluster is the name of the cluster virtual machines will be cloned into.
-	Cluster string
-
-	// APIVIP is the virtual IP address for the api endpoint
-	APIVIP string
-
-	// IngressVIP is the virtual IP address for ingress
-	IngressVIP string
-
-	// Network specifies the name of the network to be used by the cluster.
-	Network string
+	// This map is (at the time of this writing) expected to contain a subset of the following keys:
+	// Old format:
+	// - "username": string username
+	// - "password": string cleartext password
+	// New format:
+	// - "vCenters": JSON string representing a github.com/openshift/installer/pkg/types/vsphere/VCenters
+	CredsSecretData map[string][]byte
 
 	// CACert is the CA certificate(s) used to communicate with the vCenter.
 	CACert []byte
+
+	// Infrastructure is the full vSphere platform spec
+	// WARNING: Assume this contains creds! Access via the Infrastructure() getter.
+	infrastructure *installervsphere.Platform
 }
 
-func NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret *corev1.Secret) *VSphereCloudBuilder {
-	username := credsSecret.Data[constants.UsernameSecretKey]
-	password := credsSecret.Data[constants.PasswordSecretKey]
-	cacert := certsSecret.Data[".cacert"]
+// Returns the VSphere Platform (install-config style) of the builder. If `clean` is true,
+// we will scrub the credentials out of it. Do this e.g. if injecting into a non-Secret CR,
+// but not e.g. if producing the install-config.yaml Secret, which (currently) is expected
+// to contain credentials.
+func (b *VSphereCloudBuilder) Infrastructure(clean bool) *installervsphere.Platform {
+	if !clean {
+		return b.infrastructure
+	}
+	// Scrub credentials
+	i := b.infrastructure.DeepCopy()
+	i.DeprecatedPassword = ""
+	for _, v := range i.VCenters {
+		v.Password = ""
+	}
+	return i
+}
+
+func NewVSphereCloudBuilder(creds map[string][]byte, certs []byte, infra *installervsphere.Platform) *VSphereCloudBuilder {
 	return &VSphereCloudBuilder{
-		Username: string(username),
-		Password: string(password),
-		CACert:   cacert,
+		CredsSecretData: creds,
+		CACert:          certs,
+		infrastructure:  infra,
 	}
 }
 
@@ -76,10 +70,7 @@ func (p *VSphereCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secr
 			Namespace: o.Namespace,
 		},
 		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
-			constants.UsernameSecretKey: p.Username,
-			constants.PasswordSecretKey: p.Password,
-		},
+		Data: p.CredsSecretData,
 	}
 }
 
@@ -111,43 +102,29 @@ func (p *VSphereCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
 			},
-			VCenter:          p.VCenter,
-			Datacenter:       p.Datacenter,
-			DefaultDatastore: p.DefaultDatastore,
-			Folder:           p.Folder,
-			Cluster:          p.Cluster,
-			Network:          p.Network,
+			// Scrub creds -- this one is going in the CD
+			Infrastructure: p.Infrastructure(true),
 		},
 	}
 }
 
 func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.VSphere = &hivev1vsphere.MachinePool{
-		NumCPUs:           2,
-		NumCoresPerSocket: 1,
-		MemoryMiB:         8192,
-		OSDisk: hivev1vsphere.OSDisk{
-			DiskSizeGB: 120,
+		MachinePool: installervsphere.MachinePool{
+			NumCPUs:           2,
+			NumCoresPerSocket: 1,
+			MemoryMiB:         8192,
+			OSDisk: installervsphere.OSDisk{
+				DiskSizeGB: 120,
+			},
 		},
 	}
 }
 
 func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
-
-	// TODO: Watch for removal of deprecated fields https://issues.redhat.com/browse/SPLAT-1093
 	ic.Platform = installertypes.Platform{
-		VSphere: &installervsphere.Platform{
-			DeprecatedVCenter:          p.VCenter,
-			DeprecatedUsername:         p.Username,
-			DeprecatedPassword:         p.Password,
-			DeprecatedDatacenter:       p.Datacenter,
-			DeprecatedDefaultDatastore: p.DefaultDatastore,
-			DeprecatedFolder:           p.Folder,
-			DeprecatedCluster:          p.Cluster,
-			APIVIPs:                    []string{p.APIVIP},
-			IngressVIPs:                []string{p.IngressVIP},
-			DeprecatedNetwork:          p.Network,
-		},
+		// Preserve creds -- this one is going in the install-config Secret.
+		VSphere: p.Infrastructure(false),
 	}
 }
 

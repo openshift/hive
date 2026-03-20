@@ -319,7 +319,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
-
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -524,6 +523,7 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		}
 	}
 	if vsphere := platform.VSphere; vsphere != nil {
+		vsphere = vsphere.DeepCopy()
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
 		if vsphere.CredentialsSecretRef.Name == "" {
@@ -532,14 +532,11 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		// We need to have at least one VCenter; but we have to allow both the legacy
+		// (pre-zonal) and new shapes. We'll upconvert the former, but only after the CR
+		// has alreday been accepted and stored in etcd once.
+		if vsphere.DeprecatedVCenter == "" && (vsphere.Infrastructure == nil || len(vsphere.Infrastructure.VCenters) == 0) {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("infrastructure", "vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
@@ -671,6 +668,24 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
+	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
+		// HIVE-2391: Moving from a non-zonal to a zonal shape is permitted.
+		// NOTE: Existing deprecated fields may be left populated, but will be ignored.
+		// NOTE: We're allowing the creds/certs secret refs to be changed in this operation as well.
+		// In both cases the user could just update the contents of the existing Secret, but may wish
+		// to replace them instead.
+		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+			contextLogger.Debug("Allowing vsphere zonal conversion")
+			// copy over the value to spoof the immutability checker
+			oldObject.Spec.Platform.VSphere = cd.Spec.Platform.VSphere
+			// We've stealthily allowed replacement of secret refs. This will at least make sure they're not empty.
+			allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
+		}
+	}
+
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {
 		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec which is immutable except for %s fields. Unsupported change: \n%s", strings.Join(mutableFields, ","), unsupportedDiff)
@@ -704,9 +719,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			},
 		}
 	}
-
-	allErrs := field.ErrorList{}
-	specPath := field.NewPath("spec")
 
 	if cd.Spec.Installed {
 		if cd.Spec.ClusterMetadata != nil {

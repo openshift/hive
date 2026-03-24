@@ -7606,7 +7606,7 @@ objects:
         - name: v1
           schema:
             openAPIV3Schema:
-              description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncSet API
+              description: SelectorSyncIdentityProvider is the Schema for the SelectorSyncIdentityProvider API
               properties:
                 apiVersion:
                   description: |-
@@ -7633,7 +7633,7 @@ objects:
                   properties:
                     clusterDeploymentSelector:
                       description: |-
-                        ClusterDeploymentSelector is a LabelSelector indicating which clusters the SelectorIdentityProvider
+                        ClusterDeploymentSelector is a LabelSelector indicating which clusters the SelectorSyncIdentityProvider
                         applies to in any namespace.
                       properties:
                         matchExpressions:
@@ -8191,7 +8191,7 @@ objects:
                     - identityProviders
                   type: object
                 status:
-                  description: IdentityProviderStatus defines the observed state of SyncSet
+                  description: IdentityProviderStatus defines the observed state of the SyncIdentityProvider
                   type: object
               type: object
           served: true
@@ -8465,7 +8465,7 @@ objects:
                     clusterDeploymentRefs:
                       description: |-
                         ClusterDeploymentRefs is the list of LocalObjectReference indicating which clusters the
-                        SyncSet applies to in the SyncSet's namespace.
+                        SyncIdentityProvider applies to in the SyncIdentityProvider's namespace.
                       items:
                         description: |-
                           LocalObjectReference contains enough information to let you locate the
@@ -8998,7 +8998,7 @@ objects:
                     - identityProviders
                   type: object
                 status:
-                  description: IdentityProviderStatus defines the observed state of SyncSet
+                  description: IdentityProviderStatus defines the observed state of the SyncIdentityProvider
                   type: object
               type: object
           served: true

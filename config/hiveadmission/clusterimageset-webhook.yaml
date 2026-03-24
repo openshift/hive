@@ -6,6 +6,7 @@ metadata:
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:

@@ -25,6 +25,7 @@ import (
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 	"github.com/openshift/hive/apis"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -43,6 +44,7 @@ var hive_scheme *runtime.Scheme
 func init() {
 	hive_scheme = runtime.NewScheme()
 	admissionregistrationv1.AddToScheme(hive_scheme)
+	admissionv1.AddToScheme(hive_scheme)
 	admissionv1beta1.AddToScheme(hive_scheme)
 	apis.AddToScheme(hive_scheme)
 	apiextv1.AddToScheme(hive_scheme)

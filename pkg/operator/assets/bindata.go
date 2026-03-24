@@ -277,6 +277,7 @@ metadata:
 webhooks:
 - name: clusterdeploymentvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -322,6 +323,7 @@ metadata:
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -366,6 +368,7 @@ metadata:
 webhooks:
 - name: clusterpoolvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -411,6 +414,7 @@ metadata:
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -540,6 +544,7 @@ metadata:
 webhooks:
 - name: dnszonevalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -684,6 +689,7 @@ metadata:
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -753,6 +759,7 @@ metadata:
 webhooks:
 - name: selectorsyncsetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:
@@ -852,6 +859,7 @@ metadata:
 webhooks:
 - name: syncsetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
+  - v1
   - v1beta1
   clientConfig:
     service:

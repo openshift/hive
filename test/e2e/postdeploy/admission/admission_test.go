@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -90,7 +90,7 @@ func TestAdmission(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected create error: %v", err)
 			}
-			reviewResult := &admissionv1beta1.AdmissionReview{}
+			reviewResult := &admissionv1.AdmissionReview{}
 			scheme := scheme.GetScheme()
 			err = scheme.Convert(result, reviewResult, nil)
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	admissionCmd "github.com/openshift/generic-admission-server/pkg/cmd"
 	log "github.com/sirupsen/logrus"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openshift/hive/pkg/util/scheme"
@@ -36,5 +37,7 @@ func main() {
 func createDecoder() admission.Decoder {
 	scheme := scheme.GetScheme()
 	decoder := admission.NewDecoder(scheme)
+	// HACK: Prevent pruning of admissionv1, resulting in conversion errors
+	var _ admissionv1.AdmissionReview = admissionv1.AdmissionReview{}
 	return decoder
 }

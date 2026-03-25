@@ -14,7 +14,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,73 +54,73 @@ func TestSyncSetInitialize(t *testing.T) {
 func TestSyncSetValidate(t *testing.T) {
 	cases := []struct {
 		name            string
-		operation       admissionv1beta1.Operation
+		operation       admissionv1.Operation
 		expectedAllowed bool
 		syncSet         *hivev1.SyncSet
 	}{
 		{
 			name:            "Test valid patch type create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testValidPatchSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid patch type create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testInvalidPatchSyncSet(),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test empty patch type create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testPatchSyncSet(""),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid patch type update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testValidPatchSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid patch type update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testInvalidPatchSyncSet(),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test empty patch type update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testPatchSyncSet(""),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test create with no patches",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test update with no patches",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid SecretReference create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSecretReferenceSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid SecretReference update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSecretReferenceSyncSet(),
 			expectedAllowed: true,
 		},
 		{
 			name:      "Test invalid SecretReference no source name create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].SourceRef.Name = ""
@@ -130,7 +130,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid SecretReference source not in SyncSet namespace",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].SourceRef.Namespace = "anotherns"
@@ -140,7 +140,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid SecretReference source has empty namespace",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].SourceRef.Namespace = ""
@@ -150,7 +150,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid SecretReference no target name create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].TargetRef.Name = ""
@@ -160,7 +160,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid SecretReference no source name update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].SourceRef.Name = ""
@@ -170,7 +170,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid SecretReference no target name update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSecretReferenceSyncSet()
 				ss.Spec.Secrets[0].TargetRef.Name = ""
@@ -180,7 +180,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid empty string resourceApplyMode create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = ""
@@ -190,7 +190,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid empty string resourceApplyMode update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = ""
@@ -200,7 +200,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid Upsert resourceApplyMode create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "Upsert"
@@ -210,7 +210,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid Upsert resourceApplyMode update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "Upsert"
@@ -220,7 +220,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid Sync resourceApplyMode create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "Sync"
@@ -230,7 +230,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test valid Sync resourceApplyMode update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "Sync"
@@ -240,7 +240,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid resourceApplyMode create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "sync"
@@ -250,7 +250,7 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:      "Test invalid resourceApplyMode update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 			syncSet: func() *hivev1.SyncSet {
 				ss := testSyncSet()
 				ss.Spec.ResourceApplyMode = "sync"
@@ -260,134 +260,134 @@ func TestSyncSetValidate(t *testing.T) {
 		},
 		{
 			name:            "Test invalid unmarshalable Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": 798786}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test missing Kind Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "v1"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test valid Role authorization.k8s.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "Role"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid Role authorization.k8s.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "Role"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid Role authorization.openshift.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "Role"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid Role authorization.openshift.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "Role"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test valid RoleBinding authorization.k8s.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "RoleBinding"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid RoleBinding authorization.k8s.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "RoleBinding"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid RoleBinding authorization.openshift.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "RoleBinding"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid RoleBinding authorization.openshift.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "RoleBinding"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test valid ClusterRole authorization.k8s.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRole"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid ClusterRole authorization.k8s.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRole"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid ClusterRole authorization.openshift.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRole"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid ClusterRole authorization.openshift.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRole"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test valid ClusterRoleBinding authorization.k8s.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRoleBinding"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid ClusterRoleBinding authorization.k8s.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "ClusterRoleBinding"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid ClusterRoleBinding authorization.openshift.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRoleBinding"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid ClusterRoleBinding authorization.openshift.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "ClusterRoleBinding"}`),
 			expectedAllowed: false,
 		},
 
 		{
 			name:            "Test valid SubjectAccessReview authorization.k8s.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid SubjectAccessReview authorization.k8s.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview"}`),
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test invalid SubjectAccessReview authorization.openshift.io Resource create",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "SubjectAccessReview"}`),
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid SubjectAccessReview authorization.openshift.io Resource update",
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			syncSet:         testSyncSetWithResources(`{"apiVersion": "authorization.openshift.io/v1", "kind": "SubjectAccessReview"}`),
 			expectedAllowed: false,
 		},
@@ -406,7 +406,7 @@ func TestSyncSetValidate(t *testing.T) {
 				Resource: "syncsets",
 			}
 
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Operation: tc.operation,
 				Resource:  gvr,
 				Object: runtime.RawExtension{

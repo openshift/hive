@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -232,7 +232,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		newObjectRaw        []byte
 		oldObject           *hivev1.ClusterDeployment
 		oldObjectRaw        []byte
-		operation           admissionv1beta1.Operation
+		operation           admissionv1.Operation
 		expectedAllowed     bool
 		gvr                 *metav1.GroupVersionResource
 		enabledFeatureGates []string
@@ -242,28 +242,28 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "Test valid create",
 			newObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Delete Operation is allowed even with mismatch objects",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentImmutableValue(),
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with same data",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentSameValues(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with different mutable data",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentMutableValue(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -274,7 +274,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.InstallConfigSecretRef = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -286,7 +286,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -297,19 +297,19 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			newObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test create with ClusterPoolReference",
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test create with Claimed ClusterPoolReference",
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -319,70 +319,70 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Labels = map[string]string{constants.DisableCreationWebHookForDisasterRecovery: "true"}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test update with removed ClusterPoolReference",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			newObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with added ClusterPoolReference",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with modified ClusterPoolReference Namespace",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "mypool", "", ""),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with modified ClusterPoolReference PoolName",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "new-mypool", "", "foo"),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with added ClusterPoolReference CustomizationRef",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", "", "foo"),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with modified ClusterPoolReference CustomizationRef",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
 			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", "", "bar"),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with claimed ClusterPoolReference",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test update with unclaimed ClusterPoolReference",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", "foo"),
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with changed claim",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
 			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "other-claim", ""),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -393,7 +393,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Installed = true
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -414,7 +414,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -425,32 +425,32 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.PreserveOnDelete = true
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is NOT allowed with different immutable data",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentDifferentImmutableValue(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during create",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during update",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal old object during update",
 			oldObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -485,13 +485,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			name:            "Test going from previously defined list of ingress to empty ingress list",
 			oldObject:       validClusterDeploymentWithIngress(),
 			newObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test new clusterdeployment with ingress list with default defined",
 			newObject:       validClusterDeploymentWithIngress(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -501,7 +501,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].Name = "notdefault"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -511,14 +511,14 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.SSHPrivateKeySecretRef = &corev1.LocalObjectReference{Name: ""}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test updating existing empty ingress to populated ingress",
 			oldObject:       validAWSClusterDeployment(),
 			newObject:       validClusterDeploymentWithIngress(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -529,31 +529,31 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].Name = "notdefault"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test valid managed domain",
 			newObject:       clusterDeploymentWithManagedDomain("bar.foo.aaa.com"),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test base domain is not child of a managed domain",
 			newObject:       clusterDeploymentWithManagedDomain("bar.bad-domain.com"),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test base domain is not direct child of a managed domain",
 			newObject:       clusterDeploymentWithManagedDomain("baz.foo.bbb.com"),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test base domain is not same as one of the managed domains",
 			newObject:       clusterDeploymentWithManagedDomain("foo.aaa.com"),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -564,7 +564,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.BaseDomain = "bar.foo.aaa.com"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -575,7 +575,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.BaseDomain = "bar.foo.aaa.com"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -590,7 +590,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -610,7 +610,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -626,7 +626,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				*cd.Spec.InstallAttemptsLimit = 1
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -636,7 +636,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].Domain = "*.apps.sameclustername.example.com"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -646,7 +646,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Ingress[0].Domain = "apps.sameclustername.NOTexample.com"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -656,7 +656,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Name = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -666,7 +666,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.ClusterName = "this-is-a-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-long-name"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -692,7 +692,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -716,7 +716,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -741,7 +741,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -772,7 +772,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -802,7 +802,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -827,7 +827,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -854,13 +854,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Azure create valid",
 			newObject:       validAzureClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -870,7 +870,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.Region = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -880,7 +880,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.CredentialsSecretRef.Name = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -891,7 +891,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.ManageDNS = false
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -902,7 +902,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.ManageDNS = true
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -913,7 +913,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.Region = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -939,7 +939,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -963,7 +963,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -988,7 +988,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1019,7 +1019,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1050,7 +1050,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		// TODO: ensure Azure clusterDeployments have necessary info for
@@ -1082,7 +1082,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS = awsCD.Spec.Platform.AWS
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1092,7 +1092,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Azure = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1108,7 +1108,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1124,7 +1124,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1139,7 +1139,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1153,7 +1153,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1167,7 +1167,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1177,7 +1177,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.InstallConfigSecretRef = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1192,7 +1192,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1208,7 +1208,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1232,7 +1232,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					Kind:    "AgentClusterInstall",
 				}},
 			}},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1256,7 +1256,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					Kind:    "FakeClusterInstall",
 				}},
 			}},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1266,13 +1266,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "valid GCP clusterdeployment",
 			newObject:       validGCPClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1283,7 +1283,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(true)
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1294,7 +1294,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				return cd
 			}(),
 			newObject:       validGCPClusterDeployment(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1309,7 +1309,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(false)
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1335,7 +1335,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1359,7 +1359,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1384,7 +1384,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1415,7 +1415,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1445,7 +1445,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -1467,7 +1467,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1487,7 +1487,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1508,7 +1508,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1531,7 +1531,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1551,7 +1551,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -1573,7 +1573,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -1583,13 +1583,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "OpenStack create valid",
 			newObject:       validOpenStackClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1599,7 +1599,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.OpenStack.CertificatesSecretRef = &corev1.LocalObjectReference{Name: ""}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1609,13 +1609,13 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.OpenStack.CertificatesSecretRef = &corev1.LocalObjectReference{Name: "openstack-certificates"}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid delete",
 			oldObject:       validAWSClusterDeployment(),
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 		{
@@ -1628,7 +1628,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: false,
 		},
 		{
@@ -1641,25 +1641,25 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Annotations[constants.ProtectedDeleteAnnotation] = "false"
 				return cd
 			}(),
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 		{
 			name:            "vSphere create valid",
 			newObject:       validVSphereClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Nutanix create valid",
 			newObject:       validNutanixClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "IBMCloud create valid",
 			newObject:       validIBMCloudClusterDeployment(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1670,7 +1670,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.ManifestsSecretRef = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1680,7 +1680,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name = "" // Simulating a missing required field
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1690,7 +1690,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Nutanix.PrismCentral.Address = "" // Simulating a missing required field
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1700,7 +1700,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.Nutanix.PrismCentral.Port = 0 // Simulating a missing required field
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1713,7 +1713,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "bar"}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1726,7 +1726,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "bar"}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -1736,7 +1736,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -1746,7 +1746,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -1756,7 +1756,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 			awsPrivateLink:  &hivev1.AWSPrivateLinkConfig{},
 		},
@@ -1767,7 +1767,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
 				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
@@ -1785,7 +1785,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
 				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
@@ -1814,7 +1814,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -1832,7 +1832,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
 				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
@@ -1881,7 +1881,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				tc.oldObjectRaw, _ = json.Marshal(tc.oldObject)
 			}
 
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Operation: tc.operation,
 				Resource:  *tc.gvr,
 				Object: runtime.RawExtension{

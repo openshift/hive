@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,7 +84,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) Initialize(kubeClientConfig *r
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
 // Usually it's the kube apiserver that is making the admission validation request.
-func (a *ClusterProvisionValidatingAdmissionHook) Validate(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterProvisionValidatingAdmissionHook) Validate(request *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	logger := log.WithFields(log.Fields{
 		"operation": request.Operation,
 		"group":     request.Resource.Group,
@@ -97,7 +97,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) Validate(request *admissionv1b
 		logger.Info("Skipping validation for request")
 		// The request object isn't something that this validator should validate.
 		// Therefore, we say that it's allowed.
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -105,13 +105,13 @@ func (a *ClusterProvisionValidatingAdmissionHook) Validate(request *admissionv1b
 	logger.Info("Validating request")
 
 	switch request.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		return a.validateCreateRequest(request, logger)
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		return a.validateUpdateRequest(request, logger)
 	default:
 		logger.Info("Successful validation")
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -119,7 +119,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) Validate(request *admissionv1b
 
 // shouldValidate explicitly checks if the request should validated. For example, this webhook may have accidentally been registered to check
 // the validity of some other type of object with a different GVR.
-func (a *ClusterProvisionValidatingAdmissionHook) shouldValidate(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) bool {
+func (a *ClusterProvisionValidatingAdmissionHook) shouldValidate(request *admissionv1.AdmissionRequest, logger log.FieldLogger) bool {
 	logger = logger.WithField("method", "shouldValidate")
 
 	if request.Resource.Group != clusterProvisionGroup {
@@ -143,7 +143,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) shouldValidate(request *admiss
 }
 
 // validateCreateRequest specifically validates create operations for ClusterProvision objects.
-func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request *admissionv1.AdmissionRequest, logger log.FieldLogger) *admissionv1.AdmissionResponse {
 	logger = logger.WithField("method", "validateCreateRequest")
 
 	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
@@ -158,7 +158,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request 
 	if allErrs := validateClusterProvisionCreate(newObject); len(allErrs) > 0 {
 		logger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(request.Kind).GroupKind(), request.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
@@ -166,13 +166,13 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateCreateRequest(request 
 
 	// If we get here, then all checks passed, so the object is valid.
 	logger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
 // validateUpdateRequest specifically validates update operations for ClusterProvision objects.
-func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request *admissionv1beta1.AdmissionRequest, logger log.FieldLogger) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request *admissionv1.AdmissionRequest, logger log.FieldLogger) *admissionv1.AdmissionResponse {
 	logger = logger.WithField("method", "validateUpdateRequest")
 
 	newObject, resp := a.decode(request.Object, logger.WithField("decode", "Object"))
@@ -192,7 +192,7 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request 
 	if allErrs := validateClusterProvisionUpdate(oldObject, newObject); len(allErrs) > 0 {
 		logger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(request.Kind).GroupKind(), request.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
@@ -200,16 +200,16 @@ func (a *ClusterProvisionValidatingAdmissionHook) validateUpdateRequest(request 
 
 	// If we get here, then all checks passed, so the object is valid.
 	logger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
-func (a *ClusterProvisionValidatingAdmissionHook) decode(raw runtime.RawExtension, logger log.FieldLogger) (*hivev1.ClusterProvision, *admissionv1beta1.AdmissionResponse) {
+func (a *ClusterProvisionValidatingAdmissionHook) decode(raw runtime.RawExtension, logger log.FieldLogger) (*hivev1.ClusterProvision, *admissionv1.AdmissionResponse) {
 	obj := &hivev1.ClusterProvision{}
 	if err := a.decoder.DecodeRaw(raw, obj); err != nil {
 		logger.WithError(err).Error("failed to decode")
-		return nil, &admissionv1beta1.AdmissionResponse{
+		return nil, &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,

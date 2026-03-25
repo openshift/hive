@@ -6,7 +6,7 @@ metadata:
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API

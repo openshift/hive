@@ -6,7 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -69,7 +69,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Initialize(kubeC
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
 // Usually it's the kube apiserver that is making the admission validation request.
-func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Validate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -82,7 +82,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Validate(admissi
 		contextLogger.Info("Skipping validation for request")
 		// The request object isn't something that this validator should validate.
 		// Therefore, we say that it's Allowed.
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -90,13 +90,13 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Validate(admissi
 	contextLogger.Info("Validating request")
 
 	switch admissionSpec.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		return a.validateCreate(admissionSpec)
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		return a.validateUpdate(admissionSpec)
 	default:
 		contextLogger.Info("Successful validation")
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -104,7 +104,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) Validate(admissi
 
 // shouldValidate explicitly checks if the request should validated. For example, this webhook may have accidentally been registered to check
 // the validity of some other type of object with a different GVR.
-func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1beta1.AdmissionRequest) bool {
+func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1.AdmissionRequest) bool {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -134,7 +134,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) shouldValidate(a
 }
 
 // validateCreate specifically validates create operations for ClusterDeploymentCustomization objects.
-func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -146,7 +146,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(a
 	cdc := &hivev1.ClusterDeploymentCustomization{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, cdc); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -163,7 +163,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(a
 	if len(cdc.Name) > validation.DNS1123LabelMaxLength {
 		message := fmt.Sprintf("Invalid cluster deployment customization name (.meta.name): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
 		contextLogger.Error(message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -174,13 +174,13 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(a
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
 // validateUpdate specifically validates update operations for ClusterDeployment objects.
-func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -192,7 +192,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(a
 	newObject := &hivev1.ClusterDeploymentCustomization{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -207,7 +207,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(a
 	oldObject := &hivev1.ClusterDeploymentCustomization{}
 	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -221,7 +221,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(a
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }

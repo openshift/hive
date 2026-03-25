@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,21 +74,21 @@ func TestClusterPoolValidate(t *testing.T) {
 		newObjectRaw    []byte
 		oldObject       *hivev1.ClusterPool
 		oldObjectRaw    []byte
-		operation       admissionv1beta1.Operation
+		operation       admissionv1.Operation
 		expectedAllowed bool
 		gvr             *metav1.GroupVersionResource
 	}{
 		{
 			name:            "Test valid create",
 			newObject:       validAWSClusterPool(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test Update Operation is allowed with same data",
 			oldObject:       validAWSClusterPool(),
 			newObject:       validAWSClusterPool(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
@@ -99,25 +99,25 @@ func TestClusterPoolValidate(t *testing.T) {
 				pool.Spec.BaseDomain = "anotherbasedomain.example.com"
 				return pool
 			}(),
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test unable to marshal new object during create",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during update",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal old object during update",
 			oldObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -150,13 +150,13 @@ func TestClusterPoolValidate(t *testing.T) {
 		{
 			name:            "Azure create valid",
 			newObject:       validAzureClusterPool(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "OpenStack unsupported platform",
 			newObject:       invalidOpenStackClusterPool(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -166,7 +166,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.Region = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -176,7 +176,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.CredentialsSecretRef.Name = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -186,7 +186,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				cd.Spec.Platform.Azure.BaseDomainResourceGroupName = ""
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -197,7 +197,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				cd.Spec.Platform.AWS = awsCD.Spec.Platform.AWS
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -207,19 +207,19 @@ func TestClusterPoolValidate(t *testing.T) {
 				cd.Spec.Platform.Azure = nil
 				return cd
 			}(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "valid GCP clusterdeployment",
 			newObject:       validGCPClusterPool(),
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test valid delete",
 			oldObject:       validAWSClusterPool(),
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 	}
@@ -247,7 +247,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				tc.oldObjectRaw, _ = json.Marshal(tc.oldObject)
 			}
 
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Operation: tc.operation,
 				Resource:  *tc.gvr,
 				Object: runtime.RawExtension{

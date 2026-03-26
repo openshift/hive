@@ -1393,7 +1393,7 @@ func (r *ReconcileMachinePool) createActuator(
 	case cd.Spec.Platform.OpenStack != nil:
 		return NewOpenStackActuator(masterMachine, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(masterMachine, r.scheme, logger)
+		return NewVSphereActuator(masterMachine, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

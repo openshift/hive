@@ -50,6 +50,7 @@ const (
 
 var webhookAssets = []string{
 	"config/hiveadmission/clusterdeployment-webhook.yaml",
+	"config/hiveadmission/clusterdeploymentcustomization-webhook.yaml",
 	"config/hiveadmission/clusterimageset-webhook.yaml",
 	"config/hiveadmission/clusterpool-webhook.yaml",
 	"config/hiveadmission/clusterprovision-webhook.yaml",

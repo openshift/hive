@@ -2,9 +2,9 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: clusterpoolvalidators.admission.hive.openshift.io
+  name: clusterdeploymentcustomizationvalidators.admission.hive.openshift.io
 webhooks:
-- name: clusterpoolvalidators.admission.hive.openshift.io
+- name: clusterdeploymentcustomizationvalidators.admission.hive.openshift.io
   admissionReviewVersions:
   - v1beta1
   clientConfig:
@@ -12,7 +12,7 @@ webhooks:
       # reach the webhook via the registered aggregated API
       namespace: default
       name: kubernetes
-      path: /apis/admission.hive.openshift.io/v1/clusterpoolvalidators
+      path: /apis/admission.hive.openshift.io/v1/clusterdeploymentcustomizationvalidators
   rules:
   - operations:
     - CREATE
@@ -22,6 +22,6 @@ webhooks:
     apiVersions:
     - v1
     resources:
-    - clusterpools
+    - clusterdeploymentcustomizations
   failurePolicy: Fail
   sideEffects: None

@@ -385,7 +385,14 @@ install-tools:
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
+	go install $(GO_MOD_FLAGS) sigs.k8s.io/controller-runtime/tools/setup-envtest
 
 .PHONY: coverage
 coverage:
 	hack/codecov.sh
+
+.PHONY: setup-envtest
+# Downloads envtest binaries and prints the required export KUBEBUILDER_ASSETS=... command.
+# Run the printed export command (or add it to your shell rc) before running benchmarks.
+setup-envtest:
+	hack/setup-envtest.sh

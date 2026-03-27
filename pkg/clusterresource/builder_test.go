@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ghodss/yaml"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/installer/pkg/types/nutanix"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/yaml"
 )
 
 const (

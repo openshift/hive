@@ -2109,12 +2109,9 @@ github.com/openshift/library-go/pkg/verify/util
 # github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
 ## explicit; go 1.24.0
 github.com/openshift/machine-api-operator/pkg/controller/machine
-github.com/openshift/machine-api-operator/pkg/controller/vsphere
-github.com/openshift/machine-api-operator/pkg/controller/vsphere/session
 github.com/openshift/machine-api-operator/pkg/metrics
 github.com/openshift/machine-api-operator/pkg/util
 github.com/openshift/machine-api-operator/pkg/util/conditions
-github.com/openshift/machine-api-operator/pkg/util/ipam
 # github.com/openshift/machine-api-provider-gcp v0.0.1-0.20241021180644-0eca0846914a
 ## explicit; go 1.22.0
 github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
@@ -3097,12 +3094,6 @@ google.golang.org/protobuf/types/known/wrapperspb
 # gopkg.in/evanphx/json-patch.v4 v4.12.0
 ## explicit
 gopkg.in/evanphx/json-patch.v4
-# gopkg.in/gcfg.v1 v1.2.3
-## explicit
-gopkg.in/gcfg.v1
-gopkg.in/gcfg.v1/scanner
-gopkg.in/gcfg.v1/token
-gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
@@ -3115,9 +3106,6 @@ gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 ## explicit
 gopkg.in/tomb.v1
-# gopkg.in/warnings.v0 v0.1.2
-## explicit
-gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
@@ -3984,9 +3972,6 @@ k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/cloud-provider-vsphere v1.33.3 => github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb4928
-## explicit; go 1.22.0
-k8s.io/cloud-provider-vsphere/pkg/common/config
 # k8s.io/cluster-registry v0.0.6
 ## explicit
 k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1

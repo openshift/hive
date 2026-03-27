@@ -1461,6 +1461,80 @@ data:
 	}
 }
 
+func Test_setJSONLabels(t *testing.T) {
+	cases := []struct {
+		name         string
+		input        string
+		labels       map[string]string
+		wantErr      bool
+		expectLabels map[string]string
+		expectName   string
+	}{
+		{
+			name:  "add labels to object with no metadata",
+			input: `{"apiVersion":"machine.openshift.io/v1beta1","kind":"MachineSet"}`,
+			labels: map[string]string{
+				"hive.openshift.io/managed": "true",
+			},
+			expectLabels: map[string]string{
+				"hive.openshift.io/managed": "true",
+			},
+		},
+		{
+			name:  "add labels preserving existing metadata and labels",
+			input: `{"apiVersion":"machine.openshift.io/v1beta1","kind":"MachineSet","metadata":{"name":"test-ms","labels":{"existing":"label"}}}`,
+			labels: map[string]string{
+				"hive.openshift.io/managed":      "true",
+				"hive.openshift.io/machine-pool": "worker",
+			},
+			expectName: "test-ms",
+			expectLabels: map[string]string{
+				"existing":                       "label",
+				"hive.openshift.io/managed":      "true",
+				"hive.openshift.io/machine-pool": "worker",
+			},
+		},
+		{
+			name:  "add labels to object with metadata but no labels",
+			input: `{"apiVersion":"machine.openshift.io/v1beta1","kind":"MachineSet","metadata":{"name":"test-ms"}}`,
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			expectName: "test-ms",
+			expectLabels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		{
+			name:    "invalid json",
+			input:   `not json`,
+			labels:  map[string]string{"a": "b"},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := setJSONLabels([]byte(tc.input), tc.labels)
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			var ms machineapi.MachineSet
+			require.NoError(t, json.Unmarshal(output, &ms), "output should unmarshal into a MachineSet")
+
+			if tc.expectName != "" {
+				assert.Equal(t, tc.expectName, ms.Name)
+			}
+			for k, v := range tc.expectLabels {
+				assert.Equal(t, v, ms.Labels[k], "label %s", k)
+			}
+		})
+	}
+}
+
 func Test_scrubMetadataJSON(t *testing.T) {
 	cases := []struct {
 		initial  string

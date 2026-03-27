@@ -36,7 +36,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		expectZoneDeleted bool
 		validateZone      func(*testing.T, *hivev1.DNSZone)
 		errorExpected     bool
-		soaLookupResult   bool
+		nsLookupResult    bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -160,9 +160,9 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			expectZoneDeleted: true,
 		},
 		{
-			name:            "Existing zone, link to parent, reachable SOA",
-			dnsZone:         validDNSZoneWithLinkToParent(),
-			soaLookupResult: true,
+			name:           "Existing zone, link to parent, reachable NS",
+			dnsZone:        validDNSZoneWithLinkToParent(),
+			nsLookupResult: true,
 			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingAWSTags(expect)
@@ -193,8 +193,8 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				logger: zr.logger,
 			}
 
-			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
-				return tc.soaLookupResult, nil
+			r.nsLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.nsLookupResult, nil
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
@@ -242,7 +242,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 		expectZoneDeleted bool
 		validateZone      func(*testing.T, *hivev1.DNSZone)
 		errorExpected     bool
-		soaLookupResult   bool
+		nsLookupResult    bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -311,9 +311,9 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			expectZoneDeleted: true,
 		},
 		{
-			name:            "Existing zone, link to parent, reachable SOA",
-			dnsZone:         validDNSZoneWithLinkToParent(),
-			soaLookupResult: true,
+			name:           "Existing zone, link to parent, reachable NS",
+			dnsZone:        validDNSZoneWithLinkToParent(),
+			nsLookupResult: true,
 			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
 				mockGCPZoneExists(expect)
 			},
@@ -341,8 +341,8 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 				logger: zr.logger,
 			}
 
-			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
-				return tc.soaLookupResult, nil
+			r.nsLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.nsLookupResult, nil
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
@@ -390,7 +390,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 		expectZoneDeleted bool
 		validateZone      func(*testing.T, *hivev1.DNSZone)
 		errorExpected     bool
-		soaLookupResult   bool
+		nsLookupResult    bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -441,9 +441,9 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			expectZoneDeleted: true,
 		},
 		{
-			name:            "Existing zone, link to parent, reachable SOA",
-			dnsZone:         validAzureDNSZoneWithLinkToParent(),
-			soaLookupResult: true,
+			name:           "Existing zone, link to parent, reachable NS",
+			dnsZone:        validAzureDNSZoneWithLinkToParent(),
+			nsLookupResult: true,
 			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneExists(expect)
 			},
@@ -471,8 +471,8 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 				logger: zr.logger,
 			}
 
-			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
-				return tc.soaLookupResult, nil
+			r.nsLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.nsLookupResult, nil
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
@@ -520,7 +520,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 		expectDnsCondition bool
 		dnsCondition       hivev1.DNSZoneCondition
 		actuator           string
-		soaLookupResult    bool
+		nsLookupResult     bool
 	}{
 		{
 			name:    "Fail to create hosted zone, set generic dns error condition",
@@ -585,8 +585,8 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 
-			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
-				return tc.soaLookupResult, nil
+			r.nsLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.nsLookupResult, nil
 			}
 
 			if tc.setupAWSMock != nil {

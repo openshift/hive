@@ -39,6 +39,10 @@ spec:
       value: 'true'
     - name: prefetch-input
       value: '[{"type": "rpm", "path": "./hack/hermetic"}]'
+    - name: fetchTags
+      value: 'true'
+    - name: depth
+      value: '0'
     - name: build-args
       value:
         - CONTAINER_SUB_MANAGER_OFF=1

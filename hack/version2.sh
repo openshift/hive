@@ -234,7 +234,15 @@ branch_from_commit() {
         return 0
     fi
 
-    log "fatal" "Could not determine a branch! Please specify one explicitly."
+    # Default to "master" only when there are no related refs at all
+    # (e.g., detached HEAD builds without branch refs).
+    if [[ ${#descendants[@]} -eq 0 && ${#ancestors[@]} -eq 0 ]]; then
+        log "warning" "Could not determine a branch from refs, using fallback: master"
+        echo "master"
+        return 0
+    fi
+
+    log "fatal" "Could not determine a unique related branch for commit $(shortsha). Please specify a branch explicitly."
 }
 
 # Version initialization
@@ -278,9 +286,34 @@ version_init() {
 
     # Calculate prefix and commit count
     PREFIX=$(prefix_from_branch "$BRANCH_NAME")
-    local parent
-    parent=$(git rev-list --max-parents=0 "$COMMIT")
-    COMMIT_COUNT=$(git rev-list --count "${parent}..${COMMIT}")
+
+    # For detached HEAD builds in CI (e.g., Konflux), calculate commit count relative to master
+    local reference_commit="$COMMIT"
+    if [[ "$BRANCH_NAME" == "master" ]] && ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
+        for remote in "origin/master" "upstream/master" "master"; do
+            if git rev-parse --verify --quiet "$remote" >/dev/null 2>&1; then
+                local master_ref_commit
+                master_ref_commit=$(git rev-parse "$remote")
+                if is_ancestor "$master_ref_commit" "$COMMIT" || [[ "$master_ref_commit" == "$COMMIT" ]]; then
+                    reference_commit="$master_ref_commit"
+                    log "debug" "Using $remote for commit count base calculation"
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # Calculate base commit count (from repository root to reference)
+    local repo_root
+    repo_root=$(git rev-list --max-parents=0 "$reference_commit")
+    COMMIT_COUNT=$(git rev-list --count "${repo_root}..${reference_commit}")
+
+    # If current commit is ahead of reference, add those commits
+    if [[ "$reference_commit" != "$COMMIT" ]]; then
+        local commits_ahead
+        commits_ahead=$(git rev-list --count "${reference_commit}..${COMMIT}")
+        COMMIT_COUNT=$((COMMIT_COUNT + commits_ahead))
+    fi
 }
 
 # Get semver string

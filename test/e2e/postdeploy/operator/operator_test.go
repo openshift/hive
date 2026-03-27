@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

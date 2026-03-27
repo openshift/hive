@@ -4,6 +4,7 @@
 // config/sharded_controllers/statefulset.yaml
 // config/hiveadmission/apiservice.yaml
 // config/hiveadmission/clusterdeployment-webhook.yaml
+// config/hiveadmission/clusterdeploymentcustomization-webhook.yaml
 // config/hiveadmission/clusterimageset-webhook.yaml
 // config/hiveadmission/clusterpool-webhook.yaml
 // config/hiveadmission/clusterprovision-webhook.yaml
@@ -314,6 +315,50 @@ func configHiveadmissionClusterdeploymentWebhookYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configHiveadmissionClusterdeploymentcustomizationWebhookYaml = []byte(`---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: clusterdeploymentcustomizationvalidators.admission.hive.openshift.io
+webhooks:
+- name: clusterdeploymentcustomizationvalidators.admission.hive.openshift.io
+  admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      # reach the webhook via the registered aggregated API
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.hive.openshift.io/v1/clusterdeploymentcustomizationvalidators
+  rules:
+  - operations:
+    - CREATE
+    - UPDATE
+    apiGroups:
+    - hive.openshift.io
+    apiVersions:
+    - v1
+    resources:
+    - clusterdeploymentcustomizations
+  failurePolicy: Fail
+  sideEffects: None
+`)
+
+func configHiveadmissionClusterdeploymentcustomizationWebhookYamlBytes() ([]byte, error) {
+	return _configHiveadmissionClusterdeploymentcustomizationWebhookYaml, nil
+}
+
+func configHiveadmissionClusterdeploymentcustomizationWebhookYaml() (*asset, error) {
+	bytes, err := configHiveadmissionClusterdeploymentcustomizationWebhookYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/clusterdeploymentcustomization-webhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -377,7 +422,6 @@ webhooks:
   - operations:
     - CREATE
     - UPDATE
-    - DELETE
     apiGroups:
     - hive.openshift.io
     apiVersions:
@@ -2140,37 +2184,38 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"config/sharded_controllers/service.yaml":                   configSharded_controllersServiceYaml,
-	"config/sharded_controllers/statefulset.yaml":               configSharded_controllersStatefulsetYaml,
-	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
-	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
-	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
-	"config/hiveadmission/clusterpool-webhook.yaml":             configHiveadmissionClusterpoolWebhookYaml,
-	"config/hiveadmission/clusterprovision-webhook.yaml":        configHiveadmissionClusterprovisionWebhookYaml,
-	"config/hiveadmission/deployment.yaml":                      configHiveadmissionDeploymentYaml,
-	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
-	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
-	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
-	"config/hiveadmission/machinepool-webhook.yaml":             configHiveadmissionMachinepoolWebhookYaml,
-	"config/hiveadmission/sa-token-secret.yaml":                 configHiveadmissionSaTokenSecretYaml,
-	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
-	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
-	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
-	"config/hiveadmission/syncset-webhook.yaml":                 configHiveadmissionSyncsetWebhookYaml,
-	"config/controllers/deployment.yaml":                        configControllersDeploymentYaml,
-	"config/controllers/hive_controllers_role.yaml":             configControllersHive_controllers_roleYaml,
-	"config/controllers/hive_controllers_role_binding.yaml":     configControllersHive_controllers_role_bindingYaml,
-	"config/controllers/hive_controllers_serviceaccount.yaml":   configControllersHive_controllers_serviceaccountYaml,
-	"config/controllers/service.yaml":                           configControllersServiceYaml,
-	"config/rbac/hive_admin_role.yaml":                          configRbacHive_admin_roleYaml,
-	"config/rbac/hive_admin_role_binding.yaml":                  configRbacHive_admin_role_bindingYaml,
-	"config/rbac/hive_clusterpool_admin.yaml":                   configRbacHive_clusterpool_adminYaml,
-	"config/rbac/hive_frontend_role.yaml":                       configRbacHive_frontend_roleYaml,
-	"config/rbac/hive_frontend_role_binding.yaml":               configRbacHive_frontend_role_bindingYaml,
-	"config/rbac/hive_frontend_serviceaccount.yaml":             configRbacHive_frontend_serviceaccountYaml,
-	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
-	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
-	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
+	"config/sharded_controllers/service.yaml":                          configSharded_controllersServiceYaml,
+	"config/sharded_controllers/statefulset.yaml":                      configSharded_controllersStatefulsetYaml,
+	"config/hiveadmission/apiservice.yaml":                             configHiveadmissionApiserviceYaml,
+	"config/hiveadmission/clusterdeployment-webhook.yaml":              configHiveadmissionClusterdeploymentWebhookYaml,
+	"config/hiveadmission/clusterdeploymentcustomization-webhook.yaml": configHiveadmissionClusterdeploymentcustomizationWebhookYaml,
+	"config/hiveadmission/clusterimageset-webhook.yaml":                configHiveadmissionClusterimagesetWebhookYaml,
+	"config/hiveadmission/clusterpool-webhook.yaml":                    configHiveadmissionClusterpoolWebhookYaml,
+	"config/hiveadmission/clusterprovision-webhook.yaml":               configHiveadmissionClusterprovisionWebhookYaml,
+	"config/hiveadmission/deployment.yaml":                             configHiveadmissionDeploymentYaml,
+	"config/hiveadmission/dnszones-webhook.yaml":                       configHiveadmissionDnszonesWebhookYaml,
+	"config/hiveadmission/hiveadmission_rbac_role.yaml":                configHiveadmissionHiveadmission_rbac_roleYaml,
+	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml":        configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/machinepool-webhook.yaml":                    configHiveadmissionMachinepoolWebhookYaml,
+	"config/hiveadmission/sa-token-secret.yaml":                        configHiveadmissionSaTokenSecretYaml,
+	"config/hiveadmission/selectorsyncset-webhook.yaml":                configHiveadmissionSelectorsyncsetWebhookYaml,
+	"config/hiveadmission/service-account.yaml":                        configHiveadmissionServiceAccountYaml,
+	"config/hiveadmission/service.yaml":                                configHiveadmissionServiceYaml,
+	"config/hiveadmission/syncset-webhook.yaml":                        configHiveadmissionSyncsetWebhookYaml,
+	"config/controllers/deployment.yaml":                               configControllersDeploymentYaml,
+	"config/controllers/hive_controllers_role.yaml":                    configControllersHive_controllers_roleYaml,
+	"config/controllers/hive_controllers_role_binding.yaml":            configControllersHive_controllers_role_bindingYaml,
+	"config/controllers/hive_controllers_serviceaccount.yaml":          configControllersHive_controllers_serviceaccountYaml,
+	"config/controllers/service.yaml":                                  configControllersServiceYaml,
+	"config/rbac/hive_admin_role.yaml":                                 configRbacHive_admin_roleYaml,
+	"config/rbac/hive_admin_role_binding.yaml":                         configRbacHive_admin_role_bindingYaml,
+	"config/rbac/hive_clusterpool_admin.yaml":                          configRbacHive_clusterpool_adminYaml,
+	"config/rbac/hive_frontend_role.yaml":                              configRbacHive_frontend_roleYaml,
+	"config/rbac/hive_frontend_role_binding.yaml":                      configRbacHive_frontend_role_bindingYaml,
+	"config/rbac/hive_frontend_serviceaccount.yaml":                    configRbacHive_frontend_serviceaccountYaml,
+	"config/rbac/hive_reader_role.yaml":                                configRbacHive_reader_roleYaml,
+	"config/rbac/hive_reader_role_binding.yaml":                        configRbacHive_reader_role_bindingYaml,
+	"config/configmaps/install-log-regexes-configmap.yaml":             configConfigmapsInstallLogRegexesConfigmapYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -2228,21 +2273,22 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service.yaml":                         {configControllersServiceYaml, map[string]*bintree{}},
 		}},
 		"hiveadmission": {nil, map[string]*bintree{
-			"apiservice.yaml":                      {configHiveadmissionApiserviceYaml, map[string]*bintree{}},
-			"clusterdeployment-webhook.yaml":       {configHiveadmissionClusterdeploymentWebhookYaml, map[string]*bintree{}},
-			"clusterimageset-webhook.yaml":         {configHiveadmissionClusterimagesetWebhookYaml, map[string]*bintree{}},
-			"clusterpool-webhook.yaml":             {configHiveadmissionClusterpoolWebhookYaml, map[string]*bintree{}},
-			"clusterprovision-webhook.yaml":        {configHiveadmissionClusterprovisionWebhookYaml, map[string]*bintree{}},
-			"deployment.yaml":                      {configHiveadmissionDeploymentYaml, map[string]*bintree{}},
-			"dnszones-webhook.yaml":                {configHiveadmissionDnszonesWebhookYaml, map[string]*bintree{}},
-			"hiveadmission_rbac_role.yaml":         {configHiveadmissionHiveadmission_rbac_roleYaml, map[string]*bintree{}},
-			"hiveadmission_rbac_role_binding.yaml": {configHiveadmissionHiveadmission_rbac_role_bindingYaml, map[string]*bintree{}},
-			"machinepool-webhook.yaml":             {configHiveadmissionMachinepoolWebhookYaml, map[string]*bintree{}},
-			"sa-token-secret.yaml":                 {configHiveadmissionSaTokenSecretYaml, map[string]*bintree{}},
-			"selectorsyncset-webhook.yaml":         {configHiveadmissionSelectorsyncsetWebhookYaml, map[string]*bintree{}},
-			"service-account.yaml":                 {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
-			"service.yaml":                         {configHiveadmissionServiceYaml, map[string]*bintree{}},
-			"syncset-webhook.yaml":                 {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
+			"apiservice.yaml":                             {configHiveadmissionApiserviceYaml, map[string]*bintree{}},
+			"clusterdeployment-webhook.yaml":              {configHiveadmissionClusterdeploymentWebhookYaml, map[string]*bintree{}},
+			"clusterdeploymentcustomization-webhook.yaml": {configHiveadmissionClusterdeploymentcustomizationWebhookYaml, map[string]*bintree{}},
+			"clusterimageset-webhook.yaml":                {configHiveadmissionClusterimagesetWebhookYaml, map[string]*bintree{}},
+			"clusterpool-webhook.yaml":                    {configHiveadmissionClusterpoolWebhookYaml, map[string]*bintree{}},
+			"clusterprovision-webhook.yaml":               {configHiveadmissionClusterprovisionWebhookYaml, map[string]*bintree{}},
+			"deployment.yaml":                             {configHiveadmissionDeploymentYaml, map[string]*bintree{}},
+			"dnszones-webhook.yaml":                       {configHiveadmissionDnszonesWebhookYaml, map[string]*bintree{}},
+			"hiveadmission_rbac_role.yaml":                {configHiveadmissionHiveadmission_rbac_roleYaml, map[string]*bintree{}},
+			"hiveadmission_rbac_role_binding.yaml":        {configHiveadmissionHiveadmission_rbac_role_bindingYaml, map[string]*bintree{}},
+			"machinepool-webhook.yaml":                    {configHiveadmissionMachinepoolWebhookYaml, map[string]*bintree{}},
+			"sa-token-secret.yaml":                        {configHiveadmissionSaTokenSecretYaml, map[string]*bintree{}},
+			"selectorsyncset-webhook.yaml":                {configHiveadmissionSelectorsyncsetWebhookYaml, map[string]*bintree{}},
+			"service-account.yaml":                        {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
+			"service.yaml":                                {configHiveadmissionServiceYaml, map[string]*bintree{}},
+			"syncset-webhook.yaml":                        {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
 		}},
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},

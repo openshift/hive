@@ -32,3 +32,29 @@ reviews:
       of these files entirely, as reviewing code changes in kubernetes would be wildly out of scope.
       The one exception to this is `vendor/github.com/openshift/hive/**`, which should be a direct copy
       of the `apis` folder found in the root of the repo, referenced by the CRD generation guidance above.
+  - path: config/hiveadmission/*-webhook.yaml
+    instructions: |-
+      These are configuration files for admission webhooks for hive CRs. Files named *-webhook.yaml
+      contain ValidatingWebhookConfiguration (or, hypothetically, MutatingWebhookConfiguration -- but
+      we don't have any of those at this time) manifests. Please validate:
+      - They have been built into pkg/operator/assets/bindata.go (today our `verify` CI job should
+        also check this).
+      - They are all in the `webhookAssets` list in pkg/operator/hive/hiveadmission.go -- else they
+        will not be deployed!
+      - Each has a corresponding implementation in pkg/validating-webhooks/hive/v1.
+      - When any file in this directory is added or modified, also cross-check ALL other
+        existing *-webhook.yaml files in config/hiveadmission/ to verify their operations
+        are consistent with their implementations. Do not limit the audit to only the file(s)
+        in the diff.
+      - The `Operation`s in `.webhooks[].rules[].operations` must exactly match the
+        operations handled by explicit `case` branches in the implementation's `Validate()`
+        switch. A `default: Allowed: true` branch does NOT count as handling an operation.
+        If an operation appears in the YAML but has no corresponding `case`, flag it; and
+        vice versa.
+  - path: pkg/validating-webhooks/hive/v1/*_admission_hook.go
+    instructions: |-
+      These are implementations for validating (or, hypothetically, mutating -- but we don't have any
+      of those at this time) webhooks handled by our hiveadmission service. Mirroring the above checks
+      for config/hiveadmission/*-webhook.yaml, please validate that each has a corresponding
+      ValidatingWebhookConfiguration (or MutatingWebhookConfiguration) manifest under config/hiveadmission/,
+      built into bindata, with matching `Operation`s, and is listed for installation in hiveadmission.go.

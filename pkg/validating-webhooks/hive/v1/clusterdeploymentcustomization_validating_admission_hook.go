@@ -19,7 +19,7 @@ import (
 const (
 	clusterDeploymentCustomizationGroup    = "hive.openshift.io"
 	clusterDeploymentCustomizationVersion  = "v1"
-	clusterDeploymentCustomizationResource = "clusterdeploymentcustomization"
+	clusterDeploymentCustomizationResource = "clusterdeploymentcustomizations"
 
 	clusterDeploymentCustomizationAdmissionGroup   = "admission.hive.openshift.io"
 	clusterDeploymentCustomizationAdmissionVersion = "v1"
@@ -124,7 +124,7 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) shouldValidate(a
 	}
 
 	if admissionSpec.Resource.Resource != clusterDeploymentCustomizationResource {
-		contextLogger.Info("Returning False, it's our group and version, but not the right resource")
+		contextLogger.WithField("resource", admissionSpec.Resource.Resource).Info("Returning False, it's our group and version, but not the right resource")
 		return false
 	}
 

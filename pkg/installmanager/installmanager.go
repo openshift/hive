@@ -21,7 +21,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1032,16 +1031,13 @@ func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*
 		}
 		logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
 
-		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
+		// Set hive labels on the MachineSet metadata
+		manifestBytesJson, err = setJSONLabels(manifestBytesJson, map[string]string{
+			"hive.openshift.io/managed":      "true",
+			"hive.openshift.io/machine-pool": msetType,
+		})
 		if err != nil {
-			logger.WithError(err).Error("error applying hive managed label patch")
-			return nil, err
-		}
-
-		// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
-		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
-		if err != nil {
-			logger.WithError(err).Error("error applying machine pool label patch")
+			logger.WithError(err).Error("error setting labels on manifest")
 			return nil, err
 		}
 
@@ -1057,6 +1053,28 @@ func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*
 
 	return nil, nil
 
+}
+
+// setJSONLabels sets the given labels on a JSON-encoded Kubernetes resource's metadata.
+func setJSONLabels(jsonData []byte, newLabels map[string]string) ([]byte, error) {
+	var manifest map[string]interface{}
+	if err := json.Unmarshal(jsonData, &manifest); err != nil {
+		return nil, fmt.Errorf("error unmarshalling manifest JSON: %w", err)
+	}
+	metadata, _ := manifest["metadata"].(map[string]interface{})
+	if metadata == nil {
+		metadata = map[string]interface{}{}
+		manifest["metadata"] = metadata
+	}
+	labels, _ := metadata["labels"].(map[string]interface{})
+	if labels == nil {
+		labels = map[string]interface{}{}
+		metadata["labels"] = labels
+	}
+	for k, v := range newLabels {
+		labels[k] = v
+	}
+	return json.Marshal(manifest)
 }
 
 // patchWorkerMachineSetManifest accepts a yaml manifest as []byte and patches the manifest to include an additional

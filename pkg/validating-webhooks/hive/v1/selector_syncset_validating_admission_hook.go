@@ -5,7 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,7 +63,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) Initialize(kubeClientConfig *re
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
 // Usually it's the kube apiserver that is making the admission validation request.
-func (a *SelectorSyncSetValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *SelectorSyncSetValidatingAdmissionHook) Validate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -76,31 +76,31 @@ func (a *SelectorSyncSetValidatingAdmissionHook) Validate(admissionSpec *admissi
 		contextLogger.Info("Skipping validation for request")
 		// The request object isn't something that this validator should validate.
 		// Therefore, we say that it's allowed.
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
 
 	contextLogger.Info("Validating request")
 
-	if admissionSpec.Operation == admissionv1beta1.Create {
+	if admissionSpec.Operation == admissionv1.Create {
 		return a.validateCreate(admissionSpec)
 	}
 
-	if admissionSpec.Operation == admissionv1beta1.Update {
+	if admissionSpec.Operation == admissionv1.Update {
 		return a.validateUpdate(admissionSpec)
 	}
 
 	// We're only validating creates and updates at this time, so all other operations are explicitly allowed.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
 // shouldValidate explicitly checks if the request should validated. For example, this webhook may have accidentally been registered to check
 // the validity of some other type of object with a different GVR.
-func (a *SelectorSyncSetValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1beta1.AdmissionRequest) bool {
+func (a *SelectorSyncSetValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1.AdmissionRequest) bool {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -130,7 +130,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) shouldValidate(admissionSpec *a
 }
 
 // validateCreate specifically validates create operations for SelectorSyncSet objects.
-func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -142,7 +142,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	newObject := &hivev1.SelectorSyncSet{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -163,7 +163,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
 		contextLogger.Info(statusError.Message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,
 		}
@@ -171,13 +171,13 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
 // validateUpdate specifically validates update operations for SelectorSyncSet objects.
-func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -189,7 +189,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	newObject := &hivev1.SelectorSyncSet{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, newObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -210,7 +210,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
 		contextLogger.Info(statusError.Message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,
 		}
@@ -218,7 +218,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }

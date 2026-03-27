@@ -6,7 +6,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,7 +48,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 		oldSpec         hivev1.ClusterImageSetSpec
 		newObjectRaw    []byte
 		oldObjectRaw    []byte
-		operation       admissionv1beta1.Operation
+		operation       admissionv1.Operation
 		expectedAllowed bool
 		gvr             *metav1.GroupVersionResource
 	}{
@@ -57,7 +57,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 			newSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: "image:tag",
 			},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -65,7 +65,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 			newSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: "image@sha256:abc",
 			},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
@@ -73,7 +73,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 			newSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: "image@SHA256:abc",
 			},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
@@ -81,31 +81,31 @@ func TestClusterImageSetValidate(t *testing.T) {
 			newSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: "image@sh256:abc##",
 			},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test empty ClusterImageSet.Spec value",
 			newSpec:         hivev1.ClusterImageSetSpec{},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during create",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during update",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal old object during update",
 			oldObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
@@ -116,12 +116,12 @@ func TestClusterImageSetValidate(t *testing.T) {
 			oldSpec: hivev1.ClusterImageSetSpec{
 				ReleaseImage: "b:tag",
 			},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test that we don't validate deletes",
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 		{
@@ -180,7 +180,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 				}
 			}
 
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Operation: tc.operation,
 				Resource:  *tc.gvr,
 				Object: runtime.RawExtension{

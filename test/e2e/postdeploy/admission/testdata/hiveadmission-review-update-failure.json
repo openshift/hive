@@ -1,5 +1,5 @@
 {
-  "apiVersion": "admission.k8s.io/v1beta1",
+  "apiVersion": "admission.k8s.io/v1",
   "kind": "AdmissionReview",
   "request": {
     "kind": {

@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	log "github.com/sirupsen/logrus"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,7 +139,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Initialize(kubeClientConfig *
 
 // Validate is called by generic-admission-server when the registered REST resource above is called with an admission request.
 // Usually it's the kube apiserver that is making the admission validation request.
-func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -152,7 +152,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admis
 		contextLogger.Info("Skipping validation for request")
 		// The request object isn't something that this validator should validate.
 		// Therefore, we say that it's Allowed.
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -160,15 +160,15 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admis
 	contextLogger.Info("Validating request")
 
 	switch admissionSpec.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		return a.validateCreate(admissionSpec)
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		return a.validateUpdate(admissionSpec)
-	case admissionv1beta1.Delete:
+	case admissionv1.Delete:
 		return a.validateDelete(admissionSpec)
 	default:
 		contextLogger.Info("Successful validation")
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: true,
 		}
 	}
@@ -176,7 +176,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) Validate(admissionSpec *admis
 
 // shouldValidate explicitly checks if the request should validated. For example, this webhook may have accidentally been registered to check
 // the validity of some other type of object with a different GVR.
-func (a *ClusterDeploymentValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1beta1.AdmissionRequest) bool {
+func (a *ClusterDeploymentValidatingAdmissionHook) shouldValidate(admissionSpec *admissionv1.AdmissionRequest) bool {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -218,7 +218,7 @@ func creationHooksDisabled(o metav1.Object) bool {
 }
 
 // validateCreate specifically validates create operations for ClusterDeployment objects.
-func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -235,7 +235,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	cd := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, cd); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -254,7 +254,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	if len(cd.Name) > validation.DNS1123LabelMaxLength {
 		message := fmt.Sprintf("Invalid cluster deployment name (.meta.name): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
 		contextLogger.Error(message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -266,7 +266,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	if len(cd.Spec.ClusterName) > validation.DNS1123LabelMaxLength {
 		message := fmt.Sprintf("Invalid cluster name (.spec.clusterName): %s", validation.MaxLenError(validation.DNS1123LabelMaxLength))
 		contextLogger.Error(message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -288,7 +288,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	if cd.Spec.ManageDNS {
 		if !validateDomain(cd.Spec.BaseDomain, a.validManagedDomains) {
 			message := "The base domain must be a child of one of the managed domains for ClusterDeployments with manageDNS set to true"
-			return &admissionv1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -362,7 +362,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
@@ -370,7 +370,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
@@ -441,11 +441,11 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 }
 */
 
-func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1.AdmissionResponse {
 	obj := &unstructured.Unstructured{}
 	if err := decoder.DecodeRaw(admissionSpec.Object, obj); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -462,7 +462,7 @@ func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1b
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
@@ -627,7 +627,7 @@ func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.Cl
 }
 
 // validateUpdate specifically validates update operations for ClusterDeployment objects.
-func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
 		"operation": admissionSpec.Operation,
 		"group":     admissionSpec.Resource.Group,
@@ -644,7 +644,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	cd := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.Object, cd); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -659,7 +659,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	oldObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(admissionSpec.OldObject, oldObject); err != nil {
 		contextLogger.Errorf("Failed unmarshaling OldObject: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -676,7 +676,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec which is immutable except for %s fields. Unsupported change: \n%s", strings.Join(mutableFields, ","), unsupportedDiff)
 		contextLogger.Infof("Failed validation: %v", message)
 
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -696,7 +696,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		message := "Previously defined a list of ingress objects, must provide a default ingress object"
 		contextLogger.Infof("Failed validation: %v", message)
 
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -785,7 +785,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
@@ -793,13 +793,13 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
 
 // validateDelete specifically validates delete operations for ClusterDeployment objects.
-func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
+func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admissionv1.AdmissionRequest) *admissionv1.AdmissionResponse {
 	logger := log.WithFields(log.Fields{
 		"operation": request.Operation,
 		"group":     request.Resource.Group,
@@ -811,7 +811,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admis
 	oldObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(request.OldObject, oldObject); err != nil {
 		logger.Errorf("Failed unmarshaling Object: %v", err.Error())
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -839,14 +839,14 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admis
 	if len(allErrs) > 0 {
 		logger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(request.Kind).GroupKind(), request.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result:  &status,
 		}
 	}
 
 	logger.Info("Successful validation")
-	return &admissionv1beta1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: true,
 	}
 }
@@ -975,12 +975,12 @@ func validateDomain(domain string, validDomains []string) bool {
 	return matchFound
 }
 
-func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1.AdmissionResponse {
 	if !validateIngressList(&cd.Spec) {
 		message := "Ingress list must include a default entry"
 		contextLogger.Infof("Failed validation: %v", message)
 
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -992,7 +992,7 @@ func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *ad
 	if !validateIngressDomainsNotWildcard(&cd.Spec) {
 		message := "Ingress domains must not lead with *"
 		contextLogger.Infof("Failed validation: %v", message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -1004,7 +1004,7 @@ func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *ad
 	if !validateIngressDomainsShareClusterDomain(&cd.Spec) {
 		message := "Ingress domains must share the same domain as the cluster"
 		contextLogger.Infof("Failed validation: %v", message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -1016,7 +1016,7 @@ func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *ad
 	if !validateIngressServingCertificateExists(&cd.Spec) {
 		message := "Ingress has serving certificate that does not exist in certificate bundle"
 		contextLogger.Infof("Failed validation: %v", message)
-		return &admissionv1beta1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -1029,12 +1029,12 @@ func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *ad
 	return nil
 }
 
-func validateCertificateBundles(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validateCertificateBundles(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1.AdmissionResponse {
 	for _, certBundle := range cd.Spec.CertificateBundles {
 		if certBundle.Name == "" {
 			message := "Certificate bundle is missing a name"
 			contextLogger.Infof("Failed validation: %v", message)
-			return &admissionv1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
@@ -1045,7 +1045,7 @@ func validateCertificateBundles(cd *hivev1.ClusterDeployment, contextLogger *log
 		if certBundle.CertificateSecretRef.Name == "" {
 			message := "Certificate bundle is missing a secret reference"
 			contextLogger.Infof("Failed validation: %v", message)
-			return &admissionv1beta1.AdmissionResponse{
+			return &admissionv1.AdmissionResponse{
 				Allowed: false,
 				Result: &metav1.Status{
 					Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,

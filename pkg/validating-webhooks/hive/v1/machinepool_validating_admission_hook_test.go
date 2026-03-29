@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,13 +61,13 @@ func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
 					Group:    tc.group,
 					Version:  tc.version,
 					Resource: tc.resource,
 				},
-				Operation: admissionv1beta1.Create,
+				Operation: admissionv1.Create,
 			}
 			response := cut.Validate(request)
 			assert.Equal(t, tc.expectToSkip, response.Allowed)
@@ -78,20 +78,20 @@ func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
 func Test_MachinePoolAdmission_Validate_Operation(t *testing.T) {
 	cases := []struct {
 		name         string
-		operation    admissionv1beta1.Operation
+		operation    admissionv1.Operation
 		expectToSkip bool
 	}{
 		{
 			name:      "create",
-			operation: admissionv1beta1.Create,
+			operation: admissionv1.Create,
 		},
 		{
 			name:      "update",
-			operation: admissionv1beta1.Update,
+			operation: admissionv1.Update,
 		},
 		{
 			name:         "other",
-			operation:    admissionv1beta1.Operation("other"),
+			operation:    admissionv1.Operation("other"),
 			expectToSkip: true,
 		},
 	}
@@ -99,7 +99,7 @@ func Test_MachinePoolAdmission_Validate_Operation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
 					Group:    machinePoolGroup,
 					Version:  machinePoolVersion,
@@ -499,13 +499,13 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			if !assert.NoError(t, err, "unexpected error marshalling provision") {
 				return
 			}
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
 					Group:    machinePoolGroup,
 					Version:  machinePoolVersion,
 					Resource: machinePoolResource,
 				},
-				Operation: admissionv1beta1.Create,
+				Operation: admissionv1.Create,
 				Object:    runtime.RawExtension{Raw: rawProvision},
 			}
 			response := cut.Validate(request)
@@ -616,13 +616,13 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 			if !assert.NoError(t, err, "unexpected error marshalling new provision") {
 				return
 			}
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
 					Group:    machinePoolGroup,
 					Version:  machinePoolVersion,
 					Resource: machinePoolResource,
 				},
-				Operation: admissionv1beta1.Update,
+				Operation: admissionv1.Update,
 				Object:    runtime.RawExtension{Raw: newAsJSON},
 				OldObject: runtime.RawExtension{Raw: oldAsJSON},
 			}

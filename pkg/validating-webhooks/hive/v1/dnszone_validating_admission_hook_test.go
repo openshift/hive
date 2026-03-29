@@ -6,7 +6,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/stretchr/testify/assert"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,51 +48,51 @@ func TestDNSZoneValidate(t *testing.T) {
 		oldZoneStr      string
 		newObjectRaw    []byte
 		oldObjectRaw    []byte
-		operation       admissionv1beta1.Operation
+		operation       admissionv1.Operation
 		expectedAllowed bool
 		gvr             *metav1.GroupVersionResource
 	}{
 		{
 			name:            "Test valid DNSZone.Spec.Zone",
 			newZoneStr:      "this.is.a.valid.zone",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test empty DNSZone.Spec.Zone value",
 			newZoneStr:      "",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test invalid DNSZone.Spec.Zone",
 			newZoneStr:      "this_is_not_a_valid_zone",
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during create",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Create,
+			operation:       admissionv1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal new object during update",
 			newObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test unable to marshal old object during update",
 			oldObjectRaw:    []byte{0},
-			operation:       admissionv1beta1.Update,
+			operation:       admissionv1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:       "Test DNSZone.Spec.Zone is immutable (updates not allowed)",
 			newZoneStr: "this.is.a.new.valid.zone",
 			oldZoneStr: "this.is.a.valid.zone",
-			operation:  admissionv1beta1.Update,
+			operation:  admissionv1.Update,
 
 			expectedAllowed: false,
 		},
@@ -100,13 +100,13 @@ func TestDNSZoneValidate(t *testing.T) {
 			name:       "Test other updates allowed",
 			newZoneStr: "this.is.a.valid.zone",
 			oldZoneStr: "this.is.a.valid.zone",
-			operation:  admissionv1beta1.Update,
+			operation:  admissionv1.Update,
 
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test that we don't validate deletes",
-			operation:       admissionv1beta1.Delete,
+			operation:       admissionv1.Delete,
 			expectedAllowed: true,
 		},
 		{
@@ -169,7 +169,7 @@ func TestDNSZoneValidate(t *testing.T) {
 				}
 			}
 
-			request := &admissionv1beta1.AdmissionRequest{
+			request := &admissionv1.AdmissionRequest{
 				Operation: tc.operation,
 				Resource:  *tc.gvr,
 				Object: runtime.RawExtension{

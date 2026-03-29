@@ -278,7 +278,7 @@ metadata:
 webhooks:
 - name: clusterdeploymentvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -323,7 +323,7 @@ metadata:
 webhooks:
 - name: clusterdeploymentcustomizationvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -367,7 +367,7 @@ metadata:
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -411,7 +411,7 @@ metadata:
 webhooks:
 - name: clusterpoolvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -455,7 +455,7 @@ metadata:
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -584,7 +584,7 @@ metadata:
 webhooks:
 - name: dnszonevalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -728,7 +728,7 @@ metadata:
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -797,7 +797,7 @@ metadata:
 webhooks:
 - name: selectorsyncsetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API
@@ -896,7 +896,7 @@ metadata:
 webhooks:
 - name: syncsetvalidators.admission.hive.openshift.io
   admissionReviewVersions:
-  - v1beta1
+  - v1
   clientConfig:
     service:
       # reach the webhook via the registered aggregated API

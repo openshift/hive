@@ -10,10 +10,16 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
+RUN echo "=== DEBUG: Git status after COPY (RHEL8) ===" && git status -s || echo "git status failed"
+RUN echo "=== DEBUG: Git tree state (RHEL8) ===" && ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty'
+
 RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
+
+RUN echo "=== DEBUG: Git status after BUILD_IMAGE_CUSTOMIZATION (RHEL8) ===" && git status -s || echo "git status failed"
 
 RUN if [ -e "/activation-key/org" ]; then dnf install -y subscription-manager && dnf clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 ENV GO=${GO}
+RUN echo "=== DEBUG: Final git status before build-hiveutil (RHEL8) ===" && git status -s || echo "git status failed"
 RUN make build-hiveutil
 
 FROM ${EL9_BUILD_IMAGE} as builder_rhel9
@@ -24,11 +30,17 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
+RUN echo "=== DEBUG: Git status after COPY (RHEL9) ===" && git status -s || echo "git status failed"
+RUN echo "=== DEBUG: Git tree state (RHEL9) ===" && ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty'
+
 RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
+
+RUN echo "=== DEBUG: Git status after BUILD_IMAGE_CUSTOMIZATION (RHEL9) ===" && git status -s || echo "git status failed"
 
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 RUN if [ -e "/activation-key/org" ]; then dnf install -y subscription-manager && dnf clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 ENV GO=${GO}
+RUN echo "=== DEBUG: Final git status before builds (RHEL9) ===" && git status -s || echo "git status failed"
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
 

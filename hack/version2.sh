@@ -267,12 +267,10 @@ version_init() {
                 log "debug" "Using active branch $BRANCH_NAME since it corresponds to commit $(shortsha)"
             fi
         else
-            log "debug" "No active branch -- detached HEAD?"
-        fi
-
-        # If still no branch name, discover it
-        if [[ -z "$BRANCH_NAME" ]]; then
-            BRANCH_NAME=$(branch_from_commit "$commit_ish_arg")
+            # Detached HEAD: In CI builds (Konflux), always assume master since all
+            # Konflux pipelines target master branch, even if other branch refs exist.
+            log "debug" "No active branch (detached HEAD), assuming master for CI build"
+            BRANCH_NAME="master"
         fi
     fi
 

@@ -22,6 +22,10 @@ spec:
   params:
     - name: git-url
       value: '{{source_url}}'
+    - name: fetchTags
+      value: 'true'
+    - name: depth
+      value: '0'
     - name: revision
       value: '{{revision}}'
     - name: output-image

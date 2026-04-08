@@ -1,6 +1,7 @@
 package machinepool
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
-	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -28,8 +28,8 @@ type VSphereActuator struct {
 var _ Actuator = &VSphereActuator{}
 
 // NewVSphereActuator is the constructor for building a VSphereActuator
-func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
-	osImage, err := getVSphereOSImage(masterMachine, scheme, logger)
+func NewVSphereActuator(masterMachine *machineapi.Machine, logger log.FieldLogger) (*VSphereActuator, error) {
+	osImage, err := getVSphereOSImage(masterMachine, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
 		return nil, err
@@ -116,8 +116,9 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 }
 
 // Get the OS image from an existing master machine.
-func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := vsphereutil.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
+func getVSphereOSImage(masterMachine *machineapi.Machine, logger log.FieldLogger) (string, error) {
+	providerSpec, err := providerSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
+	logger.Debugf("Got provider spec from raw extension: %+v", providerSpec)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode VSphereMachineProviderSpec from master machine")
 		return "", errors.Wrap(err, "cannot decode VSphereMachineProviderSpec from master machine")
@@ -151,4 +152,20 @@ func setFolderPath(folder, datacenter string, logger log.FieldLogger) string {
 		return fmt.Sprintf("/%s/vm/%s", datacenter, folder)
 	}
 	return folder
+}
+
+// ProviderSpecFromRawExtension unmarshals the JSON-encoded spec
+// Inlined from https://github.com/openshift/machine-api-operator/blob/85c00c0d525fe75683afced6cfed878b3414bc7a/pkg/controller/vsphere/util.go#L202-L215
+// (last changed: 5 years ago)
+func providerSpecFromRawExtension(rawExtension *runtime.RawExtension) (*machineapi.VSphereMachineProviderSpec, error) {
+	if rawExtension == nil {
+		return &machineapi.VSphereMachineProviderSpec{}, nil
+	}
+
+	spec := new(machineapi.VSphereMachineProviderSpec)
+	if err := json.Unmarshal(rawExtension.Raw, &spec); err != nil {
+		return nil, fmt.Errorf("error unmarshalling providerSpec: %v", err)
+	}
+
+	return spec, nil
 }

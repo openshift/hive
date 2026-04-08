@@ -1,22 +1,22 @@
 package machinepool
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
-	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestVSphereActuator(t *testing.T) {
@@ -41,9 +41,7 @@ func TestVSphereActuator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			scheme := scheme.GetScheme()
-
-			actuator, err := NewVSphereActuator(test.masterMachine, scheme, log.WithField("actuator", "vsphereactuator_test"))
+			actuator, err := NewVSphereActuator(test.masterMachine, log.WithField("actuator", "vsphereactuator_test"))
 			assert.NoError(t, err, "unexpected error creating VSphereActuator")
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
@@ -113,7 +111,7 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 }
 
 func testVSphereMachineSpec(machineType string) machineapi.MachineSpec {
-	rawVSphereProviderSpec, err := vsphereutil.RawExtensionFromProviderSpec(testVSphereProviderSpec())
+	rawVSphereProviderSpec, err := rawExtensionFromProviderSpec(testVSphereProviderSpec())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding VSphere machine provider spec")
 	}
@@ -160,4 +158,23 @@ func testVSphereProviderSpec() *machineapi.VSphereMachineProviderSpec {
 		NumCPUs: 8,
 		DiskGiB: 120,
 	}
+}
+
+// rawExtensionFromProviderSpec marshals the machine provider spec.
+// Inlined https://github.com/openshift/machine-api-operator/blob/85c00c0d525fe75683afced6cfed878b3414bc7a/pkg/controller/vsphere/util.go#L168-L183
+// (last changed: 5 years ago)
+func rawExtensionFromProviderSpec(spec *machineapi.VSphereMachineProviderSpec) (*runtime.RawExtension, error) {
+	if spec == nil {
+		return &runtime.RawExtension{}, nil
+	}
+
+	var rawBytes []byte
+	var err error
+	if rawBytes, err = json.Marshal(spec); err != nil {
+		return nil, fmt.Errorf("error marshalling providerSpec: %v", err)
+	}
+
+	return &runtime.RawExtension{
+		Raw: rawBytes,
+	}, nil
 }

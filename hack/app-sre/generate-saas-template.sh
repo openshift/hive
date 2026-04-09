@@ -22,18 +22,19 @@ Parameters:
 EOF
 }
 
-# Check for help flag or incorrect number of arguments
+# Check for help flag first (before argument count validation)
+for arg in "$@"; do
+    if [[ "$arg" == "-h" ]] || [[ "$arg" == "--help" ]]; then
+        usage
+        exit 0
+    fi
+done
+
+# Check for incorrect number of arguments
 if [ $# -ne 3 ]; then
     usage
     exit 1
 fi
-
-for arg in "$@"; do
-    if [[ "$arg" == *"-h"* ]]; then
-        usage
-        exit 1
-    fi
-done
 
 saas_template_stub="$1"
 saas_object_file="$2"

@@ -31,7 +31,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 	mpool := pool.Platform.OpenStack
 
 	total := int64(1)
-	if role == masterRole && pool.Replicas != nil {
+	if role == "master" && pool.Replicas != nil {
 		total = *pool.Replicas
 	}
 
@@ -59,7 +59,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 		machineLabels := map[string]string{
 			"cluster.x-k8s.io/control-plane": "",
 		}
-		if role == bootstrapRole {
+		if role == "bootstrap" {
 			machineName = capiutils.GenerateBoostrapMachineName(clusterID)
 			machineLabels = map[string]string{
 				"cluster.x-k8s.io/control-plane": "",
@@ -170,18 +170,9 @@ func generateMachineSpec(clusterID string, config *types.InstallConfig, mpool *o
 
 	securityGroups := []capo.SecurityGroupParam{
 		{
-			// Bootstrap and Master share the same security group, though
-			// we layer on additional security groups for the bootstrap later.
+			// Bootstrap and Master share the same security group
 			Filter: &capo.SecurityGroupFilter{Name: fmt.Sprintf("%s-master", clusterID)},
 		},
-	}
-
-	// Add bootstrap sec group to bootstrap vm to allow collecting logs using ssh
-	// Notice: bootstrap SG is added by name and removed by tag
-	if role == bootstrapRole {
-		securityGroups = append(securityGroups, capo.SecurityGroupParam{
-			Filter: &capo.SecurityGroupFilter{Name: fmt.Sprintf("%s-bootstrap", clusterID)},
-		})
 	}
 
 	for i := range mpool.AdditionalSecurityGroupIDs {
@@ -218,7 +209,7 @@ func generateMachineSpec(clusterID string, config *types.InstallConfig, mpool *o
 		ConfigDrive: configDrive,
 	}
 
-	if role != bootstrapRole {
+	if role != "bootstrap" {
 		spec.ServerGroup = &capo.ServerGroupParam{Filter: &capo.ServerGroupFilter{Name: ptr.To(clusterID + "-" + role)}}
 	}
 

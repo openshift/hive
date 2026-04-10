@@ -65,7 +65,4 @@ func SetPlatformDefaults(p *openstack.Platform, n *types.Networking) {
 		}
 	}
 
-	if p.DNSRecordsType == "" {
-		p.DNSRecordsType = configv1.DNSRecordsTypeInternal
-	}
 }

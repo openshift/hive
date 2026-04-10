@@ -16,10 +16,6 @@ const (
 	// and managed by the cluster.
 	TagValueOwned = "owned"
 
-	// TagValueShared is the tag value to indicate that a resource is considered shared
-	// with the cluster.
-	TagValueShared = "shared"
-
 	// TagNameKubernetesUnmanaged is the tag name to indicate that a resource is unmanaged
 	// by the cluster and should be ignored by CCM. For example, kubernetes.io/cluster/unmanaged=true.
 	TagNameKubernetesUnmanaged = TagNameKubernetesClusterPrefix + "unmanaged"
@@ -59,25 +55,18 @@ func (t Tags) HasTagKeyPrefix(prefix string) bool {
 }
 
 // HasClusterOwnedTag returns true if there is a cluster owned tag.
-// That is kubernetes.io/cluster/<cluster-id>: owned.
+// That is  kubernetes.io/cluster/<cluster-id>: owned.
 func (t Tags) HasClusterOwnedTag() bool {
-	clusterIDs := t.GetClusterIDs(TagValueOwned)
+	clusterIDs := t.GetOwnedClusterIDs()
 	return len(clusterIDs) > 0
 }
 
-// HasClusterSharedTag returns true if there is a cluster shared tag.
-// That is kubernetes.io/cluster/<cluster-id>: shared.
-func (t Tags) HasClusterSharedTag() bool {
-	clusterIDs := t.GetClusterIDs(TagValueShared)
-	return len(clusterIDs) > 0
-}
-
-// GetClusterIDs returns the cluster IDs from tag "kubernetes.io/cluster/<cluster-id>: <resourceLifeCycle>" if any.
-func (t Tags) GetClusterIDs(resourceLifeCycle string) []string {
+// GetOwnedClusterIDs returns the cluster IDs from tag "kubernetes.io/cluster/<cluster-id>: owned" if any.
+func (t Tags) GetOwnedClusterIDs() []string {
 	clusterIDs := make([]string, 0)
 	keys := t.GetTagKeysWithPrefix(TagNameKubernetesClusterPrefix)
 	for _, key := range keys {
-		if value := t[key]; value == resourceLifeCycle {
+		if value := t[key]; value == TagValueOwned {
 			if clusterID := strings.TrimPrefix(key, TagNameKubernetesClusterPrefix); clusterID != "" {
 				clusterIDs = append(clusterIDs, clusterID)
 			}

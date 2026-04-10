@@ -36,7 +36,7 @@ require (
 	github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
 	github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23
+	github.com/openshift/installer v1.4.21-pre
 	github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
 	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20241021180644-0eca0846914a

@@ -20,7 +20,6 @@ require (
 	github.com/evanphx/json-patch v5.9.11+incompatible
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-logr/logr v1.4.3
-	github.com/golang/mock v1.7.0-rc.1
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -156,6 +155,8 @@ require (
 )
 
 require github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235
+
+require go.uber.org/mock v0.6.0
 
 require (
 	4d63.com/gochecknoglobals v0.2.2 // indirect

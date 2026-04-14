@@ -196,7 +196,7 @@ function save_hive_logs() {
   oc get cd -A -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{" "}{.spec.clusterMetadata.adminKubeconfigSecretRef.name}{"\n"}{end}' | while read ns cd s; do
     # Skip CDs with no kubeconfig Secret ref set
     [[ -n "$s" ]] || continue
-    oc extract secret/$s -n $ns --to=$tmpd || continue
+    oc extract secret/$s -n $ns --to=$tmpd --confirm=true || continue
     # Nodes
     if oc --kubeconfig=$tmpd/kubeconfig get no -o yaml > $tmpf; then
       mv $tmpf $ARTIFACT_DIR/SPOKE_9exit_${ns}_${cd}_nodes.yaml

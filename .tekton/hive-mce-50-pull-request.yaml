@@ -1,0 +1,81 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift/hive?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/max-keep-runs: '3'
+    pipelinesascode.tekton.dev/on-cel-expression: >-
+      event == "pull_request"
+      && !body.pull_request.draft
+      && target_branch == "master"
+      && !files.all.all(x, x.matches('^docs/|\\.md$|^(?:.*/)?(?:\\.gitignore|OWNERS|PROJECT|LICENSE)$'))
+  labels:
+    appstudio.openshift.io/application: release-mce-50
+    appstudio.openshift.io/component: hive-mce-50
+    pipelines.appstudio.openshift.io/type: build
+  name: hive-mce-50-on-pull-request
+  namespace: crt-redhat-acm-tenant
+spec:
+  params:
+    - name: git-url
+      value: '{{source_url}}'
+    - name: fetchTags
+      value: 'true'
+    - name: depth
+      value: '0'
+    - name: revision
+      value: '{{revision}}'
+    - name: output-image
+      value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hive-mce-50:on-pr-{{revision}}
+    - name: image-expires-after
+      value: 5d
+    - name: build-platforms
+      value:
+        - linux/x86_64
+    - name: dockerfile
+      value: Dockerfile
+    - name: path-context
+      value: .
+    - name: hermetic
+      value: 'true'
+    - name: prefetch-input
+      value: '[{"type": "rpm", "path": "./hack/hermetic"}]'
+    - name: build-args
+      value:
+        - CONTAINER_SUB_MANAGER_OFF=1
+        - EL8_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.13-202602241446.g1f0d617.el8
+        - EL9_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.13-202602241446.ge8e5642.el9
+        - BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+    - name: build-source-image
+      value: 'true'
+    - name: build-image-index
+      value: 'true'
+    - name: enable-cache-proxy
+      value: 'true'
+  pipelineRef:
+    resolver: git
+    params:
+      - name: url
+        value: https://github.com/stolostron/konflux-build-catalog.git
+      - name: revision
+        value: main
+      - name: pathInRepo
+        value: pipelines/common.yaml
+  taskRunSpecs:
+    - computeResources:
+        limits:
+          cpu: '4'
+          memory: 20Gi
+        requests:
+          cpu: '1'
+          memory: 16Gi
+      pipelineTaskName: build-images
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-hive-mce-50
+  workspaces:
+    - name: git-auth
+      secret:
+        secretName: '{{ git_auth_secret }}'

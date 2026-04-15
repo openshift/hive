@@ -34,3 +34,5 @@ config/apiserver/certificates/**
 *.swo
 *~
 /_output/
+test/ote/bin/
+test/ote/vendor/

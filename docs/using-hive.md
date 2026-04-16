@@ -528,7 +528,7 @@ For Azure, replace the contents of `compute.platform` and `controlPlane.platform
     azure:
       osDisk:
         diskSizeGB: 128
-      type: Standard_D2s_v3
+      type: Standard_D4s_v3
 ```
 
 and replace the contents of `platform` with:
@@ -806,7 +806,7 @@ For Azure, replace the contents of `spec.platform` with:
 azure:
   osDisk:
     diskSizeGB: 128
-  type: Standard_D2s_v3
+  type: Standard_D4s_v3
 ```
 
 For GCP, replace the contents of `spec.platform` with:

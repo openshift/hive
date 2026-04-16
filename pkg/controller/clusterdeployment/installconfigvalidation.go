@@ -63,9 +63,19 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfigSecret *co
 		if ic.Platform.VSphere == nil {
 			return ic, errors.New(novSpherePlatformErr)
 		}
-		if (ic.Platform.VSphere.DeprecatedUsername == "" || ic.Platform.VSphere.DeprecatedPassword == "") &&
-			(len(ic.Platform.VSphere.VCenters) == 0 || ic.Platform.VSphere.VCenters[0].Username == "" ||
-				ic.Platform.VSphere.VCenters[0].Password == "") {
+
+		hasCreds := ic.Platform.VSphere.DeprecatedUsername != "" && ic.Platform.VSphere.DeprecatedPassword != ""
+		// Our upconvert will spray the deprecated creds into all the vcenters if present.
+		// Otherwise, every vcenters entry must have creds set.
+		vcentersWithCreds := 0
+		for _, vcenter := range ic.Platform.VSphere.VCenters {
+			if vcenter.Username != "" && vcenter.Password != "" {
+				vcentersWithCreds++
+			}
+		}
+		hasCreds = hasCreds || (vcentersWithCreds > 0 && vcentersWithCreds == len(ic.Platform.VSphere.VCenters))
+
+		if !hasCreds {
 			return ic, errors.New(missingvSphereCredentialsErr)
 		}
 	case platform.Nutanix != nil:

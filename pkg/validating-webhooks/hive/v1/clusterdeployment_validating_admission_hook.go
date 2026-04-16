@@ -319,7 +319,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
-
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -524,22 +523,42 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		}
 	}
 	if vsphere := platform.VSphere; vsphere != nil {
+		vsphere = vsphere.DeepCopy()
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
+		// Confusingly, credentials fields exist in four objects:
+		// - The install-config Secret. This is where installer expects to find them for day 0.
+		// - The credentials Secret. This is where we pull them from when destroying. (We can't
+		//   count on the install-config still existing, or the creds therein being current.)
+		// - The metadata.json Secret. We scrub this when we get it from the installer, so it
+		//   should be clean in etcd.
+		// - The ClusterDeployment/ClusterPool, since we're inheriting the install-config's VSphere
+		//   Platform as our Infrastructure schema. We prevent the user from populating credentials
+		//   in the CD/CP:
+		//   a) we don't use them; and
+		//   b) this is a potential security hole, as users with read access to CD/CP shouldn't
+		//      necessarily have access to credentials.
+		if vsphere.Infrastructure != nil {
+			if vsphere.Infrastructure.DeprecatedPassword != "" {
+				allErrs = append(allErrs, field.Forbidden(vspherePath.Child("infrastructure", "password"), "credentials must only be provided in Secrets"))
+			}
+			for i, v := range vsphere.Infrastructure.VCenters {
+				if v.Password != "" {
+					allErrs = append(allErrs, field.Forbidden(vspherePath.Child("infrastructure", "vcenters").Index(i).Child("password"), "credentials must only be provided in Secrets"))
+				}
+			}
+		}
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
 		}
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		// We need to have at least one VCenter; but we have to allow both the legacy
+		// (pre-zonal) and new shapes. We'll upconvert the former, but only after the CR
+		// has alreday been accepted and stored in etcd once.
+		if vsphere.DeprecatedVCenter == "" && (vsphere.Infrastructure == nil || len(vsphere.Infrastructure.VCenters) == 0) {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("infrastructure", "vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
@@ -671,6 +690,24 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
+	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
+		// HIVE-2391: Moving from a non-zonal to a zonal shape is permitted.
+		// NOTE: Existing deprecated fields may be left populated, but will be ignored.
+		// NOTE: We're allowing the creds/certs secret refs to be changed in this operation as well.
+		// In both cases the user could just update the contents of the existing Secret, but may wish
+		// to replace them instead.
+		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+			contextLogger.Debug("Allowing vsphere zonal conversion")
+			// copy over the value to spoof the immutability checker
+			oldObject.Spec.Platform.VSphere = cd.Spec.Platform.VSphere
+			// We've stealthily allowed replacement of secret refs. This will at least make sure they're not empty.
+			allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
+		}
+	}
+
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {
 		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec which is immutable except for %s fields. Unsupported change: \n%s", strings.Join(mutableFields, ","), unsupportedDiff)
@@ -704,9 +741,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			},
 		}
 	}
-
-	allErrs := field.ErrorList{}
-	specPath := field.NewPath("spec")
 
 	if cd.Spec.Installed {
 		if cd.Spec.ClusterMetadata != nil {

@@ -8,7 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	compute "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	compute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
+	compute0 "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	dns "github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
 	gomock "github.com/golang/mock/gomock"
 	azureclient "github.com/openshift/hive/pkg/azureclient"
@@ -68,10 +69,10 @@ func (mr *MockClientMockRecorder) CreateOrUpdateZone(ctx, resourceGroupName, zon
 }
 
 // DeallocateVirtualMachine mocks base method.
-func (m *MockClient) DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error) {
+func (m *MockClient) DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute0.VirtualMachinesDeallocateFuture, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeallocateVirtualMachine", ctx, resourceGroup, name)
-	ret0, _ := ret[0].(compute.VirtualMachinesDeallocateFuture)
+	ret0, _ := ret[0].(compute0.VirtualMachinesDeallocateFuture)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,10 +157,10 @@ func (mr *MockClientMockRecorder) GetZone(ctx, resourceGroupName, zone interface
 }
 
 // ListAllVirtualMachines mocks base method.
-func (m *MockClient) ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error) {
+func (m *MockClient) ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute0.VirtualMachineListResultPage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListAllVirtualMachines", ctx, statusOnly)
-	ret0, _ := ret[0].(compute.VirtualMachineListResultPage)
+	ret0, _ := ret[0].(compute0.VirtualMachineListResultPage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -216,10 +217,10 @@ func (mr *MockClientMockRecorder) ListResourceSKUs(ctx, filter interface{}) *gom
 }
 
 // StartVirtualMachine mocks base method.
-func (m *MockClient) StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error) {
+func (m *MockClient) StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute0.VirtualMachinesStartFuture, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StartVirtualMachine", ctx, resourceGroup, name)
-	ret0, _ := ret[0].(compute.VirtualMachinesStartFuture)
+	ret0, _ := ret[0].(compute0.VirtualMachinesStartFuture)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -412,10 +413,10 @@ func (mr *MockImageListResultPageMockRecorder) NotDone() *gomock.Call {
 }
 
 // Values mocks base method.
-func (m *MockImageListResultPage) Values() []compute.Image {
+func (m *MockImageListResultPage) Values() []compute0.Image {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Values")
-	ret0, _ := ret[0].([]compute.Image)
+	ret0, _ := ret[0].([]compute0.Image)
 	return ret0
 }
 

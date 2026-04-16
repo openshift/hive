@@ -7,6 +7,7 @@ import (
 
 	"github.com/openshift/hive/pkg/constants"
 
+	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -350,10 +351,10 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	client.EXPECT().ListResourceSKUs(gomock.Any(), "").Return(page, nil)
 	page.EXPECT().NotDone().Return(true)
 	page.EXPECT().Values().Return(
-		[]compute.ResourceSku{
+		[]azenc.ResourceSku{
 			{
 				Name: ptr.To(testInstanceType),
-				LocationInfo: &[]compute.ResourceSkuLocationInfo{
+				LocationInfo: &[]azenc.ResourceSkuLocationInfo{
 					{
 						Location: ptr.To(testRegion),
 						Zones:    &zones,

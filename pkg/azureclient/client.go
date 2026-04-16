@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
 	"github.com/Azure/go-autorest/autorest"
@@ -44,7 +45,7 @@ type Client interface {
 	GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error)
 
 	// SKU
-	GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error)
+	GetVirtualMachineSku(ctx context.Context, name, region string) (*azenc.ResourceSku, error)
 
 	// Images
 	ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error)
@@ -54,7 +55,7 @@ type Client interface {
 type ResourceSKUsPage interface {
 	NextWithContext(ctx context.Context) error
 	NotDone() bool
-	Values() []compute.ResourceSku
+	Values() []azenc.ResourceSku
 }
 
 // RecordSetPage is a page of results from listing record sets.
@@ -71,7 +72,7 @@ type ImageListResultPage interface {
 }
 
 type azureClient struct {
-	resourceSKUsClient    *compute.ResourceSkusClient
+	resourceSKUsClient    *azenc.ResourceSkusClient
 	recordSetsClient      *dns.RecordSetsClient
 	zonesClient           *dns.ZonesClient
 	virtualMachinesClient *compute.VirtualMachinesClient
@@ -79,7 +80,7 @@ type azureClient struct {
 }
 
 func (c *azureClient) ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error) {
-	page, err := c.resourceSKUsClient.List(ctx, filter)
+	page, err := c.resourceSKUsClient.List(ctx, filter, "false")
 	return &page, err
 }
 
@@ -150,11 +151,13 @@ func (c *azureClient) GetVMCapabilities(ctx context.Context, instanceType, regio
 }
 
 // GetVirtualMachineSku retrieves the resource SKU of a specified virtual machine SKU in the specified region.
-func (c *azureClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+func (c *azureClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*azenc.ResourceSku, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	for page, err := c.resourceSKUsClient.List(ctx, ""); page.NotDone(); err = page.NextWithContext(ctx) {
+	var page azenc.ResourceSkusResultPage
+	var err error
+	for page, err = c.resourceSKUsClient.List(ctx, fmt.Sprintf("location eq '%s'", region), "false"); page.NotDone(); err = page.NextWithContext(ctx) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error fetching SKU pages")
 		}
@@ -164,18 +167,13 @@ func (c *azureClient) GetVirtualMachineSku(ctx context.Context, name, region str
 				continue
 			}
 			// Filter out resources that do not match the provided name
-			if !strings.EqualFold(name, *sku.Name) {
-				continue
-			}
-			// Return the resource from the provided region
-			for _, location := range to.StringSlice(sku.Locations) {
-				if strings.EqualFold(location, region) {
-					return &sku, nil
-				}
+			if strings.EqualFold(name, *sku.Name) {
+				return &sku, nil
 			}
 		}
 	}
-	return nil, nil
+	// err is nil if we didn't find it (page.NotDone() == false above)
+	return nil, err
 }
 
 func (c *azureClient) ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error) {
@@ -238,7 +236,7 @@ func newClient(authJSONSource func() ([]byte, error), environmentName string) (*
 		return nil, err
 	}
 
-	resourceSKUsClient := compute.NewResourceSkusClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
+	resourceSKUsClient := azenc.NewResourceSkusClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	resourceSKUsClient.Authorizer = authorizer
 
 	recordSetsClient := dns.NewRecordSetsClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)

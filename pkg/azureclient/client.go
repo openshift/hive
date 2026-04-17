@@ -3,10 +3,7 @@ package azureclient
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
-	"strings"
-	"time"
 
 	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
@@ -42,10 +39,6 @@ type Client interface {
 	ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error)
 	DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error)
 	StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error)
-	GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error)
-
-	// SKU
-	GetVirtualMachineSku(ctx context.Context, name, region string) (*azenc.ResourceSku, error)
 
 	// Images
 	ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error)
@@ -130,50 +123,6 @@ func (c *azureClient) DeallocateVirtualMachine(ctx context.Context, resourceGrou
 
 func (c *azureClient) StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error) {
 	return c.virtualMachinesClient.Start(ctx, resourceGroup, name)
-}
-
-// GetVMCapabilities retrieves the capabilities of an instance type in a specific region. Returns these values
-// in a map with the capability name as the key and the corresponding value.
-func (c *azureClient) GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error) {
-	typeMeta, err := c.GetVirtualMachineSku(ctx, instanceType, region)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to Azure client: %v", err)
-	}
-	if typeMeta == nil {
-		return nil, fmt.Errorf("not found in region %s", region)
-	}
-
-	capabilities := make(map[string]string)
-	for _, capability := range *typeMeta.Capabilities {
-		capabilities[to.String(capability.Name)] = to.String(capability.Value)
-	}
-	return capabilities, nil
-}
-
-// GetVirtualMachineSku retrieves the resource SKU of a specified virtual machine SKU in the specified region.
-func (c *azureClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*azenc.ResourceSku, error) {
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	var page azenc.ResourceSkusResultPage
-	var err error
-	for page, err = c.resourceSKUsClient.List(ctx, fmt.Sprintf("location eq '%s'", region), "false"); page.NotDone(); err = page.NextWithContext(ctx) {
-		if err != nil {
-			return nil, errors.Wrap(err, "error fetching SKU pages")
-		}
-		for _, sku := range page.Values() {
-			// Filter out resources that are not virtualMachines
-			if !strings.EqualFold("virtualMachines", *sku.ResourceType) {
-				continue
-			}
-			// Filter out resources that do not match the provided name
-			if strings.EqualFold(name, *sku.Name) {
-				return &sku, nil
-			}
-		}
-	}
-	// err is nil if we didn't find it (page.NotDone() == false above)
-	return nil, err
 }
 
 func (c *azureClient) ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error) {

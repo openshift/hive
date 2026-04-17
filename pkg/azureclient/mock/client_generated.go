@@ -111,36 +111,6 @@ func (mr *MockClientMockRecorder) DeleteZone(ctx, resourceGroupName, zone interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteZone", reflect.TypeOf((*MockClient)(nil).DeleteZone), ctx, resourceGroupName, zone)
 }
 
-// GetVMCapabilities mocks base method.
-func (m *MockClient) GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVMCapabilities", ctx, instanceType, region)
-	ret0, _ := ret[0].(map[string]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetVMCapabilities indicates an expected call of GetVMCapabilities.
-func (mr *MockClientMockRecorder) GetVMCapabilities(ctx, instanceType, region interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVMCapabilities", reflect.TypeOf((*MockClient)(nil).GetVMCapabilities), ctx, instanceType, region)
-}
-
-// GetVirtualMachineSku mocks base method.
-func (m *MockClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVirtualMachineSku", ctx, name, region)
-	ret0, _ := ret[0].(*compute.ResourceSku)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetVirtualMachineSku indicates an expected call of GetVirtualMachineSku.
-func (mr *MockClientMockRecorder) GetVirtualMachineSku(ctx, name, region interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVirtualMachineSku", reflect.TypeOf((*MockClient)(nil).GetVirtualMachineSku), ctx, name, region)
-}
-
 // GetZone mocks base method.
 func (m *MockClient) GetZone(ctx context.Context, resourceGroupName, zone string) (dns.Zone, error) {
 	m.ctrl.T.Helper()

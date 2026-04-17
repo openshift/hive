@@ -348,7 +348,7 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 
 func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockClient, zones []string) {
 	page := mockazure.NewMockResourceSKUsPage(mockCtrl)
-	client.EXPECT().ListResourceSKUs(gomock.Any(), "").Return(page, nil)
+	client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
 	page.EXPECT().NotDone().Return(true)
 	page.EXPECT().Values().Return(
 		[]azenc.ResourceSku{
@@ -367,7 +367,7 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 
 func mockGetVMCapabilities(mockCtrl *gomock.Controller, client *mockazure.MockClient, hyperVGenerations string) {
 	page := mockazure.NewMockResourceSKUsPage(mockCtrl)
-	client.EXPECT().ListResourceSKUs(gomock.Any(), fmt.Sprintf("location eq '%s'", testRegion)).Return(page, nil)
+	client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
 	page.EXPECT().NotDone().Return(true)
 	page.EXPECT().Values().Return(
 		[]azenc.ResourceSku{

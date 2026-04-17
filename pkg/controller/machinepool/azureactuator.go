@@ -201,7 +201,7 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 
 	var res azureclient.ResourceSKUsPage
 	var err error
-	for res, err = a.client.ListResourceSKUs(ctx, ""); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
+	for res, err = a.client.ListResourceSKUs(ctx, region); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
 		for _, resSku := range res.Values() {
 			if strings.EqualFold(to.String(resSku.Name), instanceType) {
 				for _, locationInfo := range *resSku.LocationInfo {
@@ -268,7 +268,7 @@ func (a *AzureActuator) getVirtualMachineSku(ctx context.Context, name, region s
 
 	var page azureclient.ResourceSKUsPage
 	var err error
-	for page, err = a.client.ListResourceSKUs(ctx, fmt.Sprintf("location eq '%s'", region)); page.NotDone(); err = page.NextWithContext(ctx) {
+	for page, err = a.client.ListResourceSKUs(ctx, region); page.NotDone(); err = page.NextWithContext(ctx) {
 		if err != nil {
 			return nil, errors.Wrap(err, "error fetching SKU pages")
 		}

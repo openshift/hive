@@ -3,6 +3,7 @@ package azureclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 
 	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -23,7 +24,7 @@ import (
 
 // Client is a wrapper object for actual Azure libraries to allow for easier mocking/testing.
 type Client interface {
-	ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error)
+	ListResourceSKUs(ctx context.Context, region string) (ResourceSKUsPage, error)
 
 	// Zones
 	CreateOrUpdateZone(ctx context.Context, resourceGroupName string, zone string) (dns.Zone, error)
@@ -72,8 +73,8 @@ type azureClient struct {
 	imagesClient          *compute.ImagesClient
 }
 
-func (c *azureClient) ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error) {
-	page, err := c.resourceSKUsClient.List(ctx, filter, "false")
+func (c *azureClient) ListResourceSKUs(ctx context.Context, region string) (ResourceSKUsPage, error) {
+	page, err := c.resourceSKUsClient.List(ctx, fmt.Sprintf("location eq '%s'", region), "false")
 	return &page, err
 }
 

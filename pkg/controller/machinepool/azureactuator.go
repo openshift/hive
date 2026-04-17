@@ -196,7 +196,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 }
 
 func (a *AzureActuator) getZones(region string, instanceType string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Minute)
 	defer cancel()
 
 	var res azureclient.ResourceSKUsPage
@@ -251,7 +251,10 @@ func (a *AzureActuator) getVMCapabilities(ctx context.Context, instanceType, reg
 		return nil, fmt.Errorf("error connecting to Azure client: %v", err)
 	}
 	if typeMeta == nil {
-		return nil, fmt.Errorf("not found in region %s", region)
+		return nil, fmt.Errorf("SKU %s not found in region %s", instanceType, region)
+	}
+	if typeMeta.Capabilities == nil {
+		return nil, fmt.Errorf("SKU %s has no Capabilities", instanceType)
 	}
 
 	capabilities := make(map[string]string)
@@ -268,21 +271,18 @@ func (a *AzureActuator) getVirtualMachineSku(ctx context.Context, name, region s
 
 	var page azureclient.ResourceSKUsPage
 	var err error
-	for page, err = a.client.ListResourceSKUs(ctx, region); page.NotDone(); err = page.NextWithContext(ctx) {
-		if err != nil {
-			return nil, errors.Wrap(err, "error fetching SKU pages")
-		}
+	for page, err = a.client.ListResourceSKUs(ctx, region); err == nil && page.NotDone(); err = page.NextWithContext(ctx) {
 		for _, sku := range page.Values() {
 			// Filter out resources that are not virtualMachines
-			if !strings.EqualFold("virtualMachines", *sku.ResourceType) {
+			if !strings.EqualFold("virtualMachines", to.String(sku.ResourceType)) {
 				continue
 			}
 			// Filter out resources that do not match the provided name
-			if strings.EqualFold(name, *sku.Name) {
+			if strings.EqualFold(name, to.String(sku.Name)) {
 				return &sku, nil
 			}
 		}
 	}
 	// err is nil if we didn't find it (page.NotDone() == false above)
-	return nil, err
+	return nil, errors.Wrap(err, "error fetching SKU pages")
 }

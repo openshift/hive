@@ -7,6 +7,7 @@ import (
 
 	"github.com/openshift/hive/pkg/constants"
 
+	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -32,17 +33,18 @@ func TestAzureActuator(t *testing.T) {
 		expectedMachineSetReplicas  map[string]int64
 		expectedImage               *machineapi.Image
 		extraProviderSpecValidation providerSpecValidator
-		expectedErr                 bool
-		expectedLogs                []string
+		// Error message (sub)string. If empty, no error is expected.
+		expectedErr  string
+		expectedLogs []string
 	}{
 		{
 			name:              "generate single machineset for single zone",
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 3,
@@ -53,9 +55,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -72,7 +74,7 @@ func TestAzureActuator(t *testing.T) {
 				return pool
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -86,9 +88,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -116,9 +118,9 @@ func TestAzureActuator(t *testing.T) {
 				return pool
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -142,9 +144,9 @@ func TestAzureActuator(t *testing.T) {
 				return p
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 2,
@@ -157,9 +159,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3", "zone4", "zone5"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3", "zone4", "zone5"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -174,9 +176,50 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName(""): 3, // Non-zoned deployment
+			},
+			expectedLogs: []string{"No availability zones detected for region. Using non-zoned deployment."},
+		},
+		{
+			name:              "getZones: no SKUs in region",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName(""): 3, // Non-zoned deployment
+			},
+			expectedLogs: []string{"No availability zones detected for region. Using non-zoned deployment."},
+		},
+		{
+			name:              "getZones: no matching SKUs in region",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							Name: ptr.To("not-my-instance-type"),
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(nil)
+				page.EXPECT().NotDone().Return(false)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName(""): 3, // Non-zoned deployment
@@ -188,9 +231,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -207,9 +250,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1")
+				mockGetVMCapabilities(mockCtrl, client, "V1")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1), testAzureImage(compute.HyperVGenerationTypesV2)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -226,9 +269,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1), testAzureImage(compute.HyperVGenerationTypesV2)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -245,9 +288,9 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetVMCapabilities(client, "V2")
+				mockGetVMCapabilities(mockCtrl, client, "V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1), testAzureImage(compute.HyperVGenerationTypesV2)})
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -273,7 +316,7 @@ func TestAzureActuator(t *testing.T) {
 				return mp
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
-				mockGetVMCapabilities(client, "V1,V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -288,6 +331,236 @@ func TestAzureActuator(t *testing.T) {
 				Version:   "testversion",
 				Type:      "MarketplaceWithPlan",
 			},
+		},
+		{
+			name:              "getVMCapabilities: no SKUs in region",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type not found in region test-region",
+		},
+		{
+			name:              "getVMCapabilities: no Capabilities in SKU",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							ResourceType: ptr.To("virtualMachines"),
+							Name:         ptr.To(testInstanceType),
+						},
+					},
+				)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type has no Capabilities",
+		},
+		{
+			name:              "getVMCapabilities: no matching SKUs in region",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							ResourceType: ptr.To("virtualMachines"),
+							Name:         ptr.To("not-my-instance-type"),
+							Capabilities: &[]azenc.ResourceSkuCapabilities{
+								{
+									Name:  ptr.To("HyperVGenerations"),
+									Value: ptr.To("N/A"),
+								},
+							},
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type not found in region test-region",
+		},
+		{
+			name:              "getVMCapabilities: no virtualMachines in region",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							ResourceType: ptr.To("notVirtualMachines"),
+							Name:         ptr.To(testInstanceType),
+							Capabilities: &[]azenc.ResourceSkuCapabilities{
+								{
+									Name:  ptr.To("HyperVGenerations"),
+									Value: ptr.To("N/A"),
+								},
+							},
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type not found in region test-region",
+		},
+		{
+			name:              "getVMCapabilities: nil ResourceType",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							Name: ptr.To(testInstanceType),
+							Capabilities: &[]azenc.ResourceSkuCapabilities{
+								{
+									Name:  ptr.To("HyperVGenerations"),
+									Value: ptr.To("N/A"),
+								},
+							},
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type not found in region test-region",
+		},
+		{
+			name:              "getVMCapabilities: nil Name",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							ResourceType: ptr.To("virtualMachines"),
+							Capabilities: &[]azenc.ResourceSkuCapabilities{
+								{
+									Name:  ptr.To("HyperVGenerations"),
+									Value: ptr.To("N/A"),
+								},
+							},
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(nil)
+				page.EXPECT().NotDone().Return(false)
+			},
+			expectedErr: "error retrieving VM capabilities: SKU test-instance-type not found in region test-region",
+		},
+		{
+			name:              "getVMCapabilities: error on initial call",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(nil, fmt.Errorf("SDK error"))
+			},
+			expectedErr: "error retrieving VM capabilities: error connecting to Azure client: error fetching SKU pages: SDK error",
+		},
+		{
+			name:              "getVMCapabilities: error getting second page",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							ResourceType: ptr.To("virtualMachines"),
+							Name:         ptr.To("not-my-instance-type"),
+							Capabilities: &[]azenc.ResourceSkuCapabilities{
+								{
+									Name:  ptr.To("HyperVGenerations"),
+									Value: ptr.To("N/A"),
+								},
+							},
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(fmt.Errorf("SDK error"))
+			},
+			expectedErr: "error retrieving VM capabilities: error connecting to Azure client: error fetching SKU pages: SDK error",
+		},
+		{
+			name:              "getImagesByResourceGroup errors on initial call",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				client.EXPECT().ListImagesByResourceGroup(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("SDK error"))
+
+			},
+			expectedErr: "error listing images by resourceGroup: foo-12345-rg: SDK error",
+		},
+		{
+			name:              "getImagesByResourceGroup errors getting second page",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				pages := mockazure.NewMockImageListResultPage(mockCtrl)
+				client.EXPECT().ListImagesByResourceGroup(gomock.Any(), gomock.Any()).Return(pages, nil)
+				pages.EXPECT().NotDone().Return(true)
+				pages.EXPECT().Values().Return([]compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				pages.EXPECT().NextWithContext(gomock.Any()).Return(fmt.Errorf("SDK error"))
+			},
+			expectedErr: "error listing images by resourceGroup: foo-12345-rg: SDK error",
+		},
+		{
+			name:              "getZones: error on initial call",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(nil, fmt.Errorf("SDK error"))
+			},
+			expectedErr: "compute pool not providing list of zones and failed to fetch list of zones: SDK error",
+		},
+		{
+			name:              "getZones: error getting second page",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "N/A")
+				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+				page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+				client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+				page.EXPECT().NotDone().Return(true)
+				page.EXPECT().Values().Return(
+					[]azenc.ResourceSku{
+						{
+							Name: ptr.To("not-my-instance-type"),
+						},
+					},
+				)
+				page.EXPECT().NextWithContext(gomock.Any()).Return(fmt.Errorf("SDK error"))
+			},
+			expectedErr: "compute pool not providing list of zones and failed to fetch list of zones: SDK error",
 		},
 	}
 
@@ -309,8 +582,10 @@ func TestAzureActuator(t *testing.T) {
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
 
-			if test.expectedErr {
-				assert.Error(t, err, "expected error for test case")
+			if test.expectedErr != "" {
+				if assert.Error(t, err, "expected error for test case") {
+					assert.Contains(t, err.Error(), test.expectedErr, "Error %q did not contain substring %q", err.Error(), test.expectedErr)
+				}
 			} else {
 				assert.NoError(t, err, "unexpected error for test case")
 				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage, test.extraProviderSpecValidation)
@@ -347,13 +622,13 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 
 func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockClient, zones []string) {
 	page := mockazure.NewMockResourceSKUsPage(mockCtrl)
-	client.EXPECT().ListResourceSKUs(gomock.Any(), "").Return(page, nil)
+	client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
 	page.EXPECT().NotDone().Return(true)
 	page.EXPECT().Values().Return(
-		[]compute.ResourceSku{
+		[]azenc.ResourceSku{
 			{
 				Name: ptr.To(testInstanceType),
-				LocationInfo: &[]compute.ResourceSkuLocationInfo{
+				LocationInfo: &[]azenc.ResourceSkuLocationInfo{
 					{
 						Location: ptr.To(testRegion),
 						Zones:    &zones,
@@ -364,11 +639,24 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	)
 }
 
-func mockGetVMCapabilities(client *mockazure.MockClient, hyperVGenerations string) {
-	capabilities := map[string]string{
-		"HyperVGenerations": hyperVGenerations,
-	}
-	client.EXPECT().GetVMCapabilities(gomock.Any(), gomock.Any(), gomock.Any()).Return(capabilities, nil)
+func mockGetVMCapabilities(mockCtrl *gomock.Controller, client *mockazure.MockClient, hyperVGenerations string) {
+	page := mockazure.NewMockResourceSKUsPage(mockCtrl)
+	client.EXPECT().ListResourceSKUs(gomock.Any(), testRegion).Return(page, nil)
+	page.EXPECT().NotDone().Return(true)
+	page.EXPECT().Values().Return(
+		[]azenc.ResourceSku{
+			{
+				ResourceType: ptr.To("virtualMachines"),
+				Name:         ptr.To(testInstanceType),
+				Capabilities: &[]azenc.ResourceSkuCapabilities{
+					{
+						Name:  ptr.To("HyperVGenerations"),
+						Value: ptr.To(hyperVGenerations),
+					},
+				},
+			},
+		},
+	)
 }
 
 func mockListImagesByResourceGroup(client *mockazure.MockClient, images []compute.Image) {

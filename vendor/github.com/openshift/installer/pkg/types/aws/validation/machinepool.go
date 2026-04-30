@@ -17,7 +17,7 @@ var (
 		types.ArchitectureARM64: true,
 	}
 
-	// validArchitectureValues lists the supported arches for AWS
+	// validArchitectureValues lists the supported arches for AWS.
 	validArchitectureValues = func() []string {
 		v := make([]string, 0, len(validArchitectures))
 		for m := range validArchitectures {
@@ -39,8 +39,17 @@ var (
 // We set a user limit of 10 and reserve 6 for use by OpenShift.
 const maxUserSecurityGroupsCount = 10
 
+// maxIopsThroughputRatio is the minimum allowed ratio of IOPS to throughput (MiBps) for gp3 volumes.
+// AWS constraint: throughput (MiBps) / iops <= 0.25 (maximum 0.25 MiBps per iops) --> iops / throughput (MiBps) >= 4
+// This constant is used for integer comparison to avoid floating point precision issues.
+const maxIopsThroughputRatio = 4
+
+// gp3DefaultIOPS is the default IOPS value for gp3 volumes when not explicitly set.
+// According to AWS documentation, gp3 volumes have a baseline of 3,000 IOPS.
+const gp3DefaultIOPS int32 = 3000
+
 // ValidateMachinePool checks that the specified machine pool is valid.
-func ValidateMachinePool(platform *aws.Platform, p *aws.MachinePool, fldPath *field.Path) field.ErrorList {
+func ValidateMachinePool(platform *aws.Platform, p *aws.MachinePool, poolName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, zone := range p.Zones {
 		if !strings.HasPrefix(zone, platform.Region) {
@@ -60,6 +69,57 @@ func ValidateMachinePool(platform *aws.Platform, p *aws.MachinePool, fldPath *fi
 
 	allErrs = append(allErrs, validateSecurityGroups(platform, p, fldPath)...)
 	allErrs = append(allErrs, ValidateCPUOptions(p, fldPath)...)
+	allErrs = append(allErrs, validateHostPlacement(p, poolName, fldPath.Child("hostPlacement"))...)
+
+	return allErrs
+}
+
+func validateHostPlacement(p *aws.MachinePool, poolName string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// No HostPlacement, so lets just return
+	if p.HostPlacement == nil {
+		return allErrs
+	}
+
+	// Dedicated hosts are only supported on worker (compute) pools
+	if poolName != "" && poolName != types.MachinePoolComputeRoleName {
+		errMsg := fmt.Sprintf("dedicated hosts are only supported on %s pools, not on %s pools", types.MachinePoolComputeRoleName, poolName)
+		allErrs = append(allErrs, field.Invalid(fldPath, p.HostPlacement, errMsg))
+		return allErrs
+	}
+
+	// Control plane pools cannot use dedicated hosts
+	if poolName == "" {
+		errMsg := "dedicated hosts are not supported on control plane pools"
+		allErrs = append(allErrs, field.Invalid(fldPath, p.HostPlacement, errMsg))
+		return allErrs
+	}
+
+	if p.HostPlacement.Affinity == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("affinity"), "affinity is required when hostPlacement is configured"))
+		return allErrs // Can't validate further without affinity
+	}
+
+	switch *p.HostPlacement.Affinity {
+	case aws.HostAffinityAnyAvailable:
+		if len(p.HostPlacement.DedicatedHost) > 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dedicatedHost"), "dedicatedHost is required when 'affinity' is set to DedicatedHost, and forbidden otherwise"))
+		}
+	case aws.HostAffinityDedicatedHost:
+		if len(p.HostPlacement.DedicatedHost) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dedicatedHost"), "dedicatedHost is required when 'affinity' is set to DedicatedHost, and forbidden otherwise"))
+		} else {
+			for index, host := range p.HostPlacement.DedicatedHost {
+				hostPath := fldPath.Child("dedicatedHost").Index(index)
+				if len(host.ID) == 0 {
+					allErrs = append(allErrs, field.Required(hostPath.Child("id"), "a hostID must be specified when configuring 'dedicatedHost'"))
+				}
+			}
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("affinity"), p.HostPlacement.Affinity, []aws.HostAffinity{aws.HostAffinityAnyAvailable, aws.HostAffinityDedicatedHost}))
+	}
 
 	return allErrs
 }
@@ -129,6 +189,31 @@ func validateThroughput(p *aws.MachinePool, fldPath *field.Path) field.ErrorList
 	case "gp3":
 		if throughput < 125 || throughput > 2000 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, "throughput must be between 125 MiB/s and 2000 MiB/s"))
+			return allErrs
+		}
+		// AWS constraint: throughput (MiBps) / iops <= 0.25 (maximum 0.25 MiBps per iops)
+		// When iops is 0 or omitted, AWS defaults to 3000 iops
+		// Validate that the throughput/iops ratio does not exceed the maximum allowed ratio
+		iops := int32(p.EC2RootVolume.IOPS)
+		if iops == 0 {
+			// Use AWS default of 3000 iops when iops is not set
+			iops = gp3DefaultIOPS
+		}
+		// Use integer comparison to avoid floating point precision issues
+		// throughput / iops <= 0.25 is equivalent to throughput * maxIopsThroughputRatio <= iops
+		if throughput*maxIopsThroughputRatio > iops {
+			// Calculate minimum required iops: iops >= throughput / 0.25
+			// Round up to nearest 100 for safety
+			calculatedIOPS := ((throughput * maxIopsThroughputRatio) + 99) / 100 * 100
+			// According to AWS documentation, gp3 volumes have a baseline of 3,000 IOPS
+			minIOPS := max(calculatedIOPS, gp3DefaultIOPS)
+			// Calculate ratio for error message display
+			ratio := float32(throughput) / float32(iops)
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("throughput"),
+				throughput,
+				fmt.Sprintf("throughput (MiBps) to iops ratio of %.6f is too high; maximum is %.6f MiBps per iops. When iops is not set, AWS defaults to %d iops. Please set iops to at least %d to satisfy the constraint", ratio, 1.0/maxIopsThroughputRatio, gp3DefaultIOPS, minIOPS),
+			))
 		}
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("throughput"), throughput, fmt.Sprintf("throughput not supported for type %s", volumeType)))

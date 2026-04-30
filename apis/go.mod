@@ -5,8 +5,8 @@ go 1.25.0
 toolchain go1.25.9
 
 require (
-	github.com/openshift/api v0.0.0-20251120220512-cb382c9eaf42
-	github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23
+	github.com/openshift/api v0.0.0-20260318185450-1f2fa3f09f4e
+	github.com/openshift/installer v1.4.22-ec5
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 )
@@ -20,8 +20,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250910181357-589584f1c912 // indirect

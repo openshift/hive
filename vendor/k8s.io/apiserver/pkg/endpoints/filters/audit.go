@@ -149,6 +149,7 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 
 // writeLatencyToAnnotation writes the latency incurred in different
 // layers of the apiserver to the annotations of the audit object.
+// it should be invoked after ev.StageTimestamp has been set appropriately.
 func writeLatencyToAnnotation(ctx context.Context) {
 	ac := audit.AuditContextFrom(ctx)
 	// we will track latency in annotation only when the total latency
@@ -156,7 +157,7 @@ func writeLatencyToAnnotation(ctx context.Context) {
 	// traces in rest/handlers for create, delete, update,
 	// get, list, and deletecollection.
 	const threshold = 500 * time.Millisecond
-	latency := time.Since(ac.GetEventRequestReceivedTimestamp().Time)
+	latency := ac.GetEventStageTimestamp().Sub(ac.GetEventRequestReceivedTimestamp().Time)
 	if latency <= threshold {
 		return
 	}

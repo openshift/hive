@@ -210,9 +210,6 @@ type Int64Observer interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
-	//
-	// Implementations of this method need to be safe for a user to call
-	// concurrently.
 	Observe(value int64, options ...ObserveOption)
 }
 

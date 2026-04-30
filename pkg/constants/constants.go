@@ -289,6 +289,10 @@ const (
 	// PasswordSecretKey is a key used to store a password inside of a secret containing username / password credentials
 	PasswordSecretKey = "password"
 
+	// VSphereVCentersSecretKey is a key used to store a JSON blob containing credentials for multiple VCenters in a Secret
+	// containing VSphere platform credentials.
+	VSphereVCentersSecretKey = "vCenters"
+
 	// AWSRoute53Region is the region to use for route53 operations.
 	AWSRoute53Region = "us-east-1"
 

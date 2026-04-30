@@ -4,8 +4,8 @@ dnf install -y \
 	golang \
 	make
 
-# Since go 1.24.x is not available in ubi8, let's go upstream
-go install golang.org/dl/go1.24.13@latest
-/root/go/bin/go1.24.13 download
+# Since go 1.25.x is not available in ubi8, let's go upstream
+go install golang.org/dl/go1.25.9@latest
+/root/go/bin/go1.25.9 download
 rm /usr/bin/go
-ln -s /root/go/bin/go1.24.13 /usr/bin/go
+ln -s /root/go/bin/go1.25.9 /usr/bin/go

@@ -54,7 +54,11 @@ type Builder interface {
 // The controllerName is needed for metrics.
 // If the ClusterDeployment carries the fake cluster annotation, a fake client will be returned populated with
 // runtime.Objects we need to query for in all our controllers.
-func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
+func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName, opts ...BuilderOption) Builder {
+	var bo builderOptions
+	for _, o := range opts {
+		o(&bo)
+	}
 	if utils.IsFakeCluster(cd) {
 		clusterVersion := ""
 		if cd.Status.InstallVersion != nil {
@@ -70,6 +74,7 @@ func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hi
 		cd:             cd,
 		controllerName: controllerName,
 		urlToUse:       activeURL,
+		opts:           bo,
 	}
 }
 
@@ -185,11 +190,29 @@ func SetUnreachableCondition(cd *hivev1.ClusterDeployment, connectionError error
 	return
 }
 
+// BuilderOption configures optional behavior on a Builder.
+type BuilderOption func(*builderOptions)
+
+type builderOptions struct {
+	transportWrapper func(http.RoundTripper) http.RoundTripper
+}
+
+// WithTransportWrapper adds a transport wrapper that will be applied to the
+// REST config returned by RESTConfig(). The wrapper is applied after the
+// controller metrics transport, so it sits on the outermost layer and
+// observes all HTTP round trips.
+func WithTransportWrapper(wrapper func(http.RoundTripper) http.RoundTripper) BuilderOption {
+	return func(o *builderOptions) {
+		o.transportWrapper = wrapper
+	}
+}
+
 type builder struct {
 	c              client.Client
 	cd             *hivev1.ClusterDeployment
 	controllerName hivev1.ControllerName
 	urlToUse       int
+	opts           builderOptions
 }
 
 const (
@@ -266,6 +289,10 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 	}
 
 	utils.AddControllerMetricsTransportWrapper(cfg, b.controllerName, true)
+
+	if b.opts.transportWrapper != nil {
+		cfg.Wrap(b.opts.transportWrapper)
+	}
 
 	if override := b.cd.Spec.ControlPlaneConfig.APIURLOverride; override != "" {
 		if b.urlToUse == primaryURL ||

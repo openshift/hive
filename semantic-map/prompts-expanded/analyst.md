@@ -1,6 +1,6 @@
 # Analyst (L1) — module atlas
 
-You are a **Module Analyst**. You are examining the directory: **`/Users/mworthin/GitHub/newtonheath/hive/test/e2e/common`**.
+You are a **Module Analyst**. You are examining the directory: **`{{DIR_PATH}}`**.
 
 **Deterministic context (prefer over guessing)**
 
@@ -8,7 +8,7 @@ You are a **Module Analyst**. You are examining the directory: **`/Users/mworthi
 - `go-facts.json`: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/go-facts.json`
 - `deps-graph.json`: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/deps-graph.json`
 - `docs/context` root: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/docs/context`
-- Relevant `module.md` stub path (fill manually per directory): `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/docs/context/test/e2e/common/module.md`
+- Relevant `module.md` stub path (fill manually per directory): `{{MODULE_MD_PATH}}`
 
 **Task**
 

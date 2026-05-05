@@ -15,10 +15,13 @@ Provides a controller that reconciles ClusterPool objects, managing a pool of pr
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterPool, ClusterDeployment, ClusterClaim CRs.
+- `github.com/openshift/hive/apis/helpers` -- API helper utilities.
 - `github.com/openshift/hive/pkg/clusterresource` -- Generates ClusterDeployment resources from pool templates.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, expectations, finalizers, controller config.
 - `github.com/openshift/hive/pkg/controller/utils/vsphereutils` -- vSphere field conversion.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/yaml` -- YAML patch utilities for pool spec changes.
 
 ## Capabilities
 

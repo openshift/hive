@@ -17,9 +17,12 @@ Provides a controller that syncs identity provider configuration to remote clust
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncIdentityProvider, SelectorSyncIdentityProvider CRs.
+- `github.com/openshift/hive/apis/helpers` -- API helper utilities.
 - `github.com/openshift/api/config/v1` -- OAuth/IdentityProvider types.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, owner references, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 
 ## Capabilities
 

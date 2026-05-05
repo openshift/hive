@@ -14,6 +14,8 @@ Provides the GCP implementation of the private link actuator interface. Manages 
 
 ## Internal Dependencies
 
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterMetadata types.
+- `github.com/openshift/hive/apis/hive/v1/gcp` -- GCP-specific PrivateLink configuration types.
 - `github.com/openshift/hive/pkg/gcpclient` -- GCP client wrapper.
 - `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface and types.
 - `github.com/openshift/hive/pkg/controller/privatelink/conditions` -- Condition management.

@@ -14,6 +14,7 @@ Provides a controller that relocates ClusterDeployments from one Hive instance t
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterRelocate, MachinePool, SyncSet, SyncIdentityProvider CRs.
+- `github.com/openshift/hive/pkg/constants` -- Label keys, annotation names.
 - `github.com/openshift/hive/pkg/remoteclient` -- Builds clients for the target Hive instance.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, relocate annotations, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.

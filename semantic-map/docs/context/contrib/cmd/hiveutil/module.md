@@ -8,7 +8,7 @@ Binary entry point for the `hiveutil` CLI. Assembles all contrib subcommands int
 
 This is a `main` package — no exported identifiers. The binary provides:
 
-- `hiveutil` CLI with subcommands: `create-cluster`, `deprovision`, `deprovision-aws-tags`, `verify-imports`, `install-manager`, `update-installer-image`, `resource`, `report`, `certificate`, `adm`, `version`, `clusterpool`, `awsprivatelink`
+- `hiveutil` CLI with subcommands: `aws-tag-deprovision`, `deprovision`, `verify-imports`, `install-manager`, `update-installer-image`, `resource`, `create-cluster`, `report`, `certificate`, `adm`, `version`, `clusterpool`, `awsprivatelink`
 
 ## Internal Dependencies
 

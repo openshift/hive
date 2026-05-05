@@ -20,8 +20,10 @@ Provides the `awsprivatelink` subcommand group for hiveutil. Enables and disable
 - `github.com/openshift/hive/pkg/awsclient` — AWS API client
 - `github.com/openshift/hive/pkg/creds/aws` — AWS credential loading
 - `github.com/openshift/hive/pkg/operator/hive` — `GetHiveNamespace` and `HiveOperatorNamespaceEnvVar`
+- `github.com/openshift/hive/pkg/util/scheme` — shared scheme registration (used for configv1 types)
 - `github.com/openshift/hive/apis/hive/v1` — HiveConfig and PrivateLink types
 - `github.com/openshift/api/config/v1` — Infrastructure type for region/infraID lookup (external)
+- `github.com/aws/aws-sdk-go-v2/service/ec2` — EC2 API calls for VPC discovery (external)
 
 ## Capabilities
 

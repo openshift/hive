@@ -9,7 +9,7 @@ Provides a controller that syncs custom control plane TLS certificates to remote
 - `Add` -- Creates the controller and adds it to the Manager.
 - `AddToManager` -- Adds the controller to a manager.
 - `NewReconciler` -- Returns a new reconciler.
-- `ControllerName` -- Constant `"controlplanecerts"`.
+- `ControllerName` -- Constant referencing `hivev1.ControlPlaneCertsControllerName`.
 - `GenerateControlPlaneCertsSyncSetName` -- Generates a predictable SyncSet name for a given CD.
 - `ReconcileControlPlaneCerts` -- Reconciler struct.
 - `ReconcileControlPlaneCerts.Reconcile` -- Creates/updates SyncSets for control plane certificate bundles.
@@ -17,10 +17,13 @@ Provides a controller that syncs custom control plane TLS certificates to remote
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncSet CRs.
+- `github.com/openshift/hive/apis/helpers` -- API helper utilities.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster client (for detecting existing serving certs).
 - `github.com/openshift/hive/pkg/resource` -- Resource helper.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, controller config, owner references.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 
 ## Capabilities
 

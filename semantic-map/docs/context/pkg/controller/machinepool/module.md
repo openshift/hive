@@ -18,11 +18,18 @@ Provides a controller that reconciles MachinePool objects by generating and sync
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- MachinePool, ClusterDeployment CRs.
+- `github.com/openshift/api/machine/v1beta1`, `machine/v1` -- MachineSet, Machine API types.
+- `github.com/openshift/api/config/v1` -- Infrastructure types.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster client for MachineSet management.
 - `github.com/openshift/hive/pkg/awsclient`, `pkg/azureclient`, `pkg/gcpclient`, `pkg/ibmclient` -- Cloud clients for subnet/zone discovery.
+- `github.com/openshift/hive/pkg/controller/utils` -- Conditions, controller config, lease exceptions.
 - `github.com/openshift/hive/pkg/controller/utils/nutanixutils` -- Nutanix failure domain conversion.
-- `github.com/openshift/installer/pkg/asset/machines/*` -- Installer MachineSet generation per platform.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/logrus`, `pkg/util/scheme` -- Logging and scheme utilities.
+- `github.com/openshift/machine-api-provider-gcp`, `machine-api-provider-ibmcloud` -- Provider-specific Machine API types.
+- `github.com/openshift/installer/pkg/asset/machines/*` -- Installer MachineSet generation per platform.
+- `github.com/openshift/installer/pkg/types` -- Installer types per platform.
 
 ## Capabilities
 

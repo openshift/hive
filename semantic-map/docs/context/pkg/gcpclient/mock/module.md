@@ -2,11 +2,11 @@
 
 ## Responsibility
 
-Generated GoMock implementation of the `gcpclient.Client` interface for unit testing. Provides `MockClient` and `MockClientMockRecorder` types with mock implementations of all 34 GCP client interface methods.
+Generated GoMock implementation of the `gcpclient.Client` interface for unit testing. Provides `MockClient` and `MockClientMockRecorder` types with mock implementations of all 32 GCP client interface methods.
 
 ## Public Interface/API
 
-- `MockClient` -- Mock of `gcpclient.Client` interface with all DNS, Compute, and networking mock methods.
+- `MockClient` -- Mock of `gcpclient.Client` interface with all 32 DNS, Compute, and networking mock methods.
 - `MockClientMockRecorder` -- Recorder for setting expectations on `MockClient` calls.
 
 ## Internal Dependencies

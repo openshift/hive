@@ -16,9 +16,11 @@ Provides a controller that manages ClusterDeprovision objects. It creates and mo
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeprovision CR.
 - `github.com/openshift/hive/pkg/install` -- Uninstall job generation.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names.
 - `github.com/openshift/hive/pkg/controller/utils` -- Finalizers, conditions, job utilities, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
 - `github.com/openshift/hive/pkg/awsclient` -- AWS credentials testing (via actuator).
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 
 ## Capabilities
 

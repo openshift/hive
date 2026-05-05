@@ -17,6 +17,9 @@ Provides the AWS implementation of the private link actuator interface. Manages 
 
 ## Internal Dependencies
 
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterMetadata types.
+- `github.com/openshift/hive/apis/hive/v1/aws` -- AWS-specific PrivateLink configuration types.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names.
 - `github.com/openshift/hive/pkg/awsclient` -- AWS SDK client wrapper.
 - `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface and types.
 - `github.com/openshift/hive/pkg/controller/privatelink/conditions` -- Condition management.

@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Provides a controller that registers provisioned OpenShift clusters with ArgoCD by creating and maintaining ArgoCD cluster secrets. When a ClusterDeployment is installed, the controller generates an ArgoCD-compatible cluster secret in the ArgoCD namespace containing the API URL, cluster name, bearer token, and TLS configuration. On ClusterDeployment deletion, the controller cleans up the ArgoCD secret using a finalizer (`hive.openshift.io/argocd-cluster`). The controller is only active when the `ARGO_CD_ENABLED` environment variable is set.
+Provides a controller that registers provisioned OpenShift clusters with ArgoCD by creating and maintaining ArgoCD cluster secrets. When a ClusterDeployment is installed, the controller generates an ArgoCD-compatible cluster secret in the ArgoCD namespace containing the API URL, cluster name, bearer token, and TLS configuration. On ClusterDeployment deletion, the controller cleans up the ArgoCD secret using a finalizer (`hive.openshift.io/argocd-cluster`). The controller is only active when the `HIVE_ARGOCD` environment variable is set (via `constants.ArgoCDEnvVar`).
 
 ## Public Interface/API
 

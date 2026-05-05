@@ -12,6 +12,8 @@ Generated gomock mock of the `actuator.Actuator` interface from the parent packa
 ## Internal Dependencies
 
 - `github.com/golang/mock/gomock`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment types used in mock method signatures.
+- `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface being mocked.
 
 ## Capabilities
 

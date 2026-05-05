@@ -18,10 +18,10 @@ Implements the `verify-imports` command for hiveutil: parses Go source files usi
 
 ## Capabilities
 
-- Parses Go source files and extracts import block structure
-- Validates import group ordering and blank-line separation against a configurable YAML ruleset
-- Reports violations with file and line information
-- Used as a CI lint step for import hygiene
+- Parses Go source files and extracts import statements via the Go AST
+- Validates import alias naming against a configurable YAML ruleset (each rule specifies an importPath and the required importName/alias)
+- Reports violations listing the actual vs expected import alias for each non-conforming import
+- Used as a CI lint step for import alias hygiene
 
 ## Understanding Score
 

@@ -24,6 +24,7 @@ Provides the AWS API client abstraction used throughout Hive: a `Client` interfa
 - `github.com/openshift/hive/apis/hive/v1/aws` — AssumeRole type
 - `github.com/openshift/hive/pkg/constants` — AWS config/credential secret keys, China region constants
 - `sigs.k8s.io/controller-runtime/pkg/client` — Kubernetes client for Secret retrieval
+- `sigs.k8s.io/controller-runtime/pkg/metrics` — Prometheus registry for metric registration
 - `github.com/prometheus/client_golang/prometheus` — API call metrics (external)
 
 ## Capabilities

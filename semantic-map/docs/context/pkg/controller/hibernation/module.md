@@ -17,6 +17,8 @@ Provides a controller that manages cluster hibernation (stop/start) for ClusterD
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment CR.
+- `github.com/openshift/hive/apis/hiveinternal/v1alpha1` -- ClusterSync (for readiness checks).
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/awsclient` -- AWS EC2 client for instance stop/start.
 - `github.com/openshift/hive/pkg/azureclient` -- Azure compute client for VM stop/start.
 - `github.com/openshift/hive/pkg/gcpclient` -- GCP compute client for instance stop/start.

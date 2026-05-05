@@ -4,8 +4,8 @@ You are a **Code Auditor**. Compare generated Markdown against the **actual sour
 
 **Inputs**
 
-- Markdown file to verify: `{{MARKDOWN_PATH}}`
-- Source directory or file to compare: `{{SOURCE_PATH}}`
+- Markdown file to verify: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/docs/context/test/e2e/common/module.md`
+- Source directory or file to compare: `/Users/mworthin/GitHub/newtonheath/hive/test/e2e/common`
 - `go-facts.json`: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/go-facts.json`
 - `deps-graph.json`: `/Users/mworthin/GitHub/newtonheath/hive/semantic-map/deps-graph.json`
 - Clone: `/Users/mworthin/GitHub/newtonheath/hive`

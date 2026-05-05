@@ -16,12 +16,15 @@ Implements the `manage-dns enable` subcommand for hiveutil: configures managed D
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` — HiveConfig, ManagedDomain types
-- `github.com/openshift/hive/contrib/pkg/utils` — GetClient, GetResourceHelper
+- `github.com/openshift/hive/contrib/pkg/utils` — GetClient for controller-runtime client
 - `github.com/openshift/hive/pkg/constants` — platform constants
 - `github.com/openshift/hive/pkg/creds/{aws,azure,gcp}` — cloud credential loading
 - `github.com/openshift/hive/pkg/resource` — resource helper for apply operations
 - `github.com/openshift/hive/pkg/util/scheme` — shared scheme
+- `github.com/google/uuid` — unique credential secret name suffix (external)
+- `k8s.io/kubectl/pkg/polymorphichelpers` — DeploymentStatusViewer for rollout status (external)
 - `sigs.k8s.io/controller-runtime/pkg/client` — dynamic client (external)
+- `sigs.k8s.io/controller-runtime/pkg/client/config` — REST config loading (external)
 
 ## Capabilities
 

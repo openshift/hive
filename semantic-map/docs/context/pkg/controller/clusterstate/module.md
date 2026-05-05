@@ -17,9 +17,11 @@ Provides a controller that maintains ClusterState objects reflecting the status 
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterState CRs.
 - `github.com/openshift/api/config/v1` -- ClusterOperator types for remote cluster querying.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/remoteclient` -- Builds clients for the remote cluster.
 - `github.com/openshift/hive/pkg/controller/utils` -- Owner references, conditions, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 
 ## Capabilities
 

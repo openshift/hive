@@ -16,6 +16,7 @@ Provides a controller that syncs the remote cluster's ClusterVersion status to t
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment CR.
 - `github.com/openshift/api/config/v1` -- ClusterVersion type for remote querying.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster client.
 - `github.com/openshift/hive/pkg/controller/utils` -- Controller config, log helpers.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.

@@ -7,7 +7,7 @@ Provides a typed Go client wrapper for Google Cloud Platform APIs used by Hive. 
 ## Public Interface/API
 
 **Interface:**
-- `Client` -- Interface defining all GCP API operations. 34 methods covering DNS, Compute, and networking resources.
+- `Client` -- Interface defining all GCP API operations. 32 methods covering DNS, Compute, and networking resources.
 
 **Option types:**
 - `InstancesStopCallOption` -- `func(*compute.InstancesStopCall) *compute.InstancesStopCall` for customizing instance stop calls.

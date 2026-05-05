@@ -6,18 +6,19 @@ Shared utility library for hiveutil contrib commands: provides controller-runtim
 
 ## Public Interface/API
 
-- `GetClient() (client.Client, error)` — creates a controller-runtime client with Watch and FieldOwner support
-- `GetResourceHelper() (resource.Helper, error)` — creates a resource helper from kubeconfig
-- `GetPullSecret(logger) (string, error)` — loads pull secret from env var or default file path
-- `DetermineReleaseImageFromSource(src) (string, error)` — resolves release image reference from a source string (URL, env, or `oc adm release info`)
-- `ProjectToDir(dir, obj, filter) error` — projects a Secret/ConfigMap's data keys to individual files in a directory (simulates volume mounts)
+- `GetClient(fieldManager string) (client.WithWatch, error)` — creates a controller-runtime client with Watch and FieldOwner support
+- `GetResourceHelper(controllerName hivev1.ControllerName, logger log.FieldLogger) (resource.Helper, error)` — creates a resource helper from kubeconfig
+- `GetPullSecret(logger log.FieldLogger, pullSecret, pullSecretFile string) (string, error)` — loads pull secret from env var, flag, or file path
+- `DetermineReleaseImageFromSource(sourceURL string) (string, error)` — resolves release image pull spec from a JSON URL
+- `ProjectToDir(obj client.Object, dir string, filter ProjectToDirFileFilter)` — projects a Secret/ConfigMap's data keys to individual files in a directory (simulates volume mounts); panics on error
 - `ProjectToDirFileFilter` — callback type for filtering/transforming projected keys
-- `LoadSecretOrDie(secretName) *corev1.Secret` — loads a Secret from env-configured namespace, returns nil if env not set
-- `LoadConfigMapOrDie(cmName) *corev1.ConfigMap` — loads a ConfigMap from env-configured namespace, returns nil if env not set
-- `InstallCerts(sourceDir) error` — copies PEM certificates into system trust store and updates trust config
-- `BuildCertBundleFromDir(dir) (string, error)` — reads and concatenates PEM files from a directory
-- `NewLogger(debug) *logrus.Logger` — creates a configured logrus logger
-- `DefaultNamespace() string` — returns the current kubeconfig namespace
+- `ProjectOnlyTheseKeys(keys ...string) ProjectToDirFileFilter` — returns a filter that only projects the named keys
+- `LoadSecretOrDie(c client.Client, secretNameEnvKey string) *corev1.Secret` — loads a Secret from env-configured namespace, returns nil if env not set
+- `LoadConfigMapOrDie(c client.Client, cmNameEnvKey string) *corev1.ConfigMap` — loads a ConfigMap from env-configured namespace, returns nil if env not set
+- `InstallCerts(sourceDir string)` — copies PEM certificates into system trust directory (no return value; fatal on error)
+- `BuildCertBundleFromDir(dir string) (string, error)` — reads and concatenates PEM certificate files from a directory
+- `NewLogger(logLevel string) (*log.Entry, error)` — creates a configured logrus Entry (not Logger)
+- `DefaultNamespace() (string, error)` — returns the current kubeconfig namespace (also returns error)
 
 ## Internal Dependencies
 
@@ -32,7 +33,7 @@ Shared utility library for hiveutil contrib commands: provides controller-runtim
 ## Capabilities
 
 - Constructs authenticated controller-runtime clients from kubeconfig
-- Resolves release images from multiple sources (direct URL, env var, `oc` CLI)
+- Resolves release images from a JSON URL endpoint
 - Projects Secret/ConfigMap data to filesystem directories with optional key filtering
 - Manages TLS certificate installation into system trust stores
 - Provides namespace-aware Secret/ConfigMap loading with graceful nil-if-not-configured behavior

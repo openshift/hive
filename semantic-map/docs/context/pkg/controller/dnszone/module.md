@@ -23,6 +23,7 @@ Provides a controller that manages DNSZone objects, creating and maintaining DNS
 - `github.com/openshift/hive/pkg/awsclient` -- AWS client for Route53 operations.
 - `github.com/openshift/hive/pkg/azureclient` -- Azure client for DNS zone operations.
 - `github.com/openshift/hive/pkg/gcpclient` -- GCP client for Cloud DNS operations.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, finalizers, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
 

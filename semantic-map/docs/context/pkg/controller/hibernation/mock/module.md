@@ -13,6 +13,7 @@ Generated gomock mocks of the `HibernationActuator`, `HibernationPreemptibleMach
 ## Internal Dependencies
 
 - `github.com/golang/mock/gomock`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment types used in mock method signatures.
 
 ## Capabilities
 

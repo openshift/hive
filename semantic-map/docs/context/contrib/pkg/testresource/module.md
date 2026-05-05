@@ -6,7 +6,9 @@ Implements the `test-resource` command for hiveutil: a developer tool that tests
 
 ## Public Interface/API
 
-- `NewTestResourceCommand() *cobra.Command` — `test-resource` subcommand: reads a YAML/JSON file and performs apply + server-side patch via the resource helper
+- `NewTestResourceCommand() *cobra.Command` — `resource` parent command with two subcommands: `apply` and `patch`
+- `apply RESOURCEFILE` subcommand — reads a YAML/JSON file and applies it via `resource.Helper.Apply`
+- `patch PATCHFILE` subcommand — reads a patch file and applies it via `resource.Helper.Patch` with configurable patch type (json, merge, strategic)
 
 ## Internal Dependencies
 
@@ -14,11 +16,12 @@ Implements the `test-resource` command for hiveutil: a developer tool that tests
 
 ## Capabilities
 
-- Reads a resource manifest from a file path argument
-- Applies the resource to the cluster via `resource.Helper.Apply`
-- Patches the resource via `resource.Helper.Patch` with `types.StrategicMergePatchType`
-- Intended as a smoke-test tool for verifying resource helper behavior
+- Provides two distinct subcommands for testing resource helper behavior
+- `apply`: reads a resource manifest, obtains its info, and applies it to a target cluster specified via `--kubeconfig`
+- `patch`: reads a patch file and applies it to a named resource with configurable patch type, kind, apiVersion, namespace, and name flags
+- Both subcommands require an explicit `--kubeconfig` flag
+- Intended as a smoke-test/developer tool for verifying resource helper behavior
 
 ## Understanding Score
 
-0.85
+0.9

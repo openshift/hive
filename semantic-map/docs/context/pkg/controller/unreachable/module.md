@@ -16,6 +16,7 @@ Provides a controller that monitors the reachability of remote cluster API serve
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment CR.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster client builder.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.

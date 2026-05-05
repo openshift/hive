@@ -18,6 +18,7 @@ Provides a cloud-agnostic PrivateLink controller that manages private connectivi
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterProvision, ClusterDeprovision CRs.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface.
 - `github.com/openshift/hive/pkg/controller/privatelink/actuator/awsactuator` -- AWS hub actuator.
 - `github.com/openshift/hive/pkg/controller/privatelink/actuator/gcpactuator` -- GCP link actuator.

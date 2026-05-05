@@ -14,9 +14,12 @@ Provides a controller that manages ClusterProvision objects, which represent ind
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterProvision, ClusterDeployment CRs.
+- `github.com/openshift/hive/apis/hive/v1/metricsconfig` -- Metrics configuration types.
 - `github.com/openshift/hive/pkg/install` -- Install job generation.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Expectations, job utilities, conditions, controller config, shared pod config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation, metrics config.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 - `github.com/openshift/installer/pkg/types` -- Installer types for log monitoring.
 
 ## Capabilities

@@ -14,6 +14,7 @@ Provides a controller that syncs DNS name server entries from DNSZone subdomains
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- DNSZone CR.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver` -- Query interface for cloud DNS operations.
 - `github.com/openshift/hive/pkg/manageddns` -- Managed domain configuration loading.
 - `github.com/openshift/hive/pkg/controller/utils` -- Controller config.

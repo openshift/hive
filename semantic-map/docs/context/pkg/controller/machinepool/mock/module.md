@@ -12,6 +12,7 @@ Generated gomock mock of the `machinepool.Actuator` interface from the parent pa
 ## Internal Dependencies
 
 - `github.com/golang/mock/gomock`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, MachinePool types used in mock method signatures.
 
 ## Capabilities
 

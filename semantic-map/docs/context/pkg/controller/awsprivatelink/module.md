@@ -16,7 +16,9 @@ Provides a controller that manages AWS PrivateLink access for ClusterDeployments
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterProvision, ClusterDeprovision CRs; AWS PrivateLink config types.
+- `github.com/openshift/hive/apis/hive/v1/aws` -- AWS-specific PrivateLink configuration types.
 - `github.com/openshift/hive/pkg/awsclient` -- AWS SDK client wrapper.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, finalizers, error scrubbing, secret loading, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
 

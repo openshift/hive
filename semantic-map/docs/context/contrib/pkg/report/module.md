@@ -2,16 +2,16 @@
 
 ## Responsibility
 
-Implements the `cluster-report` command group for hiveutil: generates provisioning and deprovisioning reports by querying ClusterDeployment resources and their associated conditions and metadata.
+Implements the `report` command group for hiveutil: generates provisioning and deprovisioning reports by querying ClusterDeployment resources and their associated conditions and metadata.
 
 ## Public Interface/API
 
-- `NewClusterReportCommand() *cobra.Command` — top-level `cluster-report` command with provisioning and deprovisioning subcommands
+- `NewClusterReportCommand() *cobra.Command` — top-level `report` command with `provisioning` and `deprovisioning` subcommands
 - `NewProvisioningReportCommand() *cobra.Command` — reports on clusters currently provisioning or recently provisioned
 - `NewDeprovisioningReportCommand() *cobra.Command` — reports on clusters currently deprovisioning
-- `ProvisioningReportOptions` — options for provisioning report (namespace filter, time thresholds)
+- `ProvisioningReportOptions` — options for provisioning report (age filters, cluster type)
 - `ProvisioningReportOptions.Complete/Validate/Run`
-- `DeprovisioningReportOptions` — options for deprovisioning report
+- `DeprovisioningReportOptions` — options for deprovisioning report (cluster type)
 - `DeprovisioningReportOptions.Complete/Validate/Run`
 
 ## Internal Dependencies
@@ -29,4 +29,4 @@ Implements the `cluster-report` command group for hiveutil: generates provisioni
 
 ## Understanding Score
 
-0.7
+0.8

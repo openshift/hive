@@ -20,13 +20,22 @@ The central controller for the ClusterDeployment lifecycle. This is the largest 
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, ClusterProvision, ClusterDeprovision, DNSZone, ClusterImageSet, ClusterDeploymentCustomization CRs.
+- `github.com/openshift/hive/apis/hive/v1/aws`, `azure`, `gcp` -- Platform-specific spec types.
+- `github.com/openshift/hive/apis/hive/v1/metricsconfig` -- Metrics configuration types.
+- `github.com/openshift/hive/apis/helpers` -- API helper utilities.
 - `github.com/openshift/hive/apis/hiveinternal/v1alpha1` -- ClusterSync, FakeClusterInstall.
 - `github.com/openshift/hive/apis/hivecontracts/v1alpha1` -- ClusterInstall contract types.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/controller/utils` -- Extensive use of conditions, finalizers, expectations, owner references, secret handling, credential validation.
 - `github.com/openshift/hive/pkg/controller/utils/vsphereutils` -- vSphere deprecated field conversion.
+- `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
 - `github.com/openshift/hive/pkg/install` -- Install/uninstall job generation.
 - `github.com/openshift/hive/pkg/imageset` -- ClusterImageSet resolution.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster API client for post-install operations.
+- `github.com/openshift/hive/pkg/gcpclient` -- GCP credential validation.
+- `github.com/openshift/hive/pkg/ibmclient` -- IBM Cloud credential validation.
+- `github.com/openshift/hive/pkg/util/contracts` -- ClusterInstall contract utilities.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 - `github.com/openshift/installer/pkg/types` -- Install config types for validation.
 
 ## Capabilities

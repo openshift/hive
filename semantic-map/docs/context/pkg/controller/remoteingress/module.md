@@ -17,10 +17,13 @@ Provides a controller that syncs custom ingress configuration to remote clusters
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncSet CRs.
+- `github.com/openshift/hive/apis/helpers` -- API helper utilities.
 - `github.com/openshift/api/operator/v1` -- IngressController types.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/resource` -- Resource helper.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, owner references, controller config.
 - `github.com/openshift/hive/pkg/controller/metrics` -- Reconcile time observation.
+- `github.com/openshift/hive/pkg/util/labels` -- Label management utilities.
 
 ## Capabilities
 

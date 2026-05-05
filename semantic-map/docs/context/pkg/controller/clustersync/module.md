@@ -18,6 +18,7 @@ Provides a controller that applies SyncSets and SelectorSyncSets to remote clust
 
 - `github.com/openshift/hive/apis/hive/v1` -- SyncSet, SelectorSyncSet CRs.
 - `github.com/openshift/hive/apis/hiveinternal/v1alpha1` -- ClusterSync internal API.
+- `github.com/openshift/hive/pkg/constants` -- Environment variable names, label keys.
 - `github.com/openshift/hive/pkg/remoteclient` -- Remote cluster client.
 - `github.com/openshift/hive/pkg/resource` -- Resource apply/patch operations.
 - `github.com/openshift/hive/pkg/controller/utils` -- Conditions, controller config, StatefulSet utilities.

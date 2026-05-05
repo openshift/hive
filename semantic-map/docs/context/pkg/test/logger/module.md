@@ -14,7 +14,7 @@ Test utility for creating logrus loggers with attached test hooks. Provides a fa
 - `fmt`
 - `github.com/sirupsen/logrus`
 - `github.com/sirupsen/logrus/hooks/test`
-- `github.com/stretchr/testify/assert`
+- `github.com/stretchr/testify/assert` -- `assert.TestingT` interface (not `*testing.T`)
 
 ## Capabilities
 

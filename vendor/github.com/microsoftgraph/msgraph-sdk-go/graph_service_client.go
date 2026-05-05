@@ -55,18 +55,18 @@ func NewGraphServiceClientWithCredentialsAndHosts(credential azcore.TokenCredent
 
 // GetAdapter returns the client current adapter, Method should only be called when the user is certain an adapter has been provided
 func (m *GraphBaseServiceClient) GetAdapter() abstractions.RequestAdapter {
-	if m.BaseRequestBuilder.RequestAdapter == nil {
+	if m.requestAdapter == nil {
 		panic(errors.New("request adapter has not been initialized"))
 	}
-	return m.BaseRequestBuilder.RequestAdapter
+	return m.requestAdapter
 }
 
 // Me provides operations to manage the user singleton.
 func (m *GraphBaseServiceClient) Me() *if6ffd1464db2d9c22e351b03e4c00ebd24a5353cd70ffb7f56cfad1c3ceec329.UserItemRequestBuilder {
 	urlTplParams := make(map[string]string)
-	for idx, item := range m.BaseRequestBuilder.PathParameters {
+	for idx, item := range m.pathParameters {
 		urlTplParams[idx] = item
 	}
 	urlTplParams["user%2Did"] = "me-token-to-replace"
-	return if6ffd1464db2d9c22e351b03e4c00ebd24a5353cd70ffb7f56cfad1c3ceec329.NewUserItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
+	return if6ffd1464db2d9c22e351b03e4c00ebd24a5353cd70ffb7f56cfad1c3ceec329.NewUserItemRequestBuilderInternal(urlTplParams, m.requestAdapter)
 }

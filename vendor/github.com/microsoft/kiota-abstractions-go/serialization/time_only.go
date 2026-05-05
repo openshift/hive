@@ -1,7 +1,7 @@
 package serialization
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 )
@@ -27,59 +27,36 @@ var timeOnlyParsingFormats = map[int]string{
 }
 
 // String returns the time only as a string following the RFC3339 standard.
-// Uses zero precision (no fractional seconds) by default.
 func (t TimeOnly) String() string {
-	return t.StringWithPrecision(0)
-}
-
-// StringWithPrecision returns the time only as a string with the specified precision.
-// precision: number of decimal places for nanoseconds (0-9)
-func (t TimeOnly) StringWithPrecision(precision int) string {
-	if precision < 0 || precision >= len(timeOnlyParsingFormats) {
-		precision = 0
-	}
-	return t.time.Format(timeOnlyParsingFormats[precision])
+	return t.time.Format(timeOnlyFormat)
 }
 
 // ParseTimeOnly parses a string into a TimeOnly following the RFC3339 standard.
 func ParseTimeOnly(s string) (*TimeOnly, error) {
-	timeOnly, _, err := ParseTimeOnlyWithPrecision(s)
-	return timeOnly, err
-}
-
-// ParseTimeOnlyWithPrecision parses a string into a TimeOnly and returns the detected precision.
-func ParseTimeOnlyWithPrecision(s string) (*TimeOnly, int, error) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil, 0, nil
+	if len(strings.TrimSpace(s)) <= 0 {
+		return nil, nil
 	}
-
-	precision := 0
-	if parts := strings.Split(s, "."); len(parts) > 1 {
-		precision = len(parts[1])
-		if precision >= len(timeOnlyParsingFormats) {
-			return nil, 0, fmt.Errorf("time precision of %d exceeds maximum allowed of %d", precision, len(timeOnlyParsingFormats)-1)
+	splat := strings.Split(s, ".")
+	parsingFormat := timeOnlyParsingFormats[0]
+	if len(splat) > 1 {
+		dotSectionLen := len(splat[1])
+		if dotSectionLen >= len(timeOnlyParsingFormats) {
+			return nil, errors.New("too many decimal places in time only string")
 		}
+		parsingFormat = timeOnlyParsingFormats[dotSectionLen]
 	}
-
-	timeValue, err := time.Parse(timeOnlyParsingFormats[precision], s)
+	timeValue, err := time.Parse(parsingFormat, s)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-
-	return &TimeOnly{time: timeValue}, precision, nil
+	return &TimeOnly{
+		time: timeValue,
+	}, nil
 }
 
 // NewTimeOnly creates a new TimeOnly from a time.Time.
 func NewTimeOnly(t time.Time) *TimeOnly {
-	return &TimeOnly{time: t}
-}
-
-// DetectPrecision determines the precision (number of fractional second digits) from a time.Time.
-func DetectPrecision(t time.Time) int {
-	nanos := t.Nanosecond()
-	if nanos == 0 {
-		return 0
+	return &TimeOnly{
+		time: t,
 	}
-	return len(strings.TrimRight(fmt.Sprintf("%09d", nanos), "0"))
 }

@@ -27,49 +27,12 @@ func NewRedirectHandler() *RedirectHandler {
 		ShouldRedirect: func(req *nethttp.Request, res *nethttp.Response) bool {
 			return true
 		},
-		ScrubSensitiveHeaders: DefaultScrubSensitiveHeaders,
 	})
 }
 
 // NewRedirectHandlerWithOptions creates a new redirect handler with the specified options.
 func NewRedirectHandlerWithOptions(options RedirectHandlerOptions) *RedirectHandler {
-	if options.ScrubSensitiveHeaders == nil {
-		options.ScrubSensitiveHeaders = DefaultScrubSensitiveHeaders
-	}
 	return &RedirectHandler{options: options}
-}
-
-// ScrubSensitiveHeaders is a callback function type for scrubbing sensitive headers during redirects.
-// It receives the request to modify (which contains the new URL) and the original URL for comparison.
-type ScrubSensitiveHeaders func(request *nethttp.Request, originalURL *url.URL)
-
-// DefaultScrubSensitiveHeaders is the default implementation for scrubbing sensitive headers during redirects.
-// This function removes Authorization and Cookie headers when the host, scheme, or port changes.
-// Note: Proxy-Authorization is not handled here as proxy configuration in Go's net/http
-// is managed at the transport level and not accessible to middleware.
-var DefaultScrubSensitiveHeaders ScrubSensitiveHeaders = func(request *nethttp.Request, originalURL *url.URL) {
-	if request == nil || originalURL == nil {
-		return
-	}
-
-	newURL := request.URL
-	if newURL == nil {
-		return
-	}
-
-	// Remove Authorization and Cookie headers if the request's scheme, host, or port changes
-	isDifferentOrigin := !strings.EqualFold(originalURL.Host, newURL.Host) ||
-		!strings.EqualFold(originalURL.Scheme, newURL.Scheme) ||
-		originalURL.Port() != newURL.Port()
-
-	if isDifferentOrigin {
-		request.Header.Del("Authorization")
-		request.Header.Del("Cookie")
-	}
-
-	// Note: Proxy-Authorization is not handled here as proxy configuration in Go's net/http
-	// is managed at the transport level (http.Transport.Proxy) and not accessible to middleware.
-	// In environments where this matters, the proxy configuration should be managed at the HTTP client level.
 }
 
 // RedirectHandlerOptions to use when evaluating whether to redirect or not.
@@ -78,9 +41,6 @@ type RedirectHandlerOptions struct {
 	ShouldRedirect func(req *nethttp.Request, res *nethttp.Response) bool
 	// The maximum number of redirects to follow.
 	MaxRedirects int
-	// A callback for scrubbing sensitive headers during redirects.
-	// Defaults to DefaultScrubSensitiveHeaders if not provided.
-	ScrubSensitiveHeaders ScrubSensitiveHeaders
 }
 
 var redirectKeyValue = abs.RequestOptionKey{
@@ -91,7 +51,6 @@ type redirectHandlerOptionsInt interface {
 	abs.RequestOption
 	GetShouldRedirect() func(req *nethttp.Request, res *nethttp.Response) bool
 	GetMaxRedirect() int
-	GetScrubSensitiveHeaders() ScrubSensitiveHeaders
 }
 
 // GetKey returns the key value to be used when the option is added to the request context
@@ -113,14 +72,6 @@ func (options *RedirectHandlerOptions) GetMaxRedirect() int {
 	} else {
 		return options.MaxRedirects
 	}
-}
-
-// GetScrubSensitiveHeaders returns the header scrubbing function.
-func (options *RedirectHandlerOptions) GetScrubSensitiveHeaders() ScrubSensitiveHeaders {
-	if options == nil || options.ScrubSensitiveHeaders == nil {
-		return DefaultScrubSensitiveHeaders
-	}
-	return options.ScrubSensitiveHeaders
 }
 
 const defaultMaxRedirects = 5
@@ -213,13 +164,11 @@ func (middleware RedirectHandler) getRedirectRequest(request *nethttp.Request, r
 	if result.Host != targetUrl.Host {
 		result.Host = targetUrl.Host
 	}
-
-	// Scrub sensitive headers before following the redirect
-	scrubber := middleware.options.GetScrubSensitiveHeaders()
-	if scrubber != nil {
-		scrubber(result, request.URL)
+	sameHost := strings.EqualFold(targetUrl.Host, request.URL.Host)
+	sameScheme := strings.EqualFold(targetUrl.Scheme, request.URL.Scheme)
+	if !sameHost || !sameScheme {
+		result.Header.Del("Authorization")
 	}
-
 	if response.StatusCode == seeOther {
 		result.Method = nethttp.MethodGet
 		result.Header.Del("Content-Type")

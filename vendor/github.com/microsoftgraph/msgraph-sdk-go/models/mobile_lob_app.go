@@ -39,8 +39,6 @@ func CreateMobileLobAppFromDiscriminatorValue(parseNode i878a80d2330e89d26896388
                         return NewMacOSLobApp(), nil
                     case "#microsoft.graph.win32LobApp":
                         return NewWin32LobApp(), nil
-                    case "#microsoft.graph.windowsAppX":
-                        return NewWindowsAppX(), nil
                     case "#microsoft.graph.windowsMobileMSI":
                         return NewWindowsMobileMSI(), nil
                     case "#microsoft.graph.windowsUniversalAppX":

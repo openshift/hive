@@ -59,7 +59,7 @@ func durationFromString(dur string) (*duration, error) {
 			continue
 		}
 
-		val, err := strconv.ParseFloat(part, 64)
+		val, err := strconv.ParseFloat(part, 10)
 		if err != nil {
 			return nil, err
 		}

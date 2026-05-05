@@ -41,7 +41,7 @@ func (m *PolicyRoot) GetAdminConsentRequestPolicy()(AdminConsentRequestPolicyabl
     }
     return nil
 }
-// GetAppManagementPolicies gets the appManagementPolicies property value. The policies that enforce app management restrictions for specific applications and service principals, overriding the defaultAppManagementPolicy.
+// GetAppManagementPolicies gets the appManagementPolicies property value. The appManagementPolicies property
 func (m *PolicyRoot) GetAppManagementPolicies()([]AppManagementPolicyable) {
     val, err := m.GetBackingStore().Get("appManagementPolicies")
     if err != nil {
@@ -118,7 +118,7 @@ func (m *PolicyRoot) GetCrossTenantAccessPolicy()(CrossTenantAccessPolicyable) {
     }
     return nil
 }
-// GetDefaultAppManagementPolicy gets the defaultAppManagementPolicy property value. The tenant-wide policy that enforces app management restrictions for all applications and service principals.
+// GetDefaultAppManagementPolicy gets the defaultAppManagementPolicy property value. The defaultAppManagementPolicy property
 func (m *PolicyRoot) GetDefaultAppManagementPolicy()(TenantAppManagementPolicyable) {
     val, err := m.GetBackingStore().Get("defaultAppManagementPolicy")
     if err != nil {
@@ -620,7 +620,7 @@ func (m *PolicyRoot) SetAdminConsentRequestPolicy(value AdminConsentRequestPolic
         panic(err)
     }
 }
-// SetAppManagementPolicies sets the appManagementPolicies property value. The policies that enforce app management restrictions for specific applications and service principals, overriding the defaultAppManagementPolicy.
+// SetAppManagementPolicies sets the appManagementPolicies property value. The appManagementPolicies property
 func (m *PolicyRoot) SetAppManagementPolicies(value []AppManagementPolicyable)() {
     err := m.GetBackingStore().Set("appManagementPolicies", value)
     if err != nil {
@@ -669,7 +669,7 @@ func (m *PolicyRoot) SetCrossTenantAccessPolicy(value CrossTenantAccessPolicyabl
         panic(err)
     }
 }
-// SetDefaultAppManagementPolicy sets the defaultAppManagementPolicy property value. The tenant-wide policy that enforces app management restrictions for all applications and service principals.
+// SetDefaultAppManagementPolicy sets the defaultAppManagementPolicy property value. The defaultAppManagementPolicy property
 func (m *PolicyRoot) SetDefaultAppManagementPolicy(value TenantAppManagementPolicyable)() {
     err := m.GetBackingStore().Set("defaultAppManagementPolicy", value)
     if err != nil {

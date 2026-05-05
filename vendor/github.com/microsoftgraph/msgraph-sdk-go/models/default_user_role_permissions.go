@@ -56,17 +56,6 @@ func (m *DefaultUserRolePermissions) GetAllowedToCreateSecurityGroups()(*bool) {
     }
     return nil
 }
-// GetAllowedToReadBitlockerKeysForOwnedDevice gets the allowedToReadBitlockerKeysForOwnedDevice property value. The allowedToReadBitlockerKeysForOwnedDevice property
-func (m *DefaultUserRolePermissions) GetAllowedToReadBitlockerKeysForOwnedDevice()(*bool) {
-    val, err := m.GetBackingStore().Get("allowedToReadBitlockerKeysForOwnedDevice")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(*bool)
-    }
-    return nil
-}
 // GetAllowedToReadOtherUsers gets the allowedToReadOtherUsers property value. Indicates whether the default user role can read other users.
 func (m *DefaultUserRolePermissions) GetAllowedToReadOtherUsers()(*bool) {
     val, err := m.GetBackingStore().Get("allowedToReadOtherUsers")
@@ -102,16 +91,6 @@ func (m *DefaultUserRolePermissions) GetFieldDeserializers()(map[string]func(i87
         }
         if val != nil {
             m.SetAllowedToCreateSecurityGroups(val)
-        }
-        return nil
-    }
-    res["allowedToReadBitlockerKeysForOwnedDevice"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
-        val, err := n.GetBoolValue()
-        if err != nil {
-            return err
-        }
-        if val != nil {
-            m.SetAllowedToReadBitlockerKeysForOwnedDevice(val)
         }
         return nil
     }
@@ -188,12 +167,6 @@ func (m *DefaultUserRolePermissions) Serialize(writer i878a80d2330e89d26896388a3
         }
     }
     {
-        err := writer.WriteBoolValue("allowedToReadBitlockerKeysForOwnedDevice", m.GetAllowedToReadBitlockerKeysForOwnedDevice())
-        if err != nil {
-            return err
-        }
-    }
-    {
         err := writer.WriteBoolValue("allowedToReadOtherUsers", m.GetAllowedToReadOtherUsers())
         if err != nil {
             return err
@@ -240,13 +213,6 @@ func (m *DefaultUserRolePermissions) SetAllowedToCreateSecurityGroups(value *boo
         panic(err)
     }
 }
-// SetAllowedToReadBitlockerKeysForOwnedDevice sets the allowedToReadBitlockerKeysForOwnedDevice property value. The allowedToReadBitlockerKeysForOwnedDevice property
-func (m *DefaultUserRolePermissions) SetAllowedToReadBitlockerKeysForOwnedDevice(value *bool)() {
-    err := m.GetBackingStore().Set("allowedToReadBitlockerKeysForOwnedDevice", value)
-    if err != nil {
-        panic(err)
-    }
-}
 // SetAllowedToReadOtherUsers sets the allowedToReadOtherUsers property value. Indicates whether the default user role can read other users.
 func (m *DefaultUserRolePermissions) SetAllowedToReadOtherUsers(value *bool)() {
     err := m.GetBackingStore().Set("allowedToReadOtherUsers", value)
@@ -279,14 +245,12 @@ type DefaultUserRolePermissionsable interface {
     i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
     GetAllowedToCreateApps()(*bool)
     GetAllowedToCreateSecurityGroups()(*bool)
-    GetAllowedToReadBitlockerKeysForOwnedDevice()(*bool)
     GetAllowedToReadOtherUsers()(*bool)
     GetBackingStore()(ie8677ce2c7e1b4c22e9c3827ecd078d41185424dd9eeb92b7d971ed2d49a392e.BackingStore)
     GetOdataType()(*string)
     GetPermissionGrantPoliciesAssigned()([]string)
     SetAllowedToCreateApps(value *bool)()
     SetAllowedToCreateSecurityGroups(value *bool)()
-    SetAllowedToReadBitlockerKeysForOwnedDevice(value *bool)()
     SetAllowedToReadOtherUsers(value *bool)()
     SetBackingStore(value ie8677ce2c7e1b4c22e9c3827ecd078d41185424dd9eeb92b7d971ed2d49a392e.BackingStore)()
     SetOdataType(value *string)()

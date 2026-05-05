@@ -1758,16 +1758,6 @@ func (m *User) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a
         }
         return nil
     }
-    res["signInActivity"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
-        val, err := n.GetObjectValue(CreateSignInActivityFromDiscriminatorValue)
-        if err != nil {
-            return err
-        }
-        if val != nil {
-            m.SetSignInActivity(val.(SignInActivityable))
-        }
-        return nil
-    }
     res["signInSessionsValidFromDateTime"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
         val, err := n.GetTimeValue()
         if err != nil {
@@ -2600,17 +2590,6 @@ func (m *User) GetShowInAddressList()(*bool) {
     }
     if val != nil {
         return val.(*bool)
-    }
-    return nil
-}
-// GetSignInActivity gets the signInActivity property value. Get the last signed-in date and request ID of the sign-in for a given user. Read-only.Returned only on $select. Supports $filter (eq, ne, not, ge, le) but not with any other filterable properties. Note: Details for this property require an Azure AD Premium P1/P2 license and the AuditLog.Read.All permission.When you specify $select=signInActivity or $filter=signInActivity while listing users, the maximum page size is 120 users. Requests with $top set higher than 120 will fail. Requests with $top set higher than 120 will fail.This property is not returned for a user who has never signed in or last signed in before April 2020.
-func (m *User) GetSignInActivity()(SignInActivityable) {
-    val, err := m.GetBackingStore().Get("signInActivity")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(SignInActivityable)
     }
     return nil
 }
@@ -3538,12 +3517,6 @@ func (m *User) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c49
         }
     }
     {
-        err = writer.WriteObjectValue("signInActivity", m.GetSignInActivity())
-        if err != nil {
-            return err
-        }
-    }
-    {
         err = writer.WriteTimeValue("signInSessionsValidFromDateTime", m.GetSignInSessionsValidFromDateTime())
         if err != nil {
             return err
@@ -4371,13 +4344,6 @@ func (m *User) SetShowInAddressList(value *bool)() {
         panic(err)
     }
 }
-// SetSignInActivity sets the signInActivity property value. Get the last signed-in date and request ID of the sign-in for a given user. Read-only.Returned only on $select. Supports $filter (eq, ne, not, ge, le) but not with any other filterable properties. Note: Details for this property require an Azure AD Premium P1/P2 license and the AuditLog.Read.All permission.When you specify $select=signInActivity or $filter=signInActivity while listing users, the maximum page size is 120 users. Requests with $top set higher than 120 will fail. Requests with $top set higher than 120 will fail.This property is not returned for a user who has never signed in or last signed in before April 2020.
-func (m *User) SetSignInActivity(value SignInActivityable)() {
-    err := m.GetBackingStore().Set("signInActivity", value)
-    if err != nil {
-        panic(err)
-    }
-}
 // SetSignInSessionsValidFromDateTime sets the signInSessionsValidFromDateTime property value. Any refresh tokens or sessions tokens (session cookies) issued before this time are invalid, and applications will get an error when using an invalid refresh or sessions token to acquire a delegated access token (to access APIs such as Microsoft Graph).  If this happens, the application will need to acquire a new refresh token by making a request to the authorize endpoint. Read-only. Use revokeSignInSessions to reset. Returned only on $select.
 func (m *User) SetSignInSessionsValidFromDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)() {
     err := m.GetBackingStore().Set("signInSessionsValidFromDateTime", value)
@@ -4567,7 +4533,6 @@ type Userable interface {
     GetSecurityIdentifier()(*string)
     GetSettings()(UserSettingsable)
     GetShowInAddressList()(*bool)
-    GetSignInActivity()(SignInActivityable)
     GetSignInSessionsValidFromDateTime()(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)
     GetSkills()([]string)
     GetState()(*string)
@@ -4687,7 +4652,6 @@ type Userable interface {
     SetSecurityIdentifier(value *string)()
     SetSettings(value UserSettingsable)()
     SetShowInAddressList(value *bool)()
-    SetSignInActivity(value SignInActivityable)()
     SetSignInSessionsValidFromDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)()
     SetSkills(value []string)()
     SetState(value *string)()

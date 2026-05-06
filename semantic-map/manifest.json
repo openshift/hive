@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "schema": "semantic-map/bundle-manifest-v2",
+  "clone_dir": "..",
+  "owner": "newtonheath",
+  "repo": "hive",
+  "slug": "newtonheath/hive",
+  "artifact_root": ".",
+  "files": {
+    "architect_summary": "architect-summary.md",
+    "deps_graph": "deps-graph.json",
+    "docs_context": "docs/context",
+    "go_facts": "go-facts.json",
+    "manifest": "manifest.json",
+    "markdown_chunks": "markdown-chunks.json",
+    "repo_tree": "repo-tree.json"
+  }
+}

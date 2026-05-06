@@ -12,7 +12,7 @@ Shared utility library for all Hive controllers. Provides condition management f
 - `func AddControllerMetricsTransportWrapper(cfg *rest.Config, controllerName hivev1.ControllerName, remote bool)`
 - `func NewDelayingReconciler(r reconcile.Reconciler, logger log.FieldLogger) reconcile.Reconciler`
 - `func BuildControllerLogger(controller hivev1.ControllerName, resource string, nsName types.NamespacedName) *log.Entry`
-- `const ConcurrentReconcilesEnvVariableFormat, ClientQPSEnvVariableFormat, ClientBurstEnvVariableFormat`
+- `const ConcurrentReconcilesEnvVariableFormat, ClientQPSEnvVariableFormat, ClientBurstEnvVariableFormat, QueueQPSEnvVariableFormat, QueueBurstEnvVariableFormat`
 
 **Condition management (per CRD type):**
 - `func InitializeClusterDeploymentConditions(existingConditions, conditionsToBeAdded) ([]hivev1.ClusterDeploymentCondition, bool)`
@@ -188,4 +188,4 @@ Shared utility library for all Hive controllers. Provides condition management f
 
 ## Understanding Score
 
-0.82
+0.84

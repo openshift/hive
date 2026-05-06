@@ -21,6 +21,7 @@ Manages cluster deprovisioning by creating and monitoring uninstall jobs for Clu
 - `github.com/openshift/hive/pkg/install` — deprovision job generation
 - `github.com/openshift/hive/pkg/awsclient` — AWS client for credential testing
 - `github.com/aws/aws-sdk-go-v2/service/sts` — STS for AWS credential verification
+- `github.com/openshift/hive/pkg/util/labels` — label utilities
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client, metrics
 
 ## Capabilities

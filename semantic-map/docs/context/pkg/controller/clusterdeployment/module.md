@@ -27,6 +27,10 @@ The primary controller for the ClusterDeployment lifecycle. Orchestrates cluster
 - `github.com/openshift/hive/pkg/imageset` — image set resolution
 - `github.com/openshift/hive/pkg/install` — install job generation
 - `github.com/openshift/hive/pkg/gcpclient`, `ibmclient` — cloud credential validation
+- `github.com/openshift/hive/pkg/util/contracts` — supported contracts configuration
+- `github.com/openshift/hive/pkg/util/labels` — label utilities
+- `github.com/openshift/hive/pkg/controller/utils/vsphereutils` — vSphere validation utilities
+- `github.com/openshift/hive/apis/helpers` — API helper functions
 - `github.com/openshift/installer/pkg/types` — InstallConfig types for validation
 - `github.com/openshift/library-go/pkg/verify` — release image signature verification
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client, metrics

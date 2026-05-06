@@ -21,6 +21,7 @@ Maintains ClusterState resources that reflect the state of cluster operators fro
 - `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
 - `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, owner references
 - `github.com/openshift/hive/pkg/remoteclient` — remote cluster client builder
+- `github.com/openshift/hive/pkg/util/labels` — label utilities
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities

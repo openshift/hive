@@ -25,12 +25,13 @@ Internal helpers:
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1` -- all Hive CRD types
-- `github.com/openshift/hive/apis/hive/v1/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- platform-specific types
+- `github.com/openshift/hive/apis/hive/v1/agent`, `aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- platform-specific types
 - `github.com/openshift/hive/apis/hivecontracts/v1alpha1` -- contract types
 - `github.com/openshift/hive/pkg/constants` -- env vars and constants
 - `github.com/openshift/hive/pkg/controller/awsprivatelink` -- AWS private link config reading
 - `github.com/openshift/hive/pkg/manageddns` -- managed domains file reading
 - `github.com/openshift/hive/pkg/util/contracts` -- contract implementation lookup
+- `github.com/openshift/hive/pkg/util/scheme` -- shared scheme for type resolution
 - `k8s.io/api/admission/v1` -- AdmissionRequest/AdmissionResponse
 - `k8s.io/apimachinery/pkg/runtime/schema` -- GVR registration
 - `k8s.io/client-go/rest` -- webhook initialization config

@@ -45,7 +45,8 @@ Shared e2e test helper package providing client construction, resource waiting u
 - `github.com/openshift/hive/pkg/util/scheme` -- shared scheme for client construction
 - `github.com/openshift/api/machine/v1beta1` -- Machine, MachineSet types
 - `github.com/evanphx/json-patch` -- JSON merge patch
-- `k8s.io/client-go/dynamic`, `kubernetes`, `rest` -- Kubernetes clients
+- `k8s.io/client-go/dynamic`, `kubernetes`, `rest`, `tools/cache` -- Kubernetes clients and informer framework
+- `k8s.io/apimachinery/pkg/runtime/schema` -- GroupVersionResource for dynamic wait
 - `k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1` -- API registration client
 - `sigs.k8s.io/controller-runtime/pkg/client`, `cache`, `config` -- controller-runtime client/cache
 

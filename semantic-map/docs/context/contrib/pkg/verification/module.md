@@ -15,10 +15,7 @@ Provides a CLI command for the `hiveutil` tool to verify that Go source file imp
 
 ## Internal Dependencies
 
-- `go/ast`, `go/parser`, `go/token` -- Go source parsing for import extraction
-- `gopkg.in/yaml.v2` -- YAML config parsing for import rules
-- `k8s.io/apimachinery/pkg/util/errors` -- Error aggregation
-- `github.com/spf13/cobra` -- CLI framework
+None (this package has no Hive-internal dependencies; it only uses Go standard library, `gopkg.in/yaml.v2`, `k8s.io/apimachinery/pkg/util/errors`, and `github.com/spf13/cobra`)
 
 ## Capabilities
 

@@ -44,7 +44,9 @@ Provides a builder library for generating all Kubernetes resources required to c
 - `github.com/openshift/hive/pkg/controller/utils/nutanixutils` -- Nutanix failure domain conversion
 - `github.com/openshift/hive/pkg/gcpclient` -- GCP project ID extraction
 - `github.com/openshift/hive/pkg/util/yaml` -- JSON patch application
+- `github.com/openshift/installer/pkg/ipnet` -- IP network CIDR parsing for install-config
 - `github.com/openshift/installer/pkg/types` -- InstallConfig, CredentialsMode
+- `github.com/openshift/installer/pkg/validate` -- Install-config field validation
 - `github.com/openshift/installer/pkg/types/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Installer platform types
 - `github.com/openshift/api/config/v1` -- FeatureSet type
 - `github.com/openshift/api/machine/v1` -- Nutanix boot type

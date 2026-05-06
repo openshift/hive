@@ -22,6 +22,7 @@ Ensures that control plane TLS certificates specified in the ClusterDeployment a
 - `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers
 - `github.com/openshift/hive/pkg/remoteclient` — remote cluster client builder
 - `github.com/openshift/hive/pkg/resource` — resource applier
+- `github.com/openshift/hive/pkg/util/labels` — label utilities
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities

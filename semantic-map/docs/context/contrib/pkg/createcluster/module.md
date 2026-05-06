@@ -27,6 +27,7 @@ Provides a CLI command (`create-cluster`) for the `hiveutil` tool that generates
 - `github.com/openshift/hive/pkg/gcpclient` -- GCP project ID extraction
 - `github.com/openshift/hive/pkg/util/scheme` -- Scheme registration
 - `github.com/openshift/installer/pkg/types`, `vsphere`, `vsphere/conversion`, `nutanix` -- Installer platform types
+- `github.com/openshift/installer/pkg/validate` -- CA bundle validation for additional trust bundles
 - `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities

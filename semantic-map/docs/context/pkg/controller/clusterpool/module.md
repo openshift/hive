@@ -19,7 +19,8 @@ Manages ClusterPool resources by maintaining a pool of pre-provisioned ClusterDe
 - `github.com/openshift/hive/pkg/clusterresource` — cluster resource generation
 - `github.com/openshift/hive/pkg/constants` — label keys, constants
 - `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
-- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, expectations, vSphere utils
+- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, expectations
+- `github.com/openshift/hive/pkg/controller/utils/vsphereutils` — vSphere validation utilities
 - `github.com/openshift/hive/pkg/util/yaml` — YAML patch utilities
 - `github.com/davegardnerisme/deephash` — deep hashing for spec change detection
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client, metrics

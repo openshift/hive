@@ -18,6 +18,7 @@ Manages ClusterProvision resources through the install lifecycle. Creates instal
 - `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer, dynamic label metrics
 - `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, expectations, shared pod config
 - `github.com/openshift/hive/pkg/install` — install job generation
+- `github.com/openshift/hive/pkg/util/labels` — label utilities
 - `github.com/openshift/installer/pkg/types` — InstallConfig types
 - `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 

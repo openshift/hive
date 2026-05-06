@@ -17,6 +17,7 @@ Manages AWS PrivateLink VPC endpoints, endpoint services, and Route53 hosted zon
 ## Internal Dependencies
 
 - `github.com/openshift/hive/apis/hive/v1`, `github.com/openshift/hive/apis/hive/v1/aws` — CRDs and AWS platform types
+- `github.com/openshift/hive/pkg/constants` — pause annotation, config env vars
 - `github.com/openshift/hive/pkg/awsclient` — AWS client abstraction
 - `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
 - `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, finalizer helpers

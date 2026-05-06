@@ -12,7 +12,7 @@ Reconciles MachinePool custom resources by generating and syncing MachineSets to
 - `AWSActuator`, `AzureActuator`, `GCPActuator`, `IBMCloudActuator`, `NutanixActuator`, `OpenStackActuator`, `VSphereActuator` -- platform-specific Actuator implementations
 - `ReconcileMachinePool` -- reconciler struct
 - `ReconcileMachinePool.Reconcile(ctx, request) (reconcile.Result, error)`
-- `GetVPCIDForMachinePool(pool, awsClient) (string, error)` -- retrieves VPC ID from AWS subnets
+- `GetVPCIDForMachinePool(awsClient, pool) (string, error)` -- retrieves VPC ID from AWS subnets
 - `IsErrorUpdateEvent(event.UpdateEvent) bool` -- predicate for rate-limited event handling
 
 ## Internal Dependencies

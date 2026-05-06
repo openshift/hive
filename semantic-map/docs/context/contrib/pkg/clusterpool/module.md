@@ -25,6 +25,7 @@ Implements the `hiveutil clusterpool` subcommand tree for creating ClusterPool r
 - `github.com/openshift/hive/pkg/creds/azure` — `GetCreds`
 - `github.com/openshift/hive/pkg/creds/gcp` — `GetCreds`
 - `github.com/openshift/hive/pkg/util/scheme` — aggregated CRD scheme
+- `github.com/pkg/errors` — error wrapping
 - `github.com/spf13/cobra` — CLI framework
 - `github.com/sirupsen/logrus` — structured logging
 - `k8s.io/cli-runtime/pkg/printers` — YAML/JSON output printers

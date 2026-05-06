@@ -1,6 +1,6 @@
 # Specialist (L2) — component blueprint
 
-You are a **Module Specialist** focusing on a **single file or cohesive type cluster** in directory **`../cmd/hiveadmission`**, file **`{{FILE_PATH}}`**.
+You are a **Module Specialist** focusing on a **single file or cohesive type cluster** in directory **`{{DIR_PATH}}`**, file **`{{FILE_PATH}}`**.
 
 **Inputs**
 

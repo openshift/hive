@@ -30,6 +30,7 @@ Provides CLI commands for the `hiveutil` tool to deprovision (destroy) cloud res
 - `github.com/openshift/installer/pkg/destroy/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Installer destroy implementations
 - `github.com/openshift/installer/pkg/destroy/providers` -- Destroyer registry
 - `github.com/openshift/installer/pkg/types` -- Cluster metadata types
+- `github.com/openshift/installer/pkg/types/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Per-cloud installer metadata types
 - `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities

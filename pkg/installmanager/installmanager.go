@@ -1792,11 +1792,14 @@ func waitForProvisioningStage(m *InstallManager) error {
 
 	_, err = clientwatch.UntilWithSync(
 		waitContext,
-		cache.NewListWatchFromClient(
+		cache.NewFilteredListWatchFromClient(
 			restClient,
 			"clusterprovisions",
 			m.ClusterProvision.Namespace,
-			fields.OneTermEqualSelector("metadata.name", m.ClusterProvision.Name),
+			func(options *metav1.ListOptions) {
+				options.FieldSelector = fields.OneTermEqualSelector("metadata.name", m.ClusterProvision.Name).String()
+				options.AllowWatchBookmarks = true
+			},
 		),
 		&hivev1.ClusterProvision{},
 		nil,

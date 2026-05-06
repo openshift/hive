@@ -19,8 +19,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
@@ -103,6 +106,7 @@ func monitorDeprovisionJob(cd *hivev1.ClusterDeployment, jobObserved *int32, log
 	logger = logger.WithField("job", deprovisionJobName)
 	nameFilter := func(options *metav1.ListOptions) {
 		options.FieldSelector = fmt.Sprintf("metadata.name=%s", deprovisionJobName)
+		options.AllowWatchBookmarks = true
 	}
 	listWatcher := cache.NewFilteredListWatchFromClient(batchClient.RESTClient(), "jobs", cd.Namespace, nameFilter)
 	var writeLogOnce sync.Once
@@ -143,6 +147,7 @@ func writeJobLog(job *batchv1.Job, logger *log.Entry) {
 	}
 	podFilter := func(options *metav1.ListOptions) {
 		options.LabelSelector = podLabelSelector.String()
+		options.AllowWatchBookmarks = true
 	}
 	var pod *corev1.Pod
 	waitForPodRunning := func(event watch.Event) (bool, error) {
@@ -196,20 +201,30 @@ func waitForClusterDeploymentToGoAway(cd *hivev1.ClusterDeployment, cl client.Wi
 	waitContext, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	opts := []client.ListOption{
-		client.InNamespace(cd.Namespace),
-		client.MatchingFields{"metadata.name": cd.Name},
+	// Create a dynamic client to access the raw Watch API with full ListOptions support
+	cfg := common.MustGetConfig()
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to create dynamic client")
+	}
+
+	// ClusterDeployment GVR
+	clusterDeploymentGVR := schema.GroupVersionResource{
+		Group:    "hive.openshift.io",
+		Version:  "v1",
+		Resource: "clusterdeployments",
 	}
 
 	listWatcher := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			clist := &hivev1.ClusterDeploymentList{}
-			err := cl.List(context.TODO(), clist, opts...)
-			return clist, err
+			options.FieldSelector = "metadata.name=" + cd.Name
+			return dynamicClient.Resource(clusterDeploymentGVR).Namespace(cd.Namespace).List(context.Background(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			clist := &hivev1.ClusterDeploymentList{}
-			return cl.Watch(context.TODO(), clist, opts...)
+			// Request bookmark events to prevent "bookmark expired" warnings
+			options.AllowWatchBookmarks = true
+			options.FieldSelector = "metadata.name=" + cd.Name
+			return dynamicClient.Resource(clusterDeploymentGVR).Namespace(cd.Namespace).Watch(context.Background(), options)
 		},
 	}
 	checkIfExists := func(store cache.Store) (bool, error) {
@@ -218,7 +233,7 @@ func waitForClusterDeploymentToGoAway(cd *hivev1.ClusterDeployment, cl client.Wi
 	isDeleted := func(event watch.Event) (bool, error) {
 		return event.Type == watch.Deleted, nil
 	}
-	_, err := clientwatch.UntilWithSync(waitContext, listWatcher, &hivev1.ClusterDeployment{}, checkIfExists, isDeleted)
+	_, err = clientwatch.UntilWithSync(waitContext, listWatcher, &unstructured.Unstructured{}, checkIfExists, isDeleted)
 	if err != nil {
 		return errors.Wrap(err, "failed to wait for cluster deployment to be deleted")
 	}

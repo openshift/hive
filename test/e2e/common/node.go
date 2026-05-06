@@ -10,15 +10,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut time.Duration) error {
 	logger := log.WithField("client", "node")
-	logger.Infof("Waiting for Nodes")
+	logger.Infof("Waiting for Node")
 	done := make(chan struct{})
-	internalCache, err := cache.New(cfg, cache.Options{})
+	scheme := scheme.GetScheme()
+
+	internalCache, err := cache.New(cfg, cache.Options{
+		Scheme:                      scheme,
+		DefaultEnableWatchBookmarks: ptr.To(true),
+	})
 	if err != nil {
 		return err
 	}

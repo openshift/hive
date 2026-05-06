@@ -7,6 +7,7 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
+		// k8s.io/* naming for < k8s 1.35 compatibility
 		"k8s.io/api/admission/v1.AdmissionRequest":                  schema_k8sio_api_admission_v1_AdmissionRequest(ref),
 		"k8s.io/api/admission/v1.AdmissionResponse":                 schema_k8sio_api_admission_v1_AdmissionResponse(ref),
 		"k8s.io/api/admission/v1.AdmissionReview":                   schema_k8sio_api_admission_v1_AdmissionReview(ref),
@@ -21,6 +22,21 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta":             schema_pkg_apis_meta_v1_ListMeta(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails":        schema_pkg_apis_meta_v1_StatusDetails(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause":          schema_pkg_apis_meta_v1_StatusCause(ref),
+		// io.k8s.* naming for >= k8s 1.35 compatibility
+		"io.k8s.api.admission.v1.AdmissionRequest":                  schema_k8sio_api_admission_v1_AdmissionRequest(ref),
+		"io.k8s.api.admission.v1.AdmissionResponse":                 schema_k8sio_api_admission_v1_AdmissionResponse(ref),
+		"io.k8s.api.admission.v1.AdmissionReview":                   schema_k8sio_api_admission_v1_AdmissionReview(ref),
+		"io.k8s.api.admission.v1beta1.AdmissionRequest":             schema_k8sio_api_admission_v1beta1_AdmissionRequest(ref),
+		"io.k8s.api.admission.v1beta1.AdmissionResponse":            schema_k8sio_api_admission_v1beta1_AdmissionResponse(ref),
+		"io.k8s.api.admission.v1beta1.AdmissionReview":              schema_k8sio_api_admission_v1beta1_AdmissionReview(ref),
+		"io.k8s.api.authentication.v1.UserInfo":                     schema_k8sio_api_authentication_v1_UserInfo(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionKind":     schema_pkg_apis_meta_v1_GroupVersionKind(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionResource": schema_pkg_apis_meta_v1_GroupVersionResource(ref),
+		"io.k8s.apimachinery.pkg.runtime.RawExtension":              schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.Status":               schema_pkg_apis_meta_v1_Status(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta":             schema_pkg_apis_meta_v1_ListMeta(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.StatusDetails":        schema_pkg_apis_meta_v1_StatusDetails(ref),
+		"io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause":          schema_pkg_apis_meta_v1_StatusCause(ref),
 	}
 }
 

@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -87,6 +89,7 @@ func newRootCommand() *cobra.Command {
 					Scheme:  scheme.GetScheme(),
 					Metrics: metricsserver.Options{BindAddress: ":2112"},
 					Logger:  utillogrus.NewLogr(log.StandardLogger()),
+					Cache:   cache.Options{DefaultEnableWatchBookmarks: ptr.To(true)},
 				})
 				if err != nil {
 					log.Fatal(err)

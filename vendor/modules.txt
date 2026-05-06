@@ -1900,8 +1900,8 @@ github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1
 ## explicit; go 1.24.0
 github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain
 github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig
-# github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6
-## explicit; go 1.24.0
+# github.com/openshift/generic-admission-server v1.14.1-0.20260305203524-5df3cca1e3cd
+## explicit; go 1.25.0
 github.com/openshift/generic-admission-server/pkg/apiserver
 github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
@@ -4038,7 +4038,7 @@ k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme
 k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1
-# k8s.io/kube-openapi v0.0.0-20251121143641-b6aabc6c6745
+# k8s.io/kube-openapi v0.0.0-20260304202019-5b3e3fdb0acf
 ## explicit; go 1.23.0
 k8s.io/kube-openapi/cmd/openapi-gen
 k8s.io/kube-openapi/cmd/openapi-gen/args

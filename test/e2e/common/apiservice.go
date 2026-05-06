@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/cache"
 	apiregv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -45,7 +46,15 @@ func WaitForAPIService(c apiregv1client.ApiregistrationV1Interface, name string,
 			done <- struct{}{}
 		}
 	}
-	watchList := cache.NewListWatchFromClient(c.RESTClient(), "apiservices", "", fields.OneTermEqualSelector("metadata.name", name))
+	watchList := cache.NewFilteredListWatchFromClient(
+		c.RESTClient(),
+		"apiservices",
+		"",
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
 		ListerWatcher: watchList,
 		ObjectType:    &apiregv1.APIService{},

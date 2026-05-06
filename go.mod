@@ -32,7 +32,7 @@ require (
 	github.com/openshift/api v0.0.0-20260318185450-1f2fa3f09f4e
 	github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c
 	github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
-	github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6
+	github.com/openshift/generic-admission-server v1.14.1-0.20260305203524-5df3cca1e3cd
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v1.4.22-ec5
 	github.com/openshift/library-go v0.0.0-20251107090138-0de9712313a5
@@ -442,7 +442,7 @@ require (
 	k8s.io/component-helpers v0.35.4 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20251121143641-b6aabc6c6745 // indirect
+	k8s.io/kube-openapi v0.0.0-20260304202019-5b3e3fdb0acf // indirect
 	mvdan.cc/gofumpt v0.7.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.32.0 // indirect

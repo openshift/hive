@@ -795,9 +795,16 @@ type informerRunnable struct {
 }
 
 func (r *informerRunnable) Start(ctx context.Context) error {
-	stopch := ctx.Done()
-	r.informer.Run(stopch)
-	cache.WaitForCacheSync(stopch, r.informer.HasSynced)
+	// Start the informer in a goroutine so it doesn't block
+	go r.informer.RunWithContext(ctx)
+
+	// Wait for the cache to sync
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, r.informer.HasSynced) {
+		return fmt.Errorf("failed to sync informer cache")
+	}
+
+	// Block until context is canceled (required by Runnable interface)
+	<-ctx.Done()
 	return nil
 }
 

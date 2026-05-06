@@ -1,41 +1,32 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/privatelink/conditions/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides helper functions for managing private link-related conditions (`PrivateLinkFailed`, `PrivateLinkReady`) on ClusterDeployment resources, with retry-on-conflict support for status updates.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `InitializeConditions`
-- `SetErrCondition`
-- `SetErrConditionWithRetry`
-- `SetReadyCondition`
-- `SetReadyConditionWithRetry`
+- `InitializeConditions(cd *hivev1.ClusterDeployment) ([]hivev1.ClusterDeploymentCondition, bool)` -- initializes private link conditions if not present
+- `SetErrCondition(client, cd, reason, err, logger) error` -- sets PrivateLinkFailed=True and PrivateLinkReady=False
+- `SetErrConditionWithRetry(client, cd, reason, err, logger) error` -- SetErrCondition with retry-on-conflict
+- `SetReadyCondition(client, cd, completed, reason, message, logger) error` -- sets PrivateLinkReady to specified status, clears PrivateLinkFailed on success
+- `SetReadyConditionWithRetry(client, cd, completed, reason, message, logger) error` -- SetReadyCondition with retry-on-conflict
 
 ## Internal Dependencies
 
-- `context`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/apimachinery/pkg/util/wait`
-- `k8s.io/client-go/util/retry`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, condition types
+- `github.com/openshift/hive/pkg/controller/utils` -- SetClusterDeploymentConditionWithChangeCheck, FindCondition, InitializeClusterDeploymentConditions
+- `k8s.io/apimachinery/pkg/util/wait`, `k8s.io/client-go/util/retry` -- retry-on-conflict
+- `sigs.k8s.io/controller-runtime/pkg/client` -- client for status updates
 
 ## Capabilities
 
-- **`package`** name(s): **conditions**.
-- Go **`import`** edges listed below (11 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/privatelink/conditions`.
+- Initializes `PrivateLinkFailed` and `PrivateLinkReady` conditions on ClusterDeployment
+- Sets error conditions with scrubbed error messages
+- Sets ready conditions with special handling: allows transition to Ready but prevents demotion once Ready
+- All condition setters re-fetch the ClusterDeployment before update to minimize conflicts
+- Retry variants use exponential backoff for conflict resolution
 
 ## Understanding Score
 
-0.0
+0.9

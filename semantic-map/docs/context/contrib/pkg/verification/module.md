@@ -1,37 +1,32 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/verification/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a CLI command for the `hiveutil` tool to verify that Go source file imports follow naming conventions defined in a YAML configuration file.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `VerifyImportsOptions` -- Options containing the Go file path, config file path, and logger
 
-- `NewVerifyImportsCommand` — NewVerifyImportsCommand adds a subcommand for verifying imports of a go file.
-- `VerifyImportsOptions` — VerifyImportsOptions contains the options for verifying go imports
-- `VerifyImportsOptions.VerifyImports` — VerifyImports verifies that the imports match the required convention.
+**Functions:**
+- `NewVerifyImportsCommand() *cobra.Command` -- Creates the `verify-imports` command that checks a Go file's imports against configured rules
+- `(o *VerifyImportsOptions) VerifyImports() error` -- Parses the Go file, loads import naming rules from YAML config, and validates import aliases match the rules
 
 ## Internal Dependencies
 
-- `fmt`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `go/ast`
-- `go/parser`
-- `go/token`
-- `gopkg.in/yaml.v2`
-- `k8s.io/apimachinery/pkg/util/errors`
-- `os`
+- `go/ast`, `go/parser`, `go/token` -- Go source parsing for import extraction
+- `gopkg.in/yaml.v2` -- YAML config parsing for import rules
+- `k8s.io/apimachinery/pkg/util/errors` -- Error aggregation
+- `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **verification**.
-- Go **`import`** edges listed below (9 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/verification`.
+- Parse Go source files to extract import statements
+- Load import naming convention rules from a YAML config file
+- Validate that import aliases match required naming conventions
+- Report all violations as aggregated errors
 
 ## Understanding Score
 
-0.0
+0.9

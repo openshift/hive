@@ -1,16 +1,29 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/generic/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides generic functional options that operate on any `hivev1.MetaRuntimeObject`, serving as the shared foundation for all type-specific test builders in `pkg/test/`. Each type-specific builder adapts these options via its own `Generic()` wrapper.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(hivev1.MetaRuntimeObject)` -- generic functional option type operating on any Hive MetaRuntimeObject
+- `WithName(name string) Option`
+- `WithNamePostfix(postfix string) Option` -- appends "-{postfix}" to existing name
+- `WithNamespace(namespace string) Option`
+- `WithAnnotationsPopulated() Option` -- ensures Annotations map is non-nil
+- `WithAnnotation(key, value string) Option`
+- `WithControllerOwnerReference(owner metav1.Object) Option`
+- `WithOwnerReference(owner hivev1.MetaRuntimeObject) Option` -- non-controller owner ref with BlockOwnerDeletion=true
+- `WithLabel(key, value string) Option`
+- `WithResourceVersion(resourceVersion string) Option`
+- `WithIncrementedResourceVersion() Option` -- increments numeric resource version by 1
+- `WithUID(uid string) Option`
+- `WithTypeMeta(typers ...runtime.ObjectTyper) Option` -- resolves and sets GVK from registered scheme
+- `WithFinalizer(finalizer string) Option`
+- `WithoutFinalizer(finalizer string) Option`
+- `WithCreationTimestamp(time time.Time) Option`
+- `Deleted() Option` -- sets DeletionTimestamp to now
+- `WithGeneration(generation int64) Option`
 
 ## Internal Dependencies
 
@@ -23,15 +36,17 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 - `k8s.io/apimachinery/pkg/types`
 - `k8s.io/apimachinery/pkg/util/sets`
 - `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `strconv`
-- `time`
 
 ## Capabilities
 
-- **`package`** name(s): **generic**.
-- Go **`import`** edges listed below (11 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/generic`.
+- Common metadata manipulation (name, namespace, labels, annotations, UID, generation)
+- Resource version management (set, increment)
+- TypeMeta resolution from registered ObjectTyper schemes
+- Owner reference management (controller and non-controller)
+- Finalizer add/remove
+- Creation/deletion timestamp manipulation
+- Foundation layer used by all `pkg/test/*` type-specific builders
 
 ## Understanding Score
 
-0.0
+0.9

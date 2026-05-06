@@ -1,35 +1,29 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/creds/azure/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements Azure credential extraction and environment configuration for Hive install/uninstall jobs. Reads Azure service account JSON credentials from files or environment variables, projects creds secret to a directory, and sets the `AZURE_AUTH_LOCATION` environment variable.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `ConfigureCreds` — ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE and CREDS_SECRET_NAME and configures Azure credential environment variables and c…
-- `GetCreds` — GetCreds reads Azure credentials used for install/uninstall from either the default credentials file (~/.azure/osServiceAccount.json), the standard environment variable, or provid…
+- `func GetCreds(credsFile string) ([]byte, error)` -- reads Azure credentials from specified file, env var `AZURE_AUTH_LOCATION`, or default `~/.azure/osServiceAccount.json`
+- `func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata)` -- loads creds secret, projects to directory, sets AZURE_AUTH_LOCATION env var, installs CA certs
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/sirupsen/logrus`
-- `k8s.io/client-go/util/homedir`
-- `os`
-- `path/filepath`
-- `sigs.k8s.io/controller-runtime/pkg/client`
+- `github.com/openshift/hive/contrib/pkg/utils` -- LoadSecretOrDie, ProjectToDir, InstallCerts
+- `github.com/openshift/hive/pkg/constants` -- credential file names, directory paths, env var names
+- `github.com/openshift/installer/pkg/types` -- ClusterMetadata type
+- `k8s.io/client-go/util/homedir` -- home directory resolution
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client
 
 ## Capabilities
 
-- **`package`** name(s): **azure**.
-- Go **`import`** edges listed below (8 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/creds/azure`.
+- Reads Azure credentials with fallback order: explicit file, env var, default home path
+- Projects secret data to filesystem directory for installer consumption
+- Sets Azure auth environment variable
+- Installs cluster proxy trusted CA bundle
 
 ## Understanding Score
 
-0.0
+0.90

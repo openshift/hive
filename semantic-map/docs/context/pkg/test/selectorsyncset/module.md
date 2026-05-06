@@ -1,31 +1,39 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/selectorsyncset/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Builder-pattern test fixture for constructing `hivev1.SelectorSyncSet` objects in unit tests. Provides options for configuring label selectors, resources, secrets, patches, apply modes, and apply behaviors.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*hivev1.SelectorSyncSet)` -- functional option type
+- `Build(opts ...Option) *hivev1.SelectorSyncSet` -- constructs a SelectorSyncSet from options
+- `type Builder interface` -- fluent builder with `Build`, `Options`, `GenericOptions` methods
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(name string, typer runtime.ObjectTyper) Builder` -- returns a pre-configured builder
+- `Generic(opt generic.Option) Option` -- adapts a generic.Option
+- `WithName(name string) Option` -- sets object name
+- `WithNamespace(namespace string) Option` -- sets object namespace
+- `WithGeneration(generation int64) Option` -- sets generation
+- `WithLabelSelector(labelKey, labelValue string) Option` -- adds a match label to ClusterDeploymentSelector
+- `WithApplyMode(applyMode hivev1.SyncSetResourceApplyMode) Option` -- sets ResourceApplyMode
+- `WithApplyBehavior(applyBehavior hivev1.SyncSetApplyBehavior) Option` -- sets ApplyBehavior
+- `WithResources(objs ...hivev1.MetaRuntimeObject) Option` -- sets spec resources
+- `WithSecrets(secrets ...hivev1.SecretMapping) Option` -- sets spec secrets
+- `WithPatches(patches ...hivev1.SyncObjectPatch) Option` -- sets spec patches
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/test/generic`
-- `k8s.io/apimachinery/pkg/runtime`
+- `github.com/openshift/hive/apis/hive/v1` -- SelectorSyncSet and related types
+- `github.com/openshift/hive/pkg/test/generic` -- shared test builder primitives
+- `k8s.io/apimachinery/pkg/runtime` -- ObjectTyper, RawExtension
 
 ## Capabilities
 
-- **`package`** name(s): **selectoryncset**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/selectorsyncset`.
+- Construct `hivev1.SelectorSyncSet` test fixtures via functional options
+- Configure label-based cluster deployment selectors
+- Set resources, secrets, patches, apply modes on SelectorSyncSet spec
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,53 +1,41 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/awsprivatelink/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements the `hiveutil awsprivatelink` subcommand tree for enabling, disabling, and managing AWS PrivateLink configuration in HiveConfig. Handles credentials secret creation, VPC discovery, and HiveConfig updates.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `NewAWSPrivateLinkCommand`
-- `NewDisableAWSPrivateLinkCommand`
-- `NewEnableAWSPrivateLinkCommand`
-- `NewEndpointVPCCommand`
+**Functions:**
+- `func NewAWSPrivateLinkCommand() *cobra.Command` — root `awsprivatelink` command with `--debug` and `--creds-secret` persistent flags; registers `enable`, `disable`, and `endpointvpc` subcommands
+- `func NewEnableAWSPrivateLinkCommand() *cobra.Command` — `enable` subcommand; discovers the active cluster's VPC, creates hub account credentials secret, and configures `HiveConfig.spec.awsPrivateLink`. Flag: `--dns-record-type` (Alias|ARecord)
+- `func NewDisableAWSPrivateLinkCommand() *cobra.Command` — `disable` subcommand; removes hub credentials secrets and clears `HiveConfig.spec.awsPrivateLink`
+- `func NewEndpointVPCCommand() *cobra.Command` — `endpointvpc` parent command; delegates to `endpointvpc.NewEndpointVPCAddCommand()` and `endpointvpc.NewEndpointVPCRemoveCommand()`
 
 ## Internal Dependencies
 
-- `context`
-- `errors`
-- `github.com/aws/aws-sdk-go-v2/aws`
-- `github.com/aws/aws-sdk-go-v2/service/ec2`
-- `github.com/aws/aws-sdk-go-v2/service/ec2/types`
-- `github.com/openshift/api/config/v1`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/contrib/pkg/awsprivatelink/common`
-- `github.com/openshift/hive/contrib/pkg/awsprivatelink/endpointvpc`
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/awsclient`
-- `github.com/openshift/hive/pkg/creds/aws`
-- `github.com/openshift/hive/pkg/operator/hive`
-- `github.com/openshift/hive/pkg/util/scheme`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/types`
-- `os/user`
-- `path/filepath`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `strings`
+- `github.com/openshift/hive/apis/hive/v1` — HiveConfig, AWSPrivateLinkConfig types
+- `github.com/openshift/hive/contrib/pkg/awsprivatelink/common` — shared `DynamicClient` and `CredsSecret` vars
+- `github.com/openshift/hive/contrib/pkg/awsprivatelink/endpointvpc` — endpoint VPC add/remove subcommands
+- `github.com/openshift/hive/contrib/pkg/utils` — `GetClient` helper
+- `github.com/openshift/hive/pkg/awsclient` — AWS client factory (`NewClientFromSecret`)
+- `github.com/openshift/hive/pkg/creds/aws` — `GetAWSCreds` for local credential extraction
+- `github.com/openshift/hive/pkg/operator/hive` — `GetHiveNamespace`
+- `github.com/openshift/hive/pkg/util/scheme` — aggregated CRD scheme
+- `github.com/openshift/api/config/v1` — OpenShift Infrastructure type for region/infraID discovery
+- `github.com/aws/aws-sdk-go-v2` — EC2 client for VPC discovery
+- `github.com/spf13/cobra` — CLI framework
+- `github.com/sirupsen/logrus` — structured logging
+- `sigs.k8s.io/controller-runtime/pkg/client` — Kubernetes dynamic client
 
 ## Capabilities
 
-- **`package`** name(s): **awsprivatelink**.
-- Go **`import`** edges listed below (24 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/awsprivatelink`.
+- Enables AWS PrivateLink by discovering the active cluster's VPC (via infra-id tag), creating a hub account credentials secret, and updating HiveConfig
+- Disables AWS PrivateLink by cleaning up credentials secrets and clearing HiveConfig's awsPrivateLink section
+- Supports using a pre-existing credentials secret on the cluster (`--creds-secret ns/name`) or extracting credentials from the local AWS environment
+- Delegates endpoint VPC management to the `endpointvpc` sub-package
+- Validates that HiveConfig has no remaining associated/endpoint VPCs before disabling
 
 ## Understanding Score
 
-0.0
+0.9

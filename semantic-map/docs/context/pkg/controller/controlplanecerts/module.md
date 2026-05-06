@@ -1,66 +1,39 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/controlplanecerts/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Ensures that control plane TLS certificates specified in the ClusterDeployment are synced to the remote cluster. Creates a SyncSet containing the certificate secrets and manages their application to the `openshift-config` namespace on the target cluster.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new ControlPlaneCerts Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `GenerateControlPlaneCertsSyncSetName` — GenerateControlPlaneCertsSyncSetName generates the name of the SyncSet that holds the control plane certificates to sync.
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileControlPlaneCerts` — ReconcileControlPlaneCerts reconciles a ClusterDeployment object
-- `ReconcileControlPlaneCerts.Reconcile` — Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read and what is in the ClusterDeployment.Spec
+- `ControllerName` — constant (from `hivev1.ControlPlaneCertsControllerName`)
+- `Add(mgr manager.Manager) error` — creates and registers the controller with the manager
+- `NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler`
+- `AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error`
+- `ReconcileControlPlaneCerts` — reconciler struct embedding `client.Client`
+- `ReconcileControlPlaneCerts.Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)`
+- `GenerateControlPlaneCertsSyncSetName(name string) string` — generates the SyncSet name for a given ClusterDeployment
 
 ## Internal Dependencies
 
-- `context`
-- `crypto/md5`
-- `fmt`
-- `github.com/openshift/hive/apis/helpers`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/remoteclient`
-- `github.com/openshift/hive/pkg/resource`
-- `github.com/openshift/hive/pkg/util/labels`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `io`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `net/url`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `sort`
-- `strconv`
-- `strings`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1`, `github.com/openshift/hive/apis/helpers` — ClusterDeployment CRD, resource name helpers
+- `github.com/openshift/hive/pkg/constants` — certificate suffix constant
+- `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
+- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers
+- `github.com/openshift/hive/pkg/remoteclient` — remote cluster client builder
+- `github.com/openshift/hive/pkg/resource` — resource applier
+- `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities
 
-- **`package`** name(s): **controlplanecerts**.
-- Go **`import`** edges listed below (34 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/controlplanecerts`.
+- Watches ClusterDeployment resources
+- Reads certificate secrets referenced by ClusterDeployment spec
+- Creates/updates a SyncSet to push certificate secrets to the remote cluster's `openshift-config` namespace
+- Hashes secret contents (MD5) to detect changes and trigger redeployment
+- Patches the remote kube-apiserver to force redeployment when certificates change
+- Sets `ControlPlaneCertificateNotFound` condition on ClusterDeployment when referenced secrets are missing
+- Periodically re-checks certificate secrets (2-minute interval)
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,33 +1,36 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/statefulset/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Builder-pattern test fixture for constructing `appsv1.StatefulSet` objects in unit tests. Provides options for replicas and current replicas status, and uses `hivev1.DeploymentName` for the name parameter in `FullBuilder`.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*appsv1.StatefulSet)` -- functional option type
+- `Build(opts ...Option) *appsv1.StatefulSet` -- constructs a StatefulSet from options
+- `type Builder interface` -- fluent builder with `Build`, `Options`, `GenericOptions` methods
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace string, name hivev1.DeploymentName, typer runtime.ObjectTyper) Builder` -- returns a pre-configured builder
+- `Generic(opt generic.Option) Option` -- adapts a generic.Option
+- `WithName(name string) Option` -- sets object name
+- `WithNamespace(namespace string) Option` -- sets object namespace
+- `WithReplicas(replicas int32) Option` -- sets spec.Replicas
+- `WithCurrentReplicas(currentReplicas int32) Option` -- sets status.CurrentReplicas
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/test/generic`
-- `k8s.io/api/apps/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/utils/ptr`
+- `github.com/openshift/hive/apis/hive/v1` -- DeploymentName type
+- `github.com/openshift/hive/pkg/test/generic` -- shared test builder primitives
+- `k8s.io/api/apps/v1` -- StatefulSet type
+- `k8s.io/apimachinery/pkg/runtime` -- ObjectTyper
+- `k8s.io/utils/ptr` -- ptr.To helper
 
 ## Capabilities
 
-- **`package`** name(s): **statefulset**.
-- Go **`import`** edges listed below (5 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/statefulset`.
+- Construct `appsv1.StatefulSet` test fixtures via functional options
+- Configure replica count and current replicas status
+- Integrate hive DeploymentName type for naming
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,47 +1,39 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/report/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides CLI commands for the `hiveutil` tool to generate reports on clusters managed by Hive, including provisioning and deprovisioning status reports with filtering capabilities.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `ProvisioningReportOptions` -- Options for the provisioning report (age filters, cluster type filter)
+- `DeprovisioningReportOptions` -- Options for the deprovisioning report (cluster type filter)
 
-- `DeprovisioningReportOptions` — DeprovisioningReportOptions is the set of options for the desired report.
-- `DeprovisioningReportOptions.Complete` — Complete finishes parsing arguments for the command
-- `DeprovisioningReportOptions.Run` — Run executes the command
-- `DeprovisioningReportOptions.Validate` — Validate ensures that option values make sense
-- `NewClusterReportCommand` — NewClusterReportCommand creates a command that generates and outputs the cluster report.
-- `NewDeprovisioningReportCommand` — NewDeprovisioningReportCommand creates a command that generates and outputs the cluster report.
-- `NewProvisioningReportCommand` — NewProvisioningReportCommand creates a command that generates and outputs the cluster report.
-- `ProvisioningReportOptions` — ProvisioningReportOptions is the set of options for the desired report.
-- `ProvisioningReportOptions.Complete` — Complete finishes parsing arguments for the command
-- `ProvisioningReportOptions.Run` — Run executes the command
-- `ProvisioningReportOptions.Validate` — Validate ensures that option values make sense
+**Functions:**
+- `NewClusterReportCommand() *cobra.Command` -- Top-level `report` command that aggregates provisioning and deprovisioning report subcommands
+- `NewProvisioningReportCommand() *cobra.Command` -- `provisioning` subcommand; lists clusters currently provisioning with details (duration, install retries, install logs)
+- `NewDeprovisioningReportCommand() *cobra.Command` -- `deprovisioning` subcommand; lists clusters currently deprovisioning with details (duration, finalizers)
+- `(o *ProvisioningReportOptions) Complete(cmd, args) error` -- Completes options (no-op)
+- `(o *ProvisioningReportOptions) Validate(cmd) error` -- Validates options (no-op)
+- `(o *ProvisioningReportOptions) Run(dynClient client.Client) error` -- Executes provisioning report
+- `(o *DeprovisioningReportOptions) Complete(cmd, args) error` -- Completes options (no-op)
+- `(o *DeprovisioningReportOptions) Validate(cmd) error` -- Validates options (no-op)
+- `(o *DeprovisioningReportOptions) Run(dynClient client.Client) error` -- Executes deprovisioning report
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/types`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment types
+- `github.com/openshift/hive/contrib/pkg/utils` -- Kube client creation
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Controller-runtime client for listing ClusterDeployments
+- `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **report**.
-- Go **`import`** edges listed below (11 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/report`.
+- List all clusters currently being provisioned with install log output, retry counts, and provisioning duration
+- List all clusters currently being deprovisioned with finalizer details and deprovisioning duration
+- Filter reports by cluster type label and creation age (less-than / greater-than duration)
 
 ## Understanding Score
 
-0.0
+0.9

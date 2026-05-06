@@ -1,32 +1,29 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/creds/nutanix/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements Nutanix credential extraction for Hive install/uninstall jobs. Reads username and password from a Kubernetes secret, sets corresponding environment variables, populates ClusterMetadata with credentials, and installs Nutanix-specific and proxy CA certificates.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `ConfigureCreds` — ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE, CREDS_SECRET_NAME, and CERTS_SECRET_NAME and configures Nutanix credential enviro…
+- `func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata)` -- loads creds and certs secrets, sets `NUTANIX_USERNAME` and `NUTANIX_PASSWORD` env vars, populates metadata, projects certs to filesystem, installs CA bundles
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/openshift/installer/pkg/types/nutanix`
-- `os`
-- `sigs.k8s.io/controller-runtime/pkg/client`
+- `github.com/openshift/hive/contrib/pkg/utils` -- LoadSecretOrDie, ProjectToDir, InstallCerts
+- `github.com/openshift/hive/pkg/constants` -- secret key names, env var names, certificate directory paths
+- `github.com/openshift/installer/pkg/types` -- ClusterMetadata type
+- `github.com/openshift/installer/pkg/types/nutanix` -- Nutanix Metadata type
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client
 
 ## Capabilities
 
-- **`package`** name(s): **nutanix**.
-- Go **`import`** edges listed below (6 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/creds/nutanix`.
+- Extracts username and password from creds secret
+- Sets Nutanix-specific environment variables
+- Populates installer ClusterMetadata with credentials (spoofs metadata if nil)
+- Loads and installs Nutanix-specific certificates from a separate secret
+- Installs cluster proxy trusted CA bundle
 
 ## Understanding Score
 
-0.0
+0.90

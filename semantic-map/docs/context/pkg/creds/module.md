@@ -1,36 +1,31 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/creds/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a registry map of platform-specific credential configuration functions, keyed by platform name string. Acts as the top-level dispatcher that routes credential setup to the appropriate cloud provider implementation (AWS, Azure, GCP, IBMCloud, Nutanix, OpenStack, VSphere).
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `ConfigureCreds`
+- `var ConfigureCreds map[string]func(client.Client, *types.ClusterMetadata)` -- map from platform constant string to provider-specific ConfigureCreds function
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/creds/aws`
-- `github.com/openshift/hive/pkg/creds/azure`
-- `github.com/openshift/hive/pkg/creds/gcp`
-- `github.com/openshift/hive/pkg/creds/ibmcloud`
-- `github.com/openshift/hive/pkg/creds/nutanix`
-- `github.com/openshift/hive/pkg/creds/openstack`
-- `github.com/openshift/hive/pkg/creds/vsphere`
-- `github.com/openshift/installer/pkg/types`
-- `sigs.k8s.io/controller-runtime/pkg/client`
+- `github.com/openshift/hive/pkg/constants` -- platform name constants (PlatformAWS, PlatformAzure, etc.)
+- `github.com/openshift/hive/pkg/creds/aws` -- AWS ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/azure` -- Azure ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/gcp` -- GCP ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/ibmcloud` -- IBMCloud ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/nutanix` -- Nutanix ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/openstack` -- OpenStack ConfigureCreds
+- `github.com/openshift/hive/pkg/creds/vsphere` -- VSphere ConfigureCreds
+- `github.com/openshift/installer/pkg/types` -- ClusterMetadata type
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client
 
 ## Capabilities
 
-- **`package`** name(s): **creds**.
-- Go **`import`** edges listed below (10 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/creds`.
+- Single registry mapping all supported cloud platforms to their credential setup functions
+- Used by install/uninstall jobs to configure environment for the appropriate cloud provider
 
 ## Understanding Score
 
-0.0
+0.90

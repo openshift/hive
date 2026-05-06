@@ -1,66 +1,41 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/ibmclient/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides an IBM Cloud API client abstraction for Hive. Defines the `API` interface covering VPC, DNS (CIS), resource groups, IAM, dedicated hosts, encryption keys, and instance lifecycle. The `Client` struct implements `API` using IBM Go SDKs.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `API` — API represents the calls made to the API.
-- `Client` — Client makes calls to the IBM Cloud API.
-- `Client.GetAuthenticatorAPIKeyDetails` — GetAuthenticatorAPIKeyDetails gets detailed information on the API key used for authentication to the IBM Cloud APIs
-- `Client.GetCISInstance` — GetCISInstance gets a specific Cloud Internet Services instance by its CRN.
-- `Client.GetDNSRecordsByName` — GetDNSRecordsByName gets DNS records in specific Cloud Internet Services instance by its CRN, zone ID, and DNS record name.
-- `Client.GetDNSZoneIDByName` — GetDNSZoneIDByName gets the CIS zone ID from its domain name.
-- `Client.GetDNSZones` — GetDNSZones returns all of the active DNS zones managed by CIS.
-- `Client.GetDedicatedHostByName` — GetDedicatedHostByName gets dedicated host by name.
-- `Client.GetDedicatedHostProfiles` — GetDedicatedHostProfiles gets a list of profiles supported in a region.
-- `Client.GetEncryptionKey` — GetEncryptionKey gets data for an encryption key
-- `Client.GetResourceGroup` — GetResourceGroup gets a resource group by its name or ID.
-- `Client.GetResourceGroups` — GetResourceGroups gets the list of resource groups.
-- `Client.GetSubnet` — GetSubnet gets a subnet by its ID.
-- `Client.GetVPC` — GetVPC gets a VPC by its ID.
-- `Client.GetVPCInstances`
-- `Client.GetVPCZonesForRegion` — GetVPCZonesForRegion gets the supported zones for a VPC region.
-- `Client.GetVSIProfiles` — GetVSIProfiles gets a list of all VSI profiles.
-- `Client.StartInstances`
-- `Client.StopInstances`
-- `DNSZoneResponse` — DNSZoneResponse represents a DNS zone response.
-- `EncryptionKeyResponse` — EncryptionKeyResponse represents an encryption key response.
-- `GetAccountID`
-- `GetCISInstanceCRN`
-- `NewIamAuthenticator` — NewIamAuthenticator returns a new IamAuthenticator for using IBM Cloud services.
-- `VPCResourceNotFoundError` — VPCResourceNotFoundError represents an error for a VPC resoruce that is not found.
-- `VPCResourceNotFoundError.Error` — Error returns the error message for the VPCResourceNotFoundError error type.
+- `API` interface -- operations for VPC, CIS DNS, IAM, resource groups, dedicated hosts, encryption keys, instance start/stop
+- `Client` struct -- concrete implementation of `API`; field `APIKey string`
+- `NewClient(apiKey string) (*Client, error)` -- create client from API key
+- `NewClientFromSecret(secret *corev1.Secret) (*Client, error)` -- create client from Kubernetes secret
+- `NewIamAuthenticator(apiKey string) (*core.IamAuthenticator, error)` -- build IAM authenticator
+- `GetCISInstanceCRN(client API, ctx, baseDomain) (string, error)` -- look up CIS instance CRN by base domain
+- `GetAccountID(client API, ctx) (string, error)` -- retrieve account ID from API key details
+- `DNSZoneResponse` struct -- Name, ID, CISInstanceCRN, CISInstanceName, ResourceGroupID
+- `EncryptionKeyResponse` struct -- placeholder for encryption key data
+- `VPCResourceNotFoundError` struct -- error type for missing VPC resources
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/IBM/go-sdk-core/v5/core`
-- `github.com/IBM/networking-go-sdk/dnsrecordsv1`
-- `github.com/IBM/networking-go-sdk/zonesv1`
-- `github.com/IBM/platform-services-go-sdk/iamidentityv1`
-- `github.com/IBM/platform-services-go-sdk/resourcecontrollerv2`
-- `github.com/IBM/platform-services-go-sdk/resourcemanagerv2`
-- `github.com/IBM/vpc-go-sdk/vpcv1`
 - `github.com/openshift/hive/pkg/constants`
+- `github.com/IBM/go-sdk-core/v5/core`
+- `github.com/IBM/networking-go-sdk/dnsrecordsv1`, `zonesv1`
+- `github.com/IBM/platform-services-go-sdk/iamidentityv1`, `resourcecontrollerv2`, `resourcemanagerv2`
+- `github.com/IBM/vpc-go-sdk/vpcv1`
 - `github.com/pkg/errors`
 - `k8s.io/api/core/v1`
-- `net/http`
-- `strings`
-- `time`
 
 ## Capabilities
 
-- **`package`** name(s): **ibmclient**.
-- Go **`import`** edges listed below (15 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/ibmclient`.
+- VPC instance listing, start, and stop by infraID and region
+- DNS zone enumeration and record lookup via CIS
+- Resource group and CIS instance queries
+- IAM API key details retrieval
+- Dedicated host and VSI profile listing
+- Subnet and VPC lookups across all regions
 
 ## Understanding Score
 
-0.0
+0.9

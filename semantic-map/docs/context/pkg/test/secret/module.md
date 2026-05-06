@@ -1,31 +1,34 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/secret/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Builder-pattern test fixture for constructing `corev1.Secret` objects in unit tests. Extends the generic builder with secret-specific options for data, type, name, and namespace.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*corev1.Secret)` -- functional option type
+- `Build(opts ...Option) *corev1.Secret` -- constructs a Secret from options
+- `type Builder interface` -- fluent builder with `Build`, `Options`, `GenericOptions` methods
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder` -- returns a builder pre-configured with TypeMeta, ResourceVersion, Namespace, and Name
+- `Generic(opt generic.Option) Option` -- adapts a generic.Option to a secret Option
+- `WithName(name string) Option` -- sets object name
+- `WithNamespace(namespace string) Option` -- sets object namespace
+- `WithDataKeyValue(key string, value []byte) Option` -- adds a key-value pair to secret data
+- `WithType(t corev1.SecretType) Option` -- sets secret type
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/pkg/test/generic`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/runtime`
+- `github.com/openshift/hive/pkg/test/generic` -- shared test builder primitives
+- `k8s.io/api/core/v1` -- Secret and SecretType types
+- `k8s.io/apimachinery/pkg/runtime` -- ObjectTyper
 
 ## Capabilities
 
-- **`package`** name(s): **secret**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/secret`.
+- Construct `corev1.Secret` test fixtures via functional options
+- Set secret data entries and secret type
+- Compose generic metadata options with secret-specific options
 
 ## Understanding Score
 
-0.0
+0.85

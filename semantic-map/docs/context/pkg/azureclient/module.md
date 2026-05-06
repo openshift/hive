@@ -1,44 +1,40 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/azureclient/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a unified Azure client interface wrapping Azure SDK services (DNS zones, DNS record sets, virtual machines, compute images, resource SKUs) with authentication via service principal credentials from Kubernetes Secrets, files, or raw bytes.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Interfaces:**
+- `Client` -- Unified interface for Azure operations: DNS zone CRUD, record set CRUD, VM lifecycle (list, deallocate, start), image listing, resource SKU listing
+- `ResourceSKUsPage` -- Paginated results for resource SKU queries
+- `RecordSetPage` -- Paginated results for DNS record set queries
+- `ImageListResultPage` -- Paginated results for image listing
 
-- `Client` — Client is a wrapper object for actual Azure libraries to allow for easier mocking/testing.
-- `ImageListResultPage`
-- `RecordSetPage` — RecordSetPage is a page of results from listing record sets.
-- `ResourceSKUsPage` — ResourceSKUsPage is a page of results from listing resource SKUs.
+**Functions:**
+- `NewClientFromSecret(secret *corev1.Secret, environmentName string) (Client, error)` -- Create client from a Kubernetes Secret
+- `NewClientFromFile(filename string, environmentName string) (Client, error)` -- Create client from a credentials file
+- `NewClient(creds []byte, environmentName string) (Client, error)` -- Create client from raw credential bytes
 
 ## Internal Dependencies
 
-- `context`
-- `encoding/json`
-- `fmt`
-- `github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute`
-- `github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute`
-- `github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns`
-- `github.com/Azure/go-autorest/autorest`
-- `github.com/Azure/go-autorest/autorest/azure`
-- `github.com/Azure/go-autorest/autorest/azure/auth`
-- `github.com/Azure/go-autorest/autorest/to`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/installer/pkg/asset/installconfig/azure`
-- `github.com/pkg/errors`
-- `k8s.io/api/core/v1`
-- `os`
+- `github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute` -- Resource SKUs client
+- `github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute` -- VM and images clients
+- `github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns` -- DNS zones and record sets clients
+- `github.com/Azure/go-autorest/autorest`, `azure`, `azure/auth` -- Azure authentication
+- `github.com/openshift/installer/pkg/asset/installconfig/azure` -- Credentials struct for JSON parsing
+- `github.com/openshift/hive/pkg/constants` -- Azure credentials name constant
 
 ## Capabilities
 
-- **`package`** name(s): **azureclient**.
-- Go **`import`** edges listed below (15 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/azureclient`.
+- Manage Azure DNS zones (create, delete, get)
+- Manage Azure DNS record sets (list, create/update, delete)
+- Manage Azure virtual machines (list all, deallocate, start)
+- List compute images by resource group
+- List resource SKUs by region
+- Authenticate using client secret credentials against configurable Azure cloud environments (Public, Government, etc.)
 
 ## Understanding Score
 
-0.0
+0.9

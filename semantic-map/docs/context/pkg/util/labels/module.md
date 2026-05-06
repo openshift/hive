@@ -1,27 +1,22 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/util/labels/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a single utility function for safely adding a label to a map, creating the map if nil.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `AddLabel` — AddLabel returns a map with the given key and value added to the given map.
+- `AddLabel(labels map[string]string, labelKey, labelValue string) map[string]string` -- returns the map with the label added; no-ops if labelKey is empty; creates the map if nil
 
 ## Internal Dependencies
 
-*None recorded via go/packages for this folder.*
+None.
 
 ## Capabilities
 
-- **`package`** name(s): **labels**.
-- Go **`import`** edges listed below (0 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/util/labels`.
+- Nil-safe label map insertion
+- No-op when key is empty
 
 ## Understanding Score
 
-0.0
+0.9

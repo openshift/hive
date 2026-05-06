@@ -1,34 +1,30 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/creds/vsphere/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements vSphere credential extraction for Hive install/uninstall jobs. Supports both the newer multi-vcenter credential format (JSON/YAML array of VCenters in the secret) and the legacy flat username/password format. Projects certificates to the filesystem and installs CA bundles. Only loads credentials when metadata is non-nil (provisioning skips this; cleanup uses it).
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `ConfigureCreds` — ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE, CREDS_SECRET_NAME, and CERTS_SECRET_NAME and configures VSphere credential enviro…
+- `func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata)` -- loads creds and certs secrets, populates metadata.VSphere.VCenters with credentials (supports both multi-vcenter YAML and flat username/password shapes), projects certs to filesystem, installs CA bundles
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/openshift/installer/pkg/types/vsphere`
-- `github.com/sirupsen/logrus`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/yaml`
-- `strings`
+- `github.com/openshift/hive/contrib/pkg/utils` -- LoadSecretOrDie, ProjectToDir, InstallCerts
+- `github.com/openshift/hive/pkg/constants` -- secret key names (VSphereVCentersSecretKey, UsernameSecretKey, PasswordSecretKey), certificate directory paths
+- `github.com/openshift/installer/pkg/types` -- ClusterMetadata type
+- `github.com/openshift/installer/pkg/types/vsphere` -- VCenters, Metadata types
+- `sigs.k8s.io/yaml` -- YAML unmarshaling for multi-vcenter format
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client
 
 ## Capabilities
 
-- **`package`** name(s): **vsphere**.
-- Go **`import`** edges listed below (8 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/creds/vsphere`.
+- Supports two credential secret shapes: multi-vcenter YAML array and flat username/password
+- For flat credentials, copies the same username/password across all VCenters in metadata
+- Fatally exits if no VCenters are available after credential loading
+- Skips credential loading when metadata is nil (install path)
+- Always loads certificates secret and installs platform-specific and proxy CA bundles
 
 ## Understanding Score
 
-0.0
+0.90

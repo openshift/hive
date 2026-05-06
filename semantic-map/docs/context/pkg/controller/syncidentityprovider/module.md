@@ -1,61 +1,40 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/syncidentityprovider/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Reconciles SyncIdentityProvider and SelectorSyncIdentityProvider resources into SyncSet objects that patch the OAuth config on remote clusters with aggregated identity provider definitions. Watches all three resource types (ClusterDeployment, SyncIdentityProvider, SelectorSyncIdentityProvider) and creates or updates a single SyncSet per ClusterDeployment containing a merge patch for the cluster OAuth object.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new IdentityProvider Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `GenerateIdentityProviderSyncSetName` — GenerateIdentityProviderSyncSetName generates the name of the SyncSet that holds the identity provider information to sync.
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileSyncIdentityProviders` — ReconcileSyncIdentityProviders reconciles the MachineSets generated from a ClusterDeployment object
-- `ReconcileSyncIdentityProviders.Reconcile` — Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes to the remote cluster MachineSets based on the state read and the worker machines define…
+- `const ControllerName` -- hivev1.SyncIdentityProviderControllerName
+- `func Add(mgr manager.Manager) error` -- creates and registers the controller
+- `func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler` -- returns a new reconciler
+- `func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error` -- registers controller with watches on ClusterDeployment, SyncIdentityProvider, SelectorSyncIdentityProvider
+- `func GenerateIdentityProviderSyncSetName(clusterDeploymentName string) string` -- generates predictable SyncSet name
+- `type ReconcileSyncIdentityProviders struct` -- reconciler; embeds client.Client
+- `func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)` -- main reconcile loop
 
 ## Internal Dependencies
 
-- `context`
-- `encoding/json`
-- `fmt`
-- `github.com/openshift/api/config/v1`
-- `github.com/openshift/hive/apis/helpers`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/util/labels`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/labels`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `reflect`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `sort`
-- `strconv`
+- `github.com/openshift/api/config/v1` -- IdentityProvider type
+- `github.com/openshift/hive/apis/helpers` -- resource name generation
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncSet, SyncIdentityProvider, SelectorSyncIdentityProvider
+- `github.com/openshift/hive/pkg/constants` -- label keys, suffixes
+- `github.com/openshift/hive/pkg/controller/metrics` -- reconcile time observer
+- `github.com/openshift/hive/pkg/controller/utils` -- controller config, client wrapper, conditions, ownership, logging
+- `github.com/openshift/hive/pkg/util/labels` -- label helpers
+- `sigs.k8s.io/controller-runtime` -- controller, reconcile, client, handler, source
 
 ## Capabilities
 
-- **`package`** name(s): **syncidentityprovider**.
-- Go **`import`** edges listed below (29 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/syncidentityprovider`.
+- Watches ClusterDeployments, SyncIdentityProviders, and SelectorSyncIdentityProviders
+- Aggregates identity providers from both namespace-scoped SyncIdentityProvider refs and cluster-wide SelectorSyncIdentityProvider label selectors
+- Creates a SyncSet with a merge patch targeting the `config.openshift.io/v1 OAuth` object named `cluster`
+- Sorts identity providers by name for deterministic patch output
+- Sets owner references on derived SyncSets for garbage collection
+- Avoids creating a SyncSet with an empty IDP list when no prior SyncSet exists
+- Respects reconcile pause annotation
 
 ## Understanding Score
 
-0.0
+0.85

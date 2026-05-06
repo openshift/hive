@@ -1,29 +1,23 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/version/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a CLI command for the `hiveutil` tool to print the Hive binary version information.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `NewVersionCommand` — NewVersionCommand creates a command that generates and outputs the cluster report.
+**Functions:**
+- `NewVersionCommand() *cobra.Command` -- Creates the `version` command that prints Hive version info via `pkg/version.String()`
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/pkg/version`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
+- `github.com/openshift/hive/pkg/version` -- Version string provider
+- `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **version**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/version`.
+- Print Hive version information to the log
 
 ## Understanding Score
 
-0.0
+0.9

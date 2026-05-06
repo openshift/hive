@@ -1,18 +1,22 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/clusterclaim/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Test-only builder utility for constructing `hivev1.ClusterClaim` objects using the functional options pattern.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*hivev1.ClusterClaim)` -- functional option type
+- `type Builder interface` -- chainable builder with `Build`, `Options`, `GenericOptions` methods
+- `Build(opts ...Option) *hivev1.ClusterClaim` -- constructs a ClusterClaim from options
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder` -- returns a builder pre-configured with TypeMeta, ResourceVersion, namespace, and name
+- `Generic(opt generic.Option) Option` -- adapts a generic option for ClusterClaim
+- `WithPool(poolName string) Option` -- sets Spec.ClusterPoolName
+- `WithCluster(clusterName string) Option` -- sets Spec.Namespace (the claimed cluster)
+- `WithSubjects(subjects []rbacv1.Subject) Option` -- sets Spec.Subjects
+- `WithCondition(cond hivev1.ClusterClaimCondition) Option` -- adds or replaces a status condition
+- `WithLifetime(lifetime time.Duration) Option` -- sets Spec.Lifetime
 
 ## Internal Dependencies
 
@@ -21,14 +25,12 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 - `k8s.io/api/rbac/v1`
 - `k8s.io/apimachinery/pkg/apis/meta/v1`
 - `k8s.io/apimachinery/pkg/runtime`
-- `time`
 
 ## Capabilities
 
-- **`package`** name(s): **clusterclaim**.
-- Go **`import`** edges listed below (6 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/clusterclaim`.
+- Builds `hivev1.ClusterClaim` test fixtures with pool reference, claimed cluster, subjects, conditions, and lifetime
+- Supports generic metadata options via `pkg/test/generic`
 
 ## Understanding Score
 
-0.0
+0.9

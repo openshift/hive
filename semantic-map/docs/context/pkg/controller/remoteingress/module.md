@@ -1,65 +1,40 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/remoteingress/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Reconciles ClusterDeployment ingress definitions into SyncSet objects that create IngressController and certificate Secret resources on remote clusters. Manages the `IngressCertificateNotFound` condition on ClusterDeployments when referenced certificate bundle secrets are missing.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new RemoteIngress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `GenerateRemoteIngressSyncSetName` — GenerateRemoteIngressSyncSetName generates the name of the SyncSet that holds the cluster ingress information to sync.
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileRemoteClusterIngress` — ReconcileRemoteClusterIngress reconciles the ingress objects defined in a ClusterDeployment object
-- `ReconcileRemoteClusterIngress.Reconcile` — Reconcile reads that state of the cluster for a ClusterDeployment object and sets up any needed ClusterIngress objects up for syncing to the remote cluster.
+- `const ControllerName` -- hivev1.RemoteIngressControllerName
+- `func Add(mgr manager.Manager) error` -- creates and registers the controller with default RBAC
+- `func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler` -- returns a new reconciler with a resource.Helper for CLI apply
+- `func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error` -- registers controller watching ClusterDeployments
+- `func GenerateRemoteIngressSyncSetName(clusterDeploymentName string) string` -- generates predictable SyncSet name
+- `type ReconcileRemoteClusterIngress struct` -- reconciler; embeds client.Client
+- `func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)` -- main reconcile loop
 
 ## Internal Dependencies
 
-- `bytes`
-- `context`
-- `crypto/md5`
-- `fmt`
-- `github.com/openshift/api/operator/v1`
-- `github.com/openshift/hive/apis/helpers`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/resource`
-- `github.com/openshift/hive/pkg/util/labels`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/apis/meta/v1/unstructured`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `reflect`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `sort`
-- `strconv`
-- `time`
+- `github.com/openshift/hive/apis/helpers` -- resource name generation
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncSet, CertificateBundle types
+- `github.com/openshift/hive/pkg/constants` -- label keys, annotation keys, suffixes
+- `github.com/openshift/hive/pkg/controller/metrics` -- reconcile time observer
+- `github.com/openshift/hive/pkg/controller/utils` -- controller config, client wrapper, conditions, ownership, logging
+- `github.com/openshift/hive/pkg/resource` -- Helper for kubectl-style apply
+- `github.com/openshift/hive/pkg/util/labels` -- label helpers
+- `github.com/openshift/api/operator/v1` -- IngressController type
+- `sigs.k8s.io/controller-runtime` -- controller, reconcile, client, handler, source
 
 ## Capabilities
 
-- **`package`** name(s): **remoteingress**.
-- Go **`import`** edges listed below (33 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/remoteingress`.
+- Watches ClusterDeployments for ingress spec changes
+- Generates SyncSet containing IngressController objects and SecretMappings for TLS certificates
+- Sets owner references on derived SyncSets for garbage collection
+- Initializes and manages the IngressCertificateNotFound cluster deployment condition
+- Respects reconcile pause annotation
+- Uses resource.Helper for idempotent apply of SyncSets
 
 ## Understanding Score
 
-0.0
+0.85

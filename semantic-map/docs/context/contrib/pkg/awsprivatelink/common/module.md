@@ -1,29 +1,25 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/awsprivatelink/common/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Holds shared package-level variables used across the `contrib/pkg/awsprivatelink` subcommand tree, providing a common place for the dynamic client and optional credentials secret initialized during `PersistentPreRun`.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `CredsSecret`
-- `DynamicClient`
+**Vars:**
+- `var CredsSecret *corev1.Secret` — optional AWS credentials secret loaded from `--creds-secret` flag
+- `var DynamicClient client.Client` — controller-runtime client initialized during command pre-run
 
 ## Internal Dependencies
 
-- `k8s.io/api/core/v1`
-- `sigs.k8s.io/controller-runtime/pkg/client`
+- `k8s.io/api/core/v1` — Secret type
+- `sigs.k8s.io/controller-runtime/pkg/client` — Client interface
 
 ## Capabilities
 
-- **`package`** name(s): **common**.
-- Go **`import`** edges listed below (2 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/awsprivatelink/common`.
+- Provides shared mutable state (client and credentials secret) for the awsprivatelink command family
+- Set by the parent command's `PersistentPreRun` and consumed by subcommands (enable, disable, endpointvpc)
 
 ## Understanding Score
 
-0.0
+0.9

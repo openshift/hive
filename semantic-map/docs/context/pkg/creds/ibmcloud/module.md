@@ -1,31 +1,25 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/creds/ibmcloud/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements IBM Cloud credential extraction for Hive install/uninstall jobs. Reads the IBM Cloud API key from a Kubernetes secret and sets the corresponding environment variable.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `ConfigureCreds` — ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE and CREDS_SECRET_NAME and configures IBMCloud credential environment variables acc…
+- `func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata)` -- loads creds secret, sets `IC_API_KEY` env var from the `ibmcloud_api_key` secret key, installs CA certs
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/installer/pkg/types`
-- `os`
-- `sigs.k8s.io/controller-runtime/pkg/client`
+- `github.com/openshift/hive/contrib/pkg/utils` -- LoadSecretOrDie, InstallCerts
+- `github.com/openshift/hive/pkg/constants` -- IBMCloudAPIKeySecretKey, IBMCloudAPIKeyEnvVar, TrustedCABundleDir
+- `github.com/openshift/installer/pkg/types` -- ClusterMetadata type
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client
 
 ## Capabilities
 
-- **`package`** name(s): **ibmcloud**.
-- Go **`import`** edges listed below (5 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/creds/ibmcloud`.
+- Extracts IBM Cloud API key from secret data and exports as environment variable
+- Installs cluster proxy trusted CA bundle
 
 ## Understanding Score
 
-0.0
+0.90

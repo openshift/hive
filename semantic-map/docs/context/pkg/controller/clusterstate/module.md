@@ -1,57 +1,37 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/clusterstate/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Maintains ClusterState resources that reflect the state of cluster operators from remote installed clusters. Periodically polls the remote cluster API to update the ClusterState status with current ClusterOperator conditions.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new ClusterState controller and adds it to the manager with default RBAC.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileClusterState` — ReconcileClusterState is the reconciler for ClusterState. It will sync on ClusterDeployment resources and ensure that a ClusterState exists and is updated when appropriate.
-- `ReconcileClusterState.Reconcile` — Reconcile ensures that a given ClusterState resource exists and reflects the state of cluster operators from its target cluster
+- `ControllerName` — constant (from `hivev1.ClusterStateControllerName`)
+- `Add(mgr manager.Manager) error` — creates and registers the controller with the manager
+- `NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler`
+- `AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error`
+- `ReconcileClusterState` — reconciler struct embedding `client.Client`
+- `ReconcileClusterState.Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)`
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/openshift/api/config/v1`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/remoteclient`
-- `github.com/openshift/hive/pkg/util/labels`
-- `github.com/sirupsen/logrus`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `reflect`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `strconv`
-- `time`
+- `github.com/openshift/api/config/v1` — ClusterOperator types from remote cluster
+- `github.com/openshift/hive/apis/hive/v1` — ClusterDeployment, ClusterState CRDs
+- `github.com/openshift/hive/pkg/constants` — pause annotation
+- `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
+- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, owner references
+- `github.com/openshift/hive/pkg/remoteclient` — remote cluster client builder
+- `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities
 
-- **`package`** name(s): **clusterstate**.
-- Go **`import`** edges listed below (26 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/clusterstate`.
+- Watches ClusterDeployment resources
+- Creates and owns ClusterState resources for installed ClusterDeployments
+- Connects to remote cluster APIs to read ClusterOperator status
+- Updates ClusterState status at a 10-minute interval
+- Manages owner references so ClusterState is garbage collected with the ClusterDeployment
+- Skips reconciliation for uninstalled clusters or those with pause annotation
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,63 +1,36 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/clusterprovision/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Manages ClusterProvision resources through the install lifecycle. Creates install jobs, monitors their progress, parses install logs for known failure patterns, and reports provision outcomes via status conditions and metrics.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new ClusterProvision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `ControllerName`
-- `ReconcileClusterProvision` — ReconcileClusterProvision reconciles a ClusterProvision object
-- `ReconcileClusterProvision.Reconcile` — Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read and what is in the ClusterProvision.Spec
+- `ControllerName` — constant (from `hivev1.ClusterProvisionControllerName`)
+- `Add(mgr manager.Manager) error` — creates and registers the controller with the manager
+- `ReconcileClusterProvision` — reconciler struct embedding `client.Client` with expectations and shared pod config
+- `ReconcileClusterProvision.Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)`
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/metricsconfig`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/install`
-- `github.com/openshift/hive/pkg/util/labels`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/pkg/errors`
-- `github.com/prometheus/client_golang/prometheus`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/batch/v1`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `regexp`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `sigs.k8s.io/controller-runtime/pkg/event`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `sigs.k8s.io/yaml`
-- `strconv`
-- `strings`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1`, `metricsconfig` — ClusterProvision CRD, metrics config
+- `github.com/openshift/hive/pkg/constants` — constants
+- `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer, dynamic label metrics
+- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers, expectations, shared pod config
+- `github.com/openshift/hive/pkg/install` — install job generation
+- `github.com/openshift/installer/pkg/types` — InstallConfig types
+- `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities
 
-- **`package`** name(s): **clusterprovision**.
-- Go **`import`** edges listed below (34 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/clusterprovision`.
+- Watches ClusterProvision, Job, and ClusterDeployment resources
+- Creates install jobs from ClusterProvision specs using shared pod config
+- Tracks job creation expectations to avoid duplicate job creation
+- Monitors install job completion and failure
+- Parses install logs using configurable regex patterns (from `install-log-regexes` and `additional-install-log-regexes` ConfigMaps)
+- Reports install failure reasons and messages based on log pattern matching
+- Emits Prometheus metrics: `hive_cluster_provision_results_total`, `hive_install_errors`, install success/failure duration histograms
 
 ## Understanding Score
 
-0.0
+0.85

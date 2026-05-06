@@ -1,35 +1,30 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`cmd/util/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Shared utility package for Hive command binaries, providing a reusable leader election wrapper used by both `cmd/manager` and `cmd/operator`.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `RunWithLeaderElection`
+- `func RunWithLeaderElection(ctx context.Context, cfg *rest.Config, lockNS, lockName string, run func(ctx context.Context))` — runs the provided function only when this instance holds the leader lease; exits the process when leadership is lost
 
 ## Internal Dependencies
 
-- `context`
-- `github.com/google/uuid`
-- `github.com/sirupsen/logrus`
-- `k8s.io/client-go/kubernetes`
-- `k8s.io/client-go/rest`
-- `k8s.io/client-go/tools/leaderelection`
-- `k8s.io/client-go/tools/leaderelection/resourcelock`
-- `os`
-- `time`
+- `github.com/google/uuid` — unique leader election identity
+- `github.com/sirupsen/logrus` — structured logging
+- `k8s.io/client-go/kubernetes` — kube client for lease management
+- `k8s.io/client-go/rest` — REST config type
+- `k8s.io/client-go/tools/leaderelection` — leader election loop
+- `k8s.io/client-go/tools/leaderelection/resourcelock` — Lease-based resource lock
 
 ## Capabilities
 
-- **`package`** name(s): **util**.
-- Go **`import`** edges listed below (9 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/cmd/util`.
+- Wraps Kubernetes leader election using Lease resource locks
+- Generates a UUID-based identity per instance
+- Configures lease duration (120s), renew deadline (90s), and retry period (30s)
+- Supports `ReleaseOnCancel` for graceful leadership handoff
+- Exits process on leadership loss
 
 ## Understanding Score
 
-0.0
+0.9

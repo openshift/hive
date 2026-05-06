@@ -1,104 +1,63 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/clusterresource/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a builder library for generating all Kubernetes resources required to create a Hive ClusterDeployment, including install-config secrets, credentials secrets, machine pools, and cloud-specific objects for AWS, Azure, GCP, IBM Cloud, OpenStack, vSphere, and Nutanix. Tests exist.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Interfaces:**
+- `CloudBuilder` -- Interface for cloud-specific resource generation: `GetCloudPlatform`, `CredsSecretName`, `GenerateCredentialsSecret`, `GenerateCloudObjects`, plus unexported `addMachinePoolPlatform`, `addInstallConfigPlatform`
 
-- `AWSCloudBuilder` — AWSCloudBuilder encapsulates cluster artifact generation logic specific to AWS.
-- `AWSCloudBuilder.CredsSecretName`
-- `AWSCloudBuilder.GenerateCloudObjects`
-- `AWSCloudBuilder.GenerateCredentialsSecret`
-- `AWSCloudBuilder.GetCloudPlatform`
-- `AWSInstanceTypeDefault`
-- `AzureCloudBuilder` — AzureCloudBuilder encapsulates cluster artifact generation logic specific to Azure.
-- `AzureCloudBuilder.CredsSecretName`
-- `AzureCloudBuilder.GenerateCloudObjects`
-- `AzureCloudBuilder.GenerateCredentialsSecret`
-- `AzureCloudBuilder.GetCloudPlatform`
-- `Builder` — Builder can be used to build all artifacts required for to create a ClusterDeployment.
-- `Builder.Build` — Build generates all resources using the fields configured.
-- `Builder.GeneratePullSecretSecret` — GeneratePullSecretSecret returns a Kubernetes Secret containing the pull secret to be used for pulling images.
-- `Builder.GetPullSecretSecretName` — TODO: handle long cluster names.
-- `Builder.Validate` — Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
-- `CloudBuilder` — CloudBuilder interface exposes the functions we will use to set cloud specific portions of the cluster's resources.
-- `GCPCloudBuilder` — GCPCloudBuilder encapsulates cluster artifact generation logic specific to GCP.
-- `GCPCloudBuilder.CredsSecretName`
-- `GCPCloudBuilder.GenerateCloudObjects`
-- `GCPCloudBuilder.GenerateCredentialsSecret`
-- `GCPCloudBuilder.GetCloudPlatform`
-- `IBMCloudBuilder` — IBMCloudBuilder encapsulates cluster artifact generation logic specific to IBM Cloud.
-- `IBMCloudBuilder.CredsSecretName`
-- `IBMCloudBuilder.GenerateCloudObjects`
-- `IBMCloudBuilder.GenerateCredentialsSecret`
-- `IBMCloudBuilder.GetCloudPlatform`
-- `InstallConfigTemplate` — InstallConfigTemplate allows for overlaying generic InstallConfig with parts known to Hive
-- `InstallConfigTemplate.MarshalJSON` — MarshalJSON will merge the known fields from InstallConfigTemplate
-- `InstallConfigTemplate.UnmarshalJSON` — UnmarshalJSON will extract the known types in InstallConfigTemplate
-- `NutanixCloudBuilder`
-- `NutanixCloudBuilder.CredsSecretName`
-- `NutanixCloudBuilder.GenerateCloudObjects`
-- `NutanixCloudBuilder.GenerateCredentialsSecret`
-- `NutanixCloudBuilder.GetCloudPlatform`
-- `OpenStackCloudBuilder` — OpenStackCloudBuilder encapsulates cluster artifact generation logic specific to OpenStack.
-- `OpenStackCloudBuilder.CredsSecretName`
-- `OpenStackCloudBuilder.GenerateCloudObjects`
-- `OpenStackCloudBuilder.GenerateCredentialsSecret`
-- `OpenStackCloudBuilder.GetCloudPlatform`
-- `VSphereCloudBuilder` — VSphereCloudBuilder encapsulates cluster artifact generation logic specific to vSphere.
-- `VSphereCloudBuilder.CredsSecretName`
-- `VSphereCloudBuilder.GenerateCloudObjects`
-- `VSphereCloudBuilder.GenerateCredentialsSecret`
-- `VSphereCloudBuilder.GetCloudPlatform`
-- `VSphereCloudBuilder.Infrastructure` — Returns the VSphere Platform (install-config style) of the builder. If `clean` is true, we will scrub the credentials out of it. Do this e.g. if injecting into a non-Secret CR, bu…
+**Types:**
+- `Builder` -- Central builder struct with fields for cluster name, namespace, cloud builder, pull secret, SSH keys, credentials mode, adoption settings, installer manifests, image sets, etc.
+- `AWSCloudBuilder` -- AWS-specific builder (access key, secret key, region, instance types, user tags, PrivateLink)
+- `AzureCloudBuilder` -- Azure-specific builder (service principal, region, cloud name, resource groups)
+- `GCPCloudBuilder` -- GCP-specific builder (service account, project ID, region, Private Service Connect, SSD hibernate behavior)
+- `IBMCloudBuilder` -- IBM Cloud-specific builder (API key, region, instance type)
+- `NutanixCloudBuilder` -- Nutanix-specific builder (Prism Central, failure domains, VIPs, CA cert)
+- `OpenStackCloudBuilder` -- OpenStack-specific builder (cloud name, clouds.yaml, network, flavors, floating IPs)
+- `VSphereCloudBuilder` -- vSphere-specific builder (credentials data, CA cert, infrastructure platform spec)
+- `InstallConfigTemplate` -- Overlay struct for merging user-supplied install-config templates with Hive-known fields
+
+**Key Functions:**
+- `(o *Builder) Build() ([]runtime.Object, error)` -- Generates all ClusterDeployment, MachinePool, install-config Secret, credentials Secret, and cloud objects
+- `(o *Builder) Validate() error` -- Validates builder configuration
+- `(o *Builder) GeneratePullSecretSecret() *corev1.Secret` -- Generates pull secret Secret
+- `(o *Builder) GetPullSecretSecretName() string` -- Returns pull secret name
+- `NewAWSCloudBuilderFromSecret(secret) *AWSCloudBuilder` -- Create AWS builder from Secret
+- `NewAWSCloudBuilderFromAssumeRole(role) *AWSCloudBuilder` -- Create AWS builder from AssumeRole
+- `NewAzureCloudBuilderFromSecret(secret) *AzureCloudBuilder` -- Create Azure builder from Secret
+- `NewGCPCloudBuilderFromSecret(secret) (*GCPCloudBuilder, error)` -- Create GCP builder from Secret
+- `NewOpenStackCloudBuilderFromSecret(secret) *OpenStackCloudBuilder` -- Create OpenStack builder from Secret
+- `NewVSphereCloudBuilder(creds, certs, infra) *VSphereCloudBuilder` -- Create vSphere builder
+- `(b *VSphereCloudBuilder) Infrastructure(clean bool) *installervsphere.Platform` -- Returns platform spec, optionally scrubbed of credentials
+
+**Constants:**
+- `AWSInstanceTypeDefault` = `"m6a.xlarge"`
 
 ## Internal Dependencies
 
-- `encoding/json`
-- `fmt`
-- `github.com/openshift/api/config/v1`
-- `github.com/openshift/api/machine/v1`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/aws`
-- `github.com/openshift/hive/apis/hive/v1/azure`
-- `github.com/openshift/hive/apis/hive/v1/gcp`
-- `github.com/openshift/hive/apis/hive/v1/ibmcloud`
-- `github.com/openshift/hive/apis/hive/v1/nutanix`
-- `github.com/openshift/hive/apis/hive/v1/openstack`
-- `github.com/openshift/hive/apis/hive/v1/vsphere`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/utils/nutanixutils`
-- `github.com/openshift/hive/pkg/gcpclient`
-- `github.com/openshift/hive/pkg/util/yaml`
-- `github.com/openshift/installer/pkg/ipnet`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/openshift/installer/pkg/types/aws`
-- `github.com/openshift/installer/pkg/types/azure`
-- `github.com/openshift/installer/pkg/types/gcp`
-- `github.com/openshift/installer/pkg/types/ibmcloud`
-- `github.com/openshift/installer/pkg/types/nutanix`
-- `github.com/openshift/installer/pkg/types/openstack`
-- `github.com/openshift/installer/pkg/types/vsphere`
-- `github.com/openshift/installer/pkg/validate`
-- `github.com/pkg/errors`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/utils/ptr`
-- `sigs.k8s.io/yaml`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` -- Hive CRD types (ClusterDeployment, MachinePool, Platform, etc.)
+- `github.com/openshift/hive/apis/hive/v1/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Per-cloud platform types
+- `github.com/openshift/hive/pkg/constants` -- Secret keys, file names
+- `github.com/openshift/hive/pkg/controller/utils/nutanixutils` -- Nutanix failure domain conversion
+- `github.com/openshift/hive/pkg/gcpclient` -- GCP project ID extraction
+- `github.com/openshift/hive/pkg/util/yaml` -- JSON patch application
+- `github.com/openshift/installer/pkg/types` -- InstallConfig, CredentialsMode
+- `github.com/openshift/installer/pkg/types/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Installer platform types
+- `github.com/openshift/api/config/v1` -- FeatureSet type
+- `github.com/openshift/api/machine/v1` -- Nutanix boot type
 
 ## Capabilities
 
-- **`package`** name(s): **clusterresource**.
-- Go **`import`** edges listed below (33 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/clusterresource`.
+- Generate complete set of Kubernetes resources for ClusterDeployment creation (CD, MachinePool, install-config Secret, credentials Secret, SSH key Secret, pull secret Secret, serving cert Secret, manifests Secret, bound SA signing key Secret)
+- Support 7 cloud providers with provider-specific install-config platform injection and credential handling
+- Support cluster adoption with admin kubeconfig, metadata.json, and admin password secrets
+- Merge user-provided install-config templates with Hive-managed fields
+- Validate builder configuration before resource generation
+- Apply JSON patches to remove unsupported fields from install-config (e.g., metadataService for AWS, osImage for Azure)
 
 ## Understanding Score
 
-0.0
+0.9

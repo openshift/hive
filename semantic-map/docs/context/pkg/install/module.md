@@ -1,58 +1,39 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/install/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Generates Kubernetes Jobs and PodSpecs for provisioning (installing) and deprovisioning (uninstalling) OpenShift clusters across all supported cloud platforms (AWS, Azure, GCP, OpenStack, VSphere, IBMCloud, Nutanix, BareMetal). Also handles AWS AssumeRole credential configuration.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `AWSAssumeRoleConfig` — AWSAssumeRoleConfig creates or updates a secret with an AWS credentials file containing: - Role configuration for AssumeRole, pointing to... - A profile containing the source cred…
-- `AWSAssumeRoleSecretName`
-- `CopyAWSServiceProviderSecret` — CopyAWSServiceProviderSecret copies the AWS service provider secret to the dest namespace when HiveAWSServiceProviderCredentialsSecretRefEnvVar is set in envVars. The secret name …
-- `GenerateInstallerJob` — GenerateInstallerJob creates a job to install an OpenShift cluster given a ClusterDeployment and an installer image.
-- `GenerateUninstallerJobForDeprovision` — GenerateUninstallerJobForDeprovision generates an uninstaller job for a given deprovision request
-- `GetInstallJobName` — GetInstallJobName returns the expected name of the install job for a cluster provision.
-- `GetUninstallJobName` — GetUninstallJobName returns the expected name of the deprovision job for a cluster deployment.
-- `InstallerPodSpec` — InstallerPodSpec generates a spec for an installer pod.
+- `GenerateInstallerJob(provision *hivev1.ClusterProvision, sharedPodConfig) (*batchv1.Job, error)` -- creates install job from a ClusterProvision
+- `InstallerPodSpec(cd, provisionName, releaseImage, serviceAccountName, httpProxy, httpsProxy, noProxy, extraEnvVars) (*corev1.PodSpec, error)` -- builds pod spec with init containers (hive, cli, installer) and platform-specific credential mounts
+- `GenerateUninstallerJobForDeprovision(req, serviceAccountName, httpProxy, httpsProxy, noProxy, extraEnvVars, sharedPodConfig, rLog) (*batchv1.Job, error)` -- creates deprovision job dispatching to platform-specific completers
+- `GetInstallJobName(provision *hivev1.ClusterProvision) string` -- deterministic install job name
+- `GetUninstallJobName(name string) string` -- deterministic uninstall job name
+- `CopyAWSServiceProviderSecret(client, destNamespace, envVars, owner, scheme) error` -- copies AWS service provider secret to target namespace
+- `AWSAssumeRoleConfig(client, role, secretName, secretNamespace, owner, scheme) error` -- creates/updates AWS AssumeRole credentials config secret
+- `AWSAssumeRoleSecretName(secretPrefix string) string` -- deterministic secret name for AssumeRole config
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
+- `github.com/openshift/hive/apis/hive/v1`, `github.com/openshift/hive/apis/hive/v1/aws`
 - `github.com/openshift/hive/apis/helpers`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/aws`
 - `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/images`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/batch/v1`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/api/resource`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/utils/ptr`
-- `os`
-- `reflect`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller/controllerutil`
-- `strconv`
-- `strings`
-- `time`
+- `github.com/openshift/hive/pkg/controller/images`, `github.com/openshift/hive/pkg/controller/utils`
+- `sigs.k8s.io/controller-runtime/pkg/client`, `controllerutil`
+- `k8s.io/api/batch/v1`, `k8s.io/api/core/v1`
+- `k8s.io/apimachinery/pkg/api/resource`, `k8s.io/utils/ptr`
 
 ## Capabilities
 
-- **`package`** name(s): **install**.
-- Go **`import`** edges listed below (25 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/install`.
+- Multi-platform install job generation with platform-specific credential mounts, env vars, and volumes
+- Multi-platform deprovision job generation with legacy and metadata-json-based flows
+- AWS AssumeRole credential file assembly and secret management
+- Proxy, trusted CA bundle, and image pull secret injection into pod specs
+- Support for additional manifests via ConfigMap or Secret, SSH keys, bound SA signing keys
+- Fake cluster install mode for testing
 
 ## Understanding Score
 
-0.0
+0.9

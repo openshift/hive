@@ -1,33 +1,29 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/images/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides utility functions for determining the Hive container image and pull policy used across controllers, sourced from environment variables with hardcoded defaults.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `DefaultHiveImage`
-- `GetHiveImage` — GetHiveImage returns the hive image to use in controllers. Either the one specified in the environment variable or the hardcoded default.
-- `GetHiveImagePullPolicy` — GetHiveImagePullPolicy returns the policy to use when pulling the hive image. Either the one specified in the environment variable or the hardcoded default.
-- `HiveClusterProvisionImagePullPolicyEnvVar`
-- `HiveImageEnvVar`
-- `HiveImagePullPolicyEnvVar`
+- `HiveImageEnvVar` -- constant `"HIVE_IMAGE"`
+- `DefaultHiveImage` -- constant `"registry.ci.openshift.org/openshift/hive-v4.0:hive"`
+- `HiveImagePullPolicyEnvVar` -- constant `"HIVE_IMAGE_PULL_POLICY"`
+- `HiveClusterProvisionImagePullPolicyEnvVar` -- constant `"HIVE_CLUSTER_PROVISION_IMAGE_PULL_POLICY"`
+- `GetHiveImage() string` -- returns hive image from env var or default
+- `GetHiveImagePullPolicy() corev1.PullPolicy` -- returns pull policy from env var or `PullAlways`
 
 ## Internal Dependencies
 
-- `k8s.io/api/core/v1`
-- `os`
+- `k8s.io/api/core/v1` -- PullPolicy type
+- `os` -- environment variable lookup
 
 ## Capabilities
 
-- **`package`** name(s): **images**.
-- Go **`import`** edges listed below (2 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/images`.
+- Reads `HIVE_IMAGE` environment variable to determine the container image for Hive controllers
+- Reads `HIVE_IMAGE_PULL_POLICY` for general pull policy and `HIVE_CLUSTER_PROVISION_IMAGE_PULL_POLICY` for cluster provision-specific pull policy
+- Falls back to hardcoded defaults when environment variables are not set
 
 ## Understanding Score
 
-0.0
+0.9

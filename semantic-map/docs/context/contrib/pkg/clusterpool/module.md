@@ -1,52 +1,43 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/clusterpool/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements the `hiveutil clusterpool` subcommand tree for creating ClusterPool resources and claiming clusters from existing pools, supporting AWS, Azure, and GCP cloud providers.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `type ClusterPoolOptions struct` — options for the `create-pool` subcommand (name, namespace, cloud, region, size, image set, pull secret, hibernate settings, output format)
+- `type ClusterClaimOptions struct` — options for the `claim` subcommand (name, namespace, lifetime, cluster pool name)
 
-- `ClusterClaimOptions`
-- `ClusterPoolOptions`
-- `NewClaimClusterPoolCommand`
-- `NewClusterPoolCommand` — NewClusterPoolCommand is the entrypoint to create the 'clusterpool' subcommand
-- `NewCreateClusterPoolCommand`
+**Functions:**
+- `func NewClusterPoolCommand() *cobra.Command` — parent `clusterpool` command; registers `create-pool` and `claim` subcommands
+- `func NewCreateClusterPoolCommand() *cobra.Command` — `create-pool CLUSTER_POOL_NAME`; generates and applies ClusterPool, credentials secret, pull secret, and ClusterImageSet resources. Flags: `--cloud`, `--namespace`, `--base-domain`, `--pull-secret`, `--pull-secret-file`, `--creds-file`, `--cloud-secret`, `--image-set`, `--release-image`, `--release-image-source`, `--region`, `--size`, `--azure-base-domain-resource-group-name`, `--hibernate-after`, `--output`
+- `func NewClaimClusterPoolCommand() *cobra.Command` — `claim CLUSTER_POOL_NAME CLAIM_NAME`; creates a ClusterClaim against an existing pool. Flags: `--namespace`, `--lifetime`
 
 ## Internal Dependencies
 
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/clusterresource`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/creds/aws`
-- `github.com/openshift/hive/pkg/creds/azure`
-- `github.com/openshift/hive/pkg/creds/gcp`
-- `github.com/openshift/hive/pkg/util/scheme`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/meta`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/cli-runtime/pkg/printers`
-- `k8s.io/client-go/util/homedir`
-- `os`
-- `path/filepath`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` — ClusterPool, ClusterClaim, ClusterImageSet types
+- `github.com/openshift/hive/contrib/pkg/utils` — `GetResourceHelper`, `DefaultNamespace`, `GetPullSecret`, `DetermineReleaseImageFromSource`
+- `github.com/openshift/hive/pkg/clusterresource` — Builder, AWSCloudBuilder, AzureCloudBuilder, GCPCloudBuilder for resource generation
+- `github.com/openshift/hive/pkg/constants` — platform name constants
+- `github.com/openshift/hive/pkg/creds/aws` — `GetAWSCreds`
+- `github.com/openshift/hive/pkg/creds/azure` — `GetCreds`
+- `github.com/openshift/hive/pkg/creds/gcp` — `GetCreds`
+- `github.com/openshift/hive/pkg/util/scheme` — aggregated CRD scheme
+- `github.com/spf13/cobra` — CLI framework
+- `github.com/sirupsen/logrus` — structured logging
+- `k8s.io/cli-runtime/pkg/printers` — YAML/JSON output printers
 
 ## Capabilities
 
-- **`package`** name(s): **clusterpool**.
-- Go **`import`** edges listed below (22 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/clusterpool`.
+- Creates ClusterPool resources with associated credentials secrets, pull secret secrets, and ClusterImageSets
+- Supports AWS, Azure, and GCP cloud providers with per-cloud credential extraction and builder configuration
+- Can determine release image from a URL source if not explicitly provided
+- Supports dry-run output in YAML or JSON format (`--output` flag)
+- Creates ClusterClaim resources to claim clusters from an existing pool, with optional lifetime
+- Defaults cloud region per provider (us-east-1 for AWS, centralus for Azure, us-east1 for GCP)
 
 ## Understanding Score
 
-0.0
+0.9

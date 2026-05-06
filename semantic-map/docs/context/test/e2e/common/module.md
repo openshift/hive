@@ -1,76 +1,63 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`test/e2e/common/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Shared e2e test helper package providing client construction, resource waiting utilities, cluster deployment retrieval, and JSON diff computation. Used across Hive end-to-end tests to interact with live clusters.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Client construction (client.go):**
+- `MustGetClient() client.WithWatch` -- returns a controller-runtime client using the hive scheme
+- `MustGetClientFromConfig(cfg *rest.Config) client.WithWatch` -- same, from explicit config
+- `MustGetKubernetesClient() kclient.Interface` -- returns a typed Kubernetes clientset
+- `MustGetAPIRegistrationClient() apiregv1client.ApiregistrationV1Interface` -- returns an API registration client
+- `MustGetDynamicClient() dynamic.Interface` -- returns a dynamic client
+- `MustGetConfig() *rest.Config` -- returns kubeconfig from environment
 
-- `DynamicWaitForDeletion` — DynamicWaitForDeletion uses the dynamic client to wait for a resource to not exist.
-- `GetHiveNamespaceOrDie`
-- `GetHiveOperatorNamespaceOrDie`
-- `GetMachinePool`
-- `JSONDiff`
-- `MustGetAPIRegistrationClient`
-- `MustGetClient`
-- `MustGetClientFromConfig`
-- `MustGetClusterDeployment`
-- `MustGetClusterDeploymentClientConfig`
-- `MustGetConfig`
-- `MustGetDynamicClient`
-- `MustGetInstalledClusterDeployment`
-- `MustGetKubernetesClient`
-- `WaitForAPIService`
-- `WaitForAPIServiceAvailable`
-- `WaitForDeployment`
-- `WaitForDeploymentReady`
-- `WaitForMachineSets`
-- `WaitForMachines`
-- `WaitForNodes`
-- `WaitForService`
+**Cluster deployment helpers (clusterdeployment.go):**
+- `MustGetClusterDeployment() *hivev1.ClusterDeployment` -- fetches CD by CLUSTER_NAME/CLUSTER_NAMESPACE env vars
+- `MustGetInstalledClusterDeployment() *hivev1.ClusterDeployment` -- same, but asserts installed state
+- `MustGetClusterDeploymentClientConfig() *rest.Config` -- returns REST config for the remote cluster of an installed CD
+
+**Wait helpers:**
+- `WaitForDeployment(c kclient.Interface, namespace, name string, testFunc func(*appsv1.Deployment) bool, timeOut time.Duration) error`
+- `WaitForDeploymentReady(c kclient.Interface, namespace, name string, timeOut time.Duration) error`
+- `WaitForService(c kclient.Interface, namespace, name string, testFunc func(*corev1.Service) bool, timeOut time.Duration) error`
+- `WaitForAPIService(c apiregv1client.ApiregistrationV1Interface, name string, testFunc func(*apiregv1.APIService) bool, timeOut time.Duration) error`
+- `WaitForAPIServiceAvailable(c apiregv1client.ApiregistrationV1Interface, name string, timeOut time.Duration) error`
+- `WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet) bool, timeOut time.Duration) error`
+- `WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool, timeOut time.Duration) error`
+- `WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut time.Duration) error`
+
+**Other helpers:**
+- `GetMachinePool(c client.Client, cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool` -- fetches a MachinePool by CD name + pool name
+- `DynamicWaitForDeletion(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace, name string, logger log.FieldLogger) error` -- polls until resource is deleted
+- `GetHiveNamespaceOrDie() string` -- reads HIVE_NAMESPACE env var
+- `GetHiveOperatorNamespaceOrDie() string` -- reads HIVE_OPERATOR_NAMESPACE env var
+- `JSONDiff(a, b any) ([]byte, error)` -- computes a JSON merge patch between two objects
 
 ## Internal Dependencies
 
-- `context`
-- `encoding/json`
-- `fmt`
-- `github.com/evanphx/json-patch`
-- `github.com/openshift/api/machine/v1beta1`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/operator/hive`
-- `github.com/openshift/hive/pkg/remoteclient`
-- `github.com/openshift/hive/pkg/util/scheme`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/apps/v1`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/fields`
-- `k8s.io/apimachinery/pkg/runtime/schema`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/client-go/dynamic`
-- `k8s.io/client-go/kubernetes`
-- `k8s.io/client-go/rest`
-- `k8s.io/client-go/tools/cache`
-- `k8s.io/kube-aggregator/pkg/apis/apiregistration/v1`
-- `k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1`
-- `os`
-- `sigs.k8s.io/controller-runtime/pkg/cache`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/client/config`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, MachinePool types
+- `github.com/openshift/hive/pkg/constants` -- HiveNamespaceEnvVar
+- `github.com/openshift/hive/pkg/operator/hive` -- HiveOperatorNamespaceEnvVar
+- `github.com/openshift/hive/pkg/remoteclient` -- remote cluster client builder
+- `github.com/openshift/hive/pkg/util/scheme` -- shared scheme for client construction
+- `github.com/openshift/api/machine/v1beta1` -- Machine, MachineSet types
+- `github.com/evanphx/json-patch` -- JSON merge patch
+- `k8s.io/client-go/dynamic`, `kubernetes`, `rest` -- Kubernetes clients
+- `k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1` -- API registration client
+- `sigs.k8s.io/controller-runtime/pkg/client`, `cache`, `config` -- controller-runtime client/cache
 
 ## Capabilities
 
-- **`package`** name(s): **common**.
-- Go **`import`** edges listed below (29 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/test/e2e/common`.
+- Construct various Kubernetes client types from kubeconfig
+- Wait for Deployments, Services, APIServices, MachineSets, Machines, and Nodes to reach desired state (informer-based watches with timeout)
+- Retrieve ClusterDeployment and MachinePool resources for e2e assertions
+- Obtain remote cluster REST config from an installed ClusterDeployment
+- Compute JSON diffs between arbitrary objects
+- Poll for dynamic resource deletion
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,51 +1,46 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/certificate/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements the `hiveutil certificate` subcommand tree for creating Let's Encrypt TLS certificates for OpenShift clusters on AWS, using Route53 DNS-01 challenge validation via certbot hooks.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `type Options struct` — options for certificate creation (Name, BaseDomain, Email, Region, OutputDir, WaitTime)
+- `type HookOptions struct` — options for DNS auth/cleanup hooks (HostedZoneID, Domain, Value, Region, WaitTime)
 
-- `HookOptions` — HookOptions is the set of options to create/delete DNS authentication entries
-- `HookOptions.Complete` — Complete finalizes options by using arguments and environment variables
-- `HookOptions.Create` — Create creates an authentication DNS record in the specified zone
-- `HookOptions.Delete` — Delete removes the authentication DNS record from the specified zone
-- `NewAuthHookCommand` — NewAuthHookCommand returns a command that will create a DNS authentication entry in the given DNS hosted zone
-- `NewCertificateCommand` — NewCertificateCommand returns a utility command to help create a certificate for OpenShift clusters on AWS
-- `NewCleanupHookCommand` — NewCleanupHookCommand returns a command that will cleanup a DNS authentication entry in the given DNS hosted zone
-- `NewCreateCertifcateCommand` — NewCreateCertifcateCommand returns a command that will create a letsencrypt serving cert for OpenShift clusters on AWS.
-- `Options` — Options is the set of options to create a new server certificate
-- `Options.Complete` — Complete finalizes command options
-- `Options.Run` — Run executes the command
+**Functions:**
+- `func NewCertificateCommand() *cobra.Command` — parent `certificate` command; registers `create`, `auth-hook`, `cleanup-hook` subcommands
+- `func NewCreateCertifcateCommand() *cobra.Command` — `create CLUSTER_NAME`; invokes certbot with DNS-01 challenge using auth/cleanup hooks. Flags: `--base-domain`, `--email`, `--region`, `--output-dir`, `--wait-time`
+- `func NewAuthHookCommand() *cobra.Command` — `auth-hook REGION HOSTEDZONEID`; creates `_acme-challenge` TXT record in Route53
+- `func NewCleanupHookCommand() *cobra.Command` — `cleanup-hook REGION HOSTEDZONEID`; deletes the TXT record
+
+**Methods on Options:**
+- `func (o *Options) Complete(cmd *cobra.Command, args []string) error`
+- `func (o *Options) Run() error` — runs certbot, copies resulting cert/key/CA files to output directory
+
+**Methods on HookOptions:**
+- `func (o *HookOptions) Complete(cmd *cobra.Command, args []string) error` — reads `CERTBOT_DOMAIN` and `CERTBOT_VALIDATION` env vars
+- `func (o *HookOptions) Create() error` — creates DNS TXT record, waits for propagation
+- `func (o *HookOptions) Delete() error` — deletes DNS TXT record
 
 ## Internal Dependencies
 
-- `bytes`
-- `fmt`
-- `github.com/aws/aws-sdk-go-v2/aws`
-- `github.com/aws/aws-sdk-go-v2/service/route53`
-- `github.com/aws/aws-sdk-go-v2/service/route53/types`
-- `github.com/openshift/hive/pkg/awsclient`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `os`
-- `os/exec`
-- `os/user`
-- `path/filepath`
-- `strings`
-- `time`
+- `github.com/openshift/hive/pkg/awsclient` — AWS client factory for Route53 operations
+- `github.com/aws/aws-sdk-go-v2/service/route53` — Route53 API for hosted zone and record management
+- `github.com/spf13/cobra` — CLI framework
+- `github.com/sirupsen/logrus` — structured logging
+- `github.com/pkg/errors` — error wrapping
 
 ## Capabilities
 
-- **`package`** name(s): **certificate**.
-- Go **`import`** edges listed below (15 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/certificate`.
+- Creates Let's Encrypt serving certificates for `api.<name>.<domain>` and `*.apps.<name>.<domain>`
+- Looks up the public Route53 hosted zone for the base domain
+- Uses certbot with `--manual` DNS-01 challenge, delegating to self-invoked `auth-hook` and `cleanup-hook` subcommands
+- Creates/deletes `_acme-challenge` TXT records in Route53 for ACME validation
+- Outputs certificate, key, and CA chain files to the specified directory
 
 ## Understanding Score
 
-0.0
+0.9

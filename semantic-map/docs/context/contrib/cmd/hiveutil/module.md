@@ -1,41 +1,54 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/cmd/hiveutil/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Entry-point binary for `hiveutil`, a multi-subcommand CLI utility for running, testing, and administering Hive clusters. Aggregates subcommands from various `contrib/pkg` packages and core Hive packages.
 
 ## Public Interface/API
 
-*No exported identifiers parsed — build errors, `go/doc` failure, or internal-only surface in this folder.*
+`main` package — no exported identifiers. Produces the `hiveutil` binary.
+
+- `main()` — builds the root cobra command and executes it
+- `newHiveutilCommand()` — unexported; creates the root command and registers all subcommands
+
+Registered subcommands:
+- `deprovision.NewDeprovisionAWSWithTagsCommand()` — deprovision AWS resources by tags
+- `deprovision.NewDeprovisionCommand()` — deprovision cluster resources
+- `verification.NewVerifyImportsCommand()` — verify import consistency
+- `installmanager.NewInstallManagerCommand()` — install manager CLI
+- `imageset.NewUpdateInstallerImageCommand()` — update installer image
+- `testresource.NewTestResourceCommand()` — create test resources
+- `createcluster.NewCreateClusterCommand()` — create a cluster
+- `report.NewClusterReportCommand()` — cluster reporting
+- `certificate.NewCertificateCommand()` — certificate management
+- `adm.NewAdmCommand()` — admin utilities
+- `version.NewVersionCommand()` — print version
+- `clusterpool.NewClusterPoolCommand()` — cluster pool management
+- `awsprivatelink.NewAWSPrivateLinkCommand()` — AWS PrivateLink management
 
 ## Internal Dependencies
 
-- `fmt`
-- `github.com/openshift/hive/contrib/pkg/adm`
-- `github.com/openshift/hive/contrib/pkg/awsprivatelink`
-- `github.com/openshift/hive/contrib/pkg/certificate`
-- `github.com/openshift/hive/contrib/pkg/clusterpool`
-- `github.com/openshift/hive/contrib/pkg/createcluster`
-- `github.com/openshift/hive/contrib/pkg/deprovision`
-- `github.com/openshift/hive/contrib/pkg/report`
-- `github.com/openshift/hive/contrib/pkg/testresource`
-- `github.com/openshift/hive/contrib/pkg/verification`
-- `github.com/openshift/hive/contrib/pkg/version`
-- `github.com/openshift/hive/pkg/imageset`
-- `github.com/openshift/hive/pkg/installmanager`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `os`
+- `github.com/openshift/hive/contrib/pkg/adm` — admin subcommand
+- `github.com/openshift/hive/contrib/pkg/awsprivatelink` — AWS PrivateLink subcommand
+- `github.com/openshift/hive/contrib/pkg/certificate` — certificate subcommand
+- `github.com/openshift/hive/contrib/pkg/clusterpool` — cluster pool subcommand
+- `github.com/openshift/hive/contrib/pkg/createcluster` — create cluster subcommand
+- `github.com/openshift/hive/contrib/pkg/deprovision` — deprovision subcommands
+- `github.com/openshift/hive/contrib/pkg/report` — cluster report subcommand
+- `github.com/openshift/hive/contrib/pkg/testresource` — test resource subcommand
+- `github.com/openshift/hive/contrib/pkg/verification` — import verification subcommand
+- `github.com/openshift/hive/contrib/pkg/version` — version subcommand
+- `github.com/openshift/hive/pkg/imageset` — installer image update command
+- `github.com/openshift/hive/pkg/installmanager` — install manager command
+- `github.com/spf13/cobra` — CLI framework
+- `github.com/sirupsen/logrus` — structured logging
 
 ## Capabilities
 
-- **`package`** name(s): **main**.
-- Go **`import`** edges listed below (16 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/cmd/hiveutil`.
-- Contains at least one **`main`** package (executable / operator binary layout).
+- Provides a unified CLI for Hive administration and testing tasks
+- Aggregates 13 subcommands spanning cluster lifecycle (create, deprovision), resource management (certificates, cluster pools, AWS PrivateLink), reporting, and install management
+- Acts as the primary developer/operator utility tool for Hive
 
 ## Understanding Score
 
-0.0
+0.9

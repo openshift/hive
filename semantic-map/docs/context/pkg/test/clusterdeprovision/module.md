@@ -1,18 +1,21 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/clusterdeprovision/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Test-only builder utility for constructing `hivev1.ClusterDeprovision` objects using the functional options pattern.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*hivev1.ClusterDeprovision)` -- functional option type
+- `type Builder interface` -- chainable builder with `Build`, `Options`, `GenericOptions` methods
+- `Build(opts ...Option) *hivev1.ClusterDeprovision` -- constructs a ClusterDeprovision from options
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder` -- pre-configured with TypeMeta, ResourceVersion, namespace, name
+- `Generic(opt generic.Option) Option` -- adapts a generic option
+- `WithName(name string) Option`
+- `WithNamespace(namespace string) Option`
+- `Completed() Option` -- sets Status.Completed to true
+- `WithAuthenticationFailure() Option` -- adds an AuthenticationFailure condition with ConditionTrue
 
 ## Internal Dependencies
 
@@ -24,10 +27,10 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 
 ## Capabilities
 
-- **`package`** name(s): **clusterdeprovision**.
-- Go **`import`** edges listed below (5 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/clusterdeprovision`.
+- Builds `hivev1.ClusterDeprovision` test fixtures with completion status and authentication failure conditions
+- Uses `controllerutils.SetClusterDeprovisionCondition` for condition management
+- Supports generic metadata options via `pkg/test/generic`
 
 ## Understanding Score
 
-0.0
+0.9

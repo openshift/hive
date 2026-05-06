@@ -1,50 +1,34 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/clusterpoolnamespace/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Reaps namespaces created for ClusterPool clusters after all ClusterDeployments have been removed. Also cleans up previously claimed ClusterDeployments that are no longer needed.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new ClusterDeployment Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileClusterPoolNamespace` — ReconcileClusterPoolNamespace reconciles a Namespace object for the purpose of reaping namespaces created for ClusterPool clusters after the clusters have been deleted.
-- `ReconcileClusterPoolNamespace.Reconcile` — Reconcile deletes a Namespace if it no longer contains any ClusterDeployments.
+- `ControllerName` — constant (from `hivev1.ClusterpoolNamespaceControllerName`)
+- `Add(mgr manager.Manager) error` — creates and registers the controller with the manager
+- `NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler`
+- `AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error`
+- `ReconcileClusterPoolNamespace` — reconciler struct embedding `client.Client`
+- `ReconcileClusterPoolNamespace.Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)`
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` — ClusterDeployment CRD
+- `github.com/openshift/hive/pkg/constants` — ClusterPoolNameLabel
+- `github.com/openshift/hive/pkg/controller/metrics` — reconcile observer
+- `github.com/openshift/hive/pkg/controller/utils` — controller config, client wrappers
+- `sigs.k8s.io/controller-runtime` — controller, reconcile, manager, client
 
 ## Capabilities
 
-- **`package`** name(s): **clusterpoolnamespace**.
-- Go **`import`** edges listed below (19 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/clusterpoolnamespace`.
+- Watches Namespace and ClusterDeployment resources
+- Deletes namespaces labeled with `hive.openshift.io/clusterpool-name` once they contain no ClusterDeployments
+- Enforces a minimum namespace lifetime (5 minutes) before deletion
+- Cleans up previously claimed ClusterDeployments within pool namespaces
+- Maps ClusterDeployment changes to reconcile requests for the containing namespace
 
 ## Understanding Score
 
-0.0
+0.85

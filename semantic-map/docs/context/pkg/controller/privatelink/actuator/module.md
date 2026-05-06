@@ -1,19 +1,19 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/privatelink/actuator/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Defines the `Actuator` interface and supporting types for cloud-specific private link operations, used by the privatelink controller to abstract over AWS PrivateLink and GCP Private Service Connect.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Actuator`
-- `ActuatorType`
-- `AliasTarget`
-- `DnsRecord`
+- `Actuator` -- interface:
+  - `Cleanup(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger) error`
+  - `CleanupRequired(cd *hivev1.ClusterDeployment) bool`
+  - `Reconcile(cd, metadata, *DnsRecord, logger) (reconcile.Result, error)`
+  - `ShouldSync(cd *hivev1.ClusterDeployment) bool`
+- `ActuatorType` -- string type with constants `ActuatorTypeHub` and `ActuatorTypeLink`
+- `DnsRecord` -- struct with `IpAddress []string` and `AliasTarget`
+- `AliasTarget` -- struct with `Name string` and `HostedZoneID string`
 
 ## Internal Dependencies
 
@@ -23,10 +23,10 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 
 ## Capabilities
 
-- **`package`** name(s): **actuator**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/privatelink/actuator`.
+- Provides the contract for private link actuator implementations (AWS, GCP)
+- Defines DNS record types used to configure private link API endpoint DNS records
+- Distinguishes between Hub (management cluster side) and Link (spoke cluster side) actuator types
 
 ## Understanding Score
 
-0.0
+0.9

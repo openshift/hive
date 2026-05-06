@@ -1,18 +1,19 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/job/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Test-only builder utility for constructing `batchv1.Job` objects using the functional options pattern.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*batchv1.Job)` -- functional option type
+- `type Builder interface` -- chainable builder with `Build`, `Options`, `GenericOptions` methods
+- `Build(opts ...Option) *batchv1.Job` -- constructs a Job from options
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder` -- pre-configured with TypeMeta, ResourceVersion, namespace, name
+- `Generic(opt generic.Option) Option` -- adapts a generic option
+- `WithName(name string) Option`
+- `WithNamespace(namespace string) Option`
 
 ## Internal Dependencies
 
@@ -22,10 +23,9 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 
 ## Capabilities
 
-- **`package`** name(s): **job**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/job`.
+- Builds `batchv1.Job` test fixtures with name and namespace
+- Supports generic metadata options via `pkg/test/generic`
 
 ## Understanding Score
 
-0.0
+0.9

@@ -1,17 +1,13 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/operator/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Registry for Hive operator controllers. Collects controller add-functions and registers them with a controller-runtime manager. The init function registers the hive and metrics controllers.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `AddToOperator` — AddToOperator adds all Controllers to the Operator manager
-- `AddToOperatorFuncs` — AddToOperatorFuncs is a list of functions to add all Controllers to the Manager
+- `AddToOperatorFuncs` var `[]func(manager.Manager) error` -- list of controller registration functions
+- `AddToOperator(m manager.Manager) error` -- iterates AddToOperatorFuncs and adds all controllers to the manager
 
 ## Internal Dependencies
 
@@ -21,10 +17,9 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 
 ## Capabilities
 
-- **`package`** name(s): **operator**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/operator`.
+- Aggregates operator controller registration functions into a single list
+- Registers hive reconciler and metrics controllers via init()
 
 ## Understanding Score
 
-0.0
+0.9

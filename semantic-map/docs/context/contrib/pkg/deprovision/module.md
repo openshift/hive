@@ -1,71 +1,44 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/deprovision/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides CLI commands for the `hiveutil` tool to deprovision (destroy) cloud resources for OpenShift clusters across multiple cloud providers. Includes both a generic metadata.json-based destroyer and legacy per-platform subcommands.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `AzureOptions` -- Options for Azure cluster deprovisioning (cloud name, resource group, base domain resource group)
 
-- `AzureOptions` — AzureOptions is the set of options to deprovision an Azure cluster
-- `NewDeprovisionAWSWithTagsCommand` — NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
-- `NewDeprovisionAzureCommand` — NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
-- `NewDeprovisionCommand` — NewDeprovisionCommand is the entrypoint to create the 'deprovision' subcommand
-- `NewDeprovisionGCPCommand` — NewDeprovisionGCPCommand is the entrypoint to create the GCP deprovision subcommand
-- `NewDeprovisionIBMCloudCommand` — NewDeprovisionIBMCloudCommand is the entrypoint to create the IBM Cloud deprovision subcommand
-- `NewDeprovisionNutanixCommand`
-- `NewDeprovisionOpenStackCommand` — NewDeprovisionOpenStackCommand is the entrypoint to create the OpenStack deprovision subcommand
-- `NewDeprovisionvSphereCommand` — NewDeprovisionvSphereCommand is the entrypoint to create the vSphere deprovision subcommand
+**Functions:**
+- `NewDeprovisionCommand() *cobra.Command` -- Top-level `deprovision` command; supports generic deprovisioning via `--metadata-json-secret-name` and adds per-platform subcommands
+- `NewDeprovisionAWSWithTagsCommand() *cobra.Command` -- `aws-tag-deprovision` subcommand; destroys AWS resources by tag key=value pairs
+- `NewDeprovisionAzureCommand(logLevel string) *cobra.Command` -- `azure` subcommand; destroys Azure resources by infra ID
+- `NewDeprovisionGCPCommand(logLevel string) *cobra.Command` -- `gcp` subcommand; destroys GCP resources by infra ID and region
+- `NewDeprovisionIBMCloudCommand(logLevel string) *cobra.Command` -- `ibmcloud` subcommand; destroys IBM Cloud resources by infra ID, region, base domain, and cluster name
+- `NewDeprovisionNutanixCommand(logLevel string) *cobra.Command` -- `nutanix` subcommand; destroys Nutanix resources by infra ID
+- `NewDeprovisionOpenStackCommand(logLevel string) *cobra.Command` -- `openstack` subcommand; destroys OpenStack resources by infra ID and cloud name
+- `NewDeprovisionvSphereCommand(logLevel string) *cobra.Command` -- `vsphere` subcommand; destroys vSphere resources by infra ID
 
 ## Internal Dependencies
 
-- `context`
-- `encoding/json`
-- `fmt`
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/creds`
-- `github.com/openshift/hive/pkg/creds/aws`
-- `github.com/openshift/hive/pkg/creds/azure`
-- `github.com/openshift/hive/pkg/creds/gcp`
-- `github.com/openshift/hive/pkg/creds/ibmcloud`
-- `github.com/openshift/hive/pkg/creds/nutanix`
-- `github.com/openshift/hive/pkg/creds/openstack`
-- `github.com/openshift/hive/pkg/creds/vsphere`
-- `github.com/openshift/hive/pkg/gcpclient`
-- `github.com/openshift/hive/pkg/ibmclient`
-- `github.com/openshift/installer/pkg/destroy/aws`
-- `github.com/openshift/installer/pkg/destroy/azure`
-- `github.com/openshift/installer/pkg/destroy/gcp`
-- `github.com/openshift/installer/pkg/destroy/ibmcloud`
-- `github.com/openshift/installer/pkg/destroy/nutanix`
-- `github.com/openshift/installer/pkg/destroy/openstack`
-- `github.com/openshift/installer/pkg/destroy/providers`
-- `github.com/openshift/installer/pkg/destroy/vsphere`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/openshift/installer/pkg/types/aws`
-- `github.com/openshift/installer/pkg/types/azure`
-- `github.com/openshift/installer/pkg/types/gcp`
-- `github.com/openshift/installer/pkg/types/ibmcloud`
-- `github.com/openshift/installer/pkg/types/nutanix`
-- `github.com/openshift/installer/pkg/types/openstack`
-- `github.com/openshift/installer/pkg/types/vsphere`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `log`
-- `os`
-- `strings`
+- `github.com/openshift/hive/contrib/pkg/utils` -- Kube client, logger, secret loading
+- `github.com/openshift/hive/pkg/constants` -- Env var names, secret keys
+- `github.com/openshift/hive/pkg/creds` -- Generic credential configuration dispatch
+- `github.com/openshift/hive/pkg/creds/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Per-cloud credential configuration
+- `github.com/openshift/hive/pkg/gcpclient` -- GCP project ID extraction
+- `github.com/openshift/hive/pkg/ibmclient` -- IBM Cloud client for CIS and account lookup
+- `github.com/openshift/installer/pkg/destroy/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- Installer destroy implementations
+- `github.com/openshift/installer/pkg/destroy/providers` -- Destroyer registry
+- `github.com/openshift/installer/pkg/types` -- Cluster metadata types
+- `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **deprovision**.
-- Go **`import`** edges listed below (37 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/deprovision`.
+- Generic cluster deprovisioning using metadata.json Secret and the installer's provider registry
+- Legacy per-platform deprovisioning subcommands for AWS (tag-based), Azure, GCP, IBM Cloud, Nutanix, OpenStack, vSphere
+- Credential loading from environment variables and Kubernetes secrets per cloud provider
+- Configurable log levels
 
 ## Understanding Score
 
-0.0
+0.9

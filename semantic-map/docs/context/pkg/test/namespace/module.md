@@ -1,31 +1,30 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/namespace/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Builder-pattern test fixture for constructing `corev1.Namespace` objects in unit tests. Provides functional options and a fluent Builder interface with support for generic object metadata options.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*corev1.Namespace)` -- functional option type
+- `Build(opts ...Option) *corev1.Namespace` -- constructs a Namespace from options
+- `type Builder interface` -- fluent builder with `Build`, `Options`, `GenericOptions` methods
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(name string, typer runtime.ObjectTyper) Builder` -- returns a builder pre-configured with TypeMeta, ResourceVersion, and Name
+- `Generic(opt generic.Option) Option` -- adapts a generic.Option to a namespace Option
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/pkg/test/generic`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/runtime`
+- `github.com/openshift/hive/pkg/test/generic` -- shared test builder primitives
+- `k8s.io/api/core/v1` -- Namespace type
+- `k8s.io/apimachinery/pkg/runtime` -- ObjectTyper
 
 ## Capabilities
 
-- **`package`** name(s): **namespace**.
-- Go **`import`** edges listed below (3 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/namespace`.
+- Construct `corev1.Namespace` test fixtures via functional options
+- Compose generic metadata options (name, type meta, resource version) with namespace-specific options
+- Fluent builder pattern for accumulating options across test setup
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,51 +1,36 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/privatelink/actuator/gcpactuator/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements the private link Actuator interface for GCP, managing Private Service Connect (PSC) resources including service attachments, forwarding rules, subnets, and endpoint connections between Hive's management cluster and spoke clusters.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `GCPLinkActuator`
-- `GCPLinkActuator.Cleanup` — Cleanup is the actuator interface for cleaning up the cloud resources.
-- `GCPLinkActuator.CleanupRequired` — CleanupRequired is the actuator interface for determining if cleanup is required.
-- `GCPLinkActuator.Reconcile` — Reconcile is the actuator interface for reconciling the cloud resources.
-- `GCPLinkActuator.ShouldSync` — ShouldSync is the actuator interface to determine if there are changes that need to be made.
+- `GCPLinkActuator` -- implements `actuator.Actuator` for GCP private service connect
+  - `Cleanup(cd, metadata, logger) error` -- cleans up PSC resources (forwarding rules, subnets, service attachments)
+  - `CleanupRequired(cd) bool`
+  - `Reconcile(cd, metadata, dnsRecord, logger) (reconcile.Result, error)` -- reconciles PSC resources
+  - `ShouldSync(cd) bool`
+- `NewGCPLinkActuator(client, config, cd, privateLinkEnabled, gcpClientFn, logger) (*GCPLinkActuator, error)`
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/gcp`
-- `github.com/openshift/hive/pkg/controller/privatelink/actuator`
-- `github.com/openshift/hive/pkg/controller/privatelink/conditions`
+- `github.com/openshift/hive/apis/hive/v1`, `apis/hive/v1/gcp` -- GCP-specific status types
+- `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface
+- `github.com/openshift/hive/pkg/controller/privatelink/conditions` -- condition helpers
 - `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/openshift/hive/pkg/gcpclient`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `google.golang.org/api/compute/v1`
-- `google.golang.org/api/googleapi`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/apimachinery/pkg/util/wait`
-- `k8s.io/client-go/util/retry`
-- `net/http`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sort`
-- `time`
+- `github.com/openshift/hive/pkg/gcpclient` -- GCP client factory
+- `google.golang.org/api/compute/v1` -- GCP Compute API
 
 ## Capabilities
 
-- **`package`** name(s): **gcpactuator**.
-- Go **`import`** edges listed below (21 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/privatelink/actuator/gcpactuator`.
+- Manages GCP Private Service Connect lifecycle: service attachments, forwarding rules, subnets
+- Creates hub and spoke GCP clients from Kubernetes secrets
+- Updates `PrivateServiceConnect` status on ClusterDeployment
+- Handles cleanup of PSC resources on deletion, with retry-on-conflict for status updates
+- Uses `defaultServiceAttachmentSubnetCidr` for subnet allocation
+- Detects 404 errors from GCP API for idempotent cleanup
 
 ## Understanding Score
 
-0.0
+0.85

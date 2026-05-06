@@ -1,56 +1,37 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/velerobackup/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Creates Velero Backup objects when Hive namespace-scoped resources (ClusterDeployments, SyncSets, DNSZones) change. Tracks per-namespace checksums in Checkpoint objects to detect changes and rate-limits backup creation to avoid excessive backups. Only enabled when the `VELERO_BACKUP` environment variable is set to "true".
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Add` — Add creates a new Backup Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller and Start it when the Manager is Started.
-- `AddToManager` — AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-- `ControllerName`
-- `NewReconciler` — NewReconciler returns a new reconcile.Reconciler
-- `ReconcileBackup` — ReconcileBackup ensures that Velero backup objects are created when changes are made to Hive objects.
-- `ReconcileBackup.Reconcile` — Reconcile ensures that all Hive object changes have corresponding Velero backup objects.
+- `const ControllerName` -- hivev1.VeleroBackupControllerName
+- `func Add(mgr manager.Manager) error` -- creates and registers the controller (no-op unless VELERO_BACKUP=true)
+- `func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (reconcile.Reconciler, error)` -- returns a new reconciler with configurable rate limit duration and Velero namespace
+- `func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error` -- registers controller with watches on ClusterDeployment, SyncSet, DNSZone
+- `type ReconcileBackup struct` -- reconciler; embeds client.Client
+- `func (r *ReconcileBackup) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error)` -- compares checksums and creates backups if changed
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/heptio/velero/pkg/apis/velero/v1`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/metrics`
-- `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/sirupsen/logrus`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/client-go/util/flowcontrol`
-- `k8s.io/client-go/util/workqueue`
-- `os`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/controller`
-- `sigs.k8s.io/controller-runtime/pkg/handler`
-- `sigs.k8s.io/controller-runtime/pkg/manager`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sigs.k8s.io/controller-runtime/pkg/source`
-- `sort`
-- `strconv`
-- `strings`
-- `time`
+- `github.com/heptio/velero/pkg/apis/velero/v1` -- Velero Backup type and BackupPhase constants
+- `github.com/openshift/hive/apis/hive/v1` -- ClusterDeployment, SyncSet, DNSZone, Checkpoint, BackupReference
+- `github.com/openshift/hive/pkg/constants` -- env vars (VELERO_BACKUP, MIN_BACKUP_PERIOD_SECONDS, VELERO_NAMESPACE), CheckpointName
+- `github.com/openshift/hive/pkg/controller/metrics` -- reconcile time observer
+- `github.com/openshift/hive/pkg/controller/utils` -- controller config, client wrapper, checksum, logging, ListRuntimeObjects
+- `sigs.k8s.io/controller-runtime` -- controller, reconcile, client, handler, source
 
 ## Capabilities
 
-- **`package`** name(s): **velerobackup**.
-- Go **`import`** edges listed below (25 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/velerobackup`.
+- Conditionally enabled via environment variable
+- Watches ClusterDeployment, SyncSet, and DNSZone resources, mapping changes to namespace-level reconcile requests
+- Computes MD5 checksums of Hive object specs (excluding status and ResourceVersion) to detect changes
+- Rate-limits backup creation per namespace using Checkpoint objects (default 3 minutes, configurable)
+- Creates Velero Backup objects in the configurable Velero namespace
+- Tracks last backup checksum, time, and reference in per-namespace Checkpoint objects
+- Excludes pods, jobs, and checkpoints from backups
 
 ## Understanding Score
 
-0.0
+0.85

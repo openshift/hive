@@ -1,65 +1,43 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/createcluster/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a CLI command (`create-cluster`) for the `hiveutil` tool that generates and applies all Kubernetes resources needed to create a new Hive ClusterDeployment, supporting AWS, Azure, GCP, IBM Cloud, OpenStack, vSphere, and Nutanix cloud providers.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Types:**
+- `Options` -- Configuration struct holding all flags and parameters for cluster creation (cloud provider, credentials, region, SSH keys, pull secret, adoption settings, per-cloud options for AWS/Azure/GCP/OpenStack/vSphere/IBM/Nutanix)
 
-- `NewCreateClusterCommand` — NewCreateClusterCommand creates a command that generates and applies cluster deployment artifacts.
-- `Options` — Options is the set of options to generate and apply a new cluster deployment
-- `Options.Complete` — Complete finishes parsing arguments for the command
-- `Options.GenerateObjects` — GenerateObjects generates resources for a new cluster deployment
-- `Options.Run` — Run executes the command
-- `Options.Validate` — Validate ensures that option values make sense
+**Functions:**
+- `NewCreateClusterCommand() *cobra.Command` -- Creates the `create-cluster` cobra command with all cloud-specific flags
+- `(o *Options) Complete(cmd *cobra.Command, args []string) error` -- Finishes parsing arguments, sets region defaults, parses durations
+- `(o *Options) Validate(cmd *cobra.Command) error` -- Validates flag combinations and cloud-specific requirements
+- `(o *Options) Run() error` -- Generates objects and either prints (yaml/json) or applies them to the cluster
+- `(o *Options) GenerateObjects() ([]runtime.Object, error)` -- Generates all ClusterDeployment, Secret, MachinePool, ImageSet, and SyncSet resources
 
 ## Internal Dependencies
 
-- `bytes`
-- `encoding/json`
-- `fmt`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/azure`
-- `github.com/openshift/hive/contrib/pkg/utils`
-- `github.com/openshift/hive/pkg/clusterresource`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/creds/aws`
-- `github.com/openshift/hive/pkg/creds/azure`
-- `github.com/openshift/hive/pkg/creds/gcp`
-- `github.com/openshift/hive/pkg/creds/openstack`
-- `github.com/openshift/hive/pkg/gcpclient`
-- `github.com/openshift/hive/pkg/util/scheme`
-- `github.com/openshift/installer/pkg/types`
-- `github.com/openshift/installer/pkg/types/nutanix`
-- `github.com/openshift/installer/pkg/types/vsphere`
-- `github.com/openshift/installer/pkg/types/vsphere/conversion`
-- `github.com/openshift/installer/pkg/validate`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/meta`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/cli-runtime/pkg/printers`
-- `os`
-- `os/user`
-- `path/filepath`
-- `strconv`
-- `strings`
-- `time`
+- `github.com/openshift/hive/apis/hive/v1` -- Hive CRD types
+- `github.com/openshift/hive/apis/hive/v1/azure` -- Azure platform types
+- `github.com/openshift/hive/contrib/pkg/utils` -- Kube client, pull secret, resource helper utilities
+- `github.com/openshift/hive/pkg/clusterresource` -- Builder and CloudBuilder for generating cluster resources
+- `github.com/openshift/hive/pkg/constants` -- Platform names, env vars, secret keys
+- `github.com/openshift/hive/pkg/creds/aws`, `azure`, `gcp`, `openstack` -- Credential loaders per cloud
+- `github.com/openshift/hive/pkg/gcpclient` -- GCP project ID extraction
+- `github.com/openshift/hive/pkg/util/scheme` -- Scheme registration
+- `github.com/openshift/installer/pkg/types`, `vsphere`, `vsphere/conversion`, `nutanix` -- Installer platform types
+- `github.com/spf13/cobra` -- CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **createcluster**.
-- Go **`import`** edges listed below (34 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/createcluster`.
+- Generate ClusterDeployment, MachinePool, install-config Secret, credentials Secret, SSH key Secret, pull secret Secret, serving cert Secret, ClusterImageSet, and SyncSet/SelectorSyncSet resources
+- Support 7 cloud providers: AWS, Azure, GCP, IBM Cloud, OpenStack, vSphere, Nutanix
+- Support cluster adoption (importing pre-existing clusters) with admin kubeconfig, infra ID, cluster ID
+- Output generated resources as YAML or JSON, or apply directly to the cluster
+- Handle credential loading from files, environment variables, or Kubernetes secrets per cloud provider
+- Manage optional features: DNS management, hibernation, deletion scheduling, PrivateLink, manual CCO mode, bound SA signing keys, additional trust bundles, installer manifests injection
 
 ## Understanding Score
 
-0.0
+0.9

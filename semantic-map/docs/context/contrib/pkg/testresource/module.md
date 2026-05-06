@@ -1,32 +1,26 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/testresource/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a CLI command for the `hiveutil` tool to test Hive's resource apply and patch functions against a target cluster, useful for development and debugging.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `NewTestResourceCommand` — NewTestResourceCommand returns a command to test resource functions
+**Functions:**
+- `NewTestResourceCommand() *cobra.Command` -- Creates the `resource` command with `apply` and `patch` subcommands for testing Hive's resource helper
 
 ## Internal Dependencies
 
-- `fmt`
-- `github.com/openshift/hive/pkg/resource`
-- `github.com/sirupsen/logrus`
-- `github.com/spf13/cobra`
-- `k8s.io/apimachinery/pkg/types`
-- `os`
+- `github.com/openshift/hive/pkg/resource` -- Hive resource helper (Apply, Patch, Info)
+- `github.com/spf13/cobra` -- CLI framework
+- `k8s.io/apimachinery/pkg/types` -- NamespacedName, PatchType
 
 ## Capabilities
 
-- **`package`** name(s): **testresource**.
-- Go **`import`** edges listed below (6 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/testresource`.
+- Test `resource.Apply` by reading a resource YAML file and applying it via the Hive resource helper
+- Test `resource.Patch` by applying a patch file (JSON, merge, or strategic merge) to a named resource
+- Requires a kubeconfig to connect to the target cluster
 
 ## Understanding Score
 
-0.0
+0.9

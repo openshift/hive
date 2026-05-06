@@ -1,32 +1,27 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/util/logrus/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides adapters between logrus and two other logging interfaces: the `logr.Logger` interface (for controller-runtime) and the `events.Recorder` interface (for library-go operator events). Allows hive components to bridge logrus-based logging into these frameworks.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `NewLoggingEventRecorder` — NewLoggingEventRecorder creates an event recorder that logs events via logrus
-- `NewLogr` — NewLogr returns a new logger that implements logr.Logger interface using the FieldLogger.
+- `NewLogr(logger log.FieldLogger) logr.Logger` -- returns a logr.Logger backed by logrus (Info maps to Debug, Error maps to Error)
+- `NewLoggingEventRecorder(logger log.FieldLogger, component string) events.Recorder` -- returns an events.Recorder that logs events via logrus
 
 ## Internal Dependencies
 
-- `context`
-- `fmt`
-- `github.com/go-logr/logr`
-- `github.com/openshift/library-go/pkg/operator/events`
-- `github.com/sirupsen/logrus`
+- `github.com/go-logr/logr` -- logr.Logger interface
+- `github.com/openshift/library-go/pkg/operator/events` -- events.Recorder interface
+- `github.com/sirupsen/logrus` -- FieldLogger
 
 ## Capabilities
 
-- **`package`** name(s): **logrus**.
-- Go **`import`** edges listed below (5 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/util/logrus`.
+- Adapt logrus FieldLogger to logr.Logger (LogSink implementation)
+- Adapt logrus FieldLogger to library-go events.Recorder
+- Support component naming, context, and suffix on event recorder
+- Key-value fields propagation from logr to logrus Fields
 
 ## Understanding Score
 
-0.0
+0.85

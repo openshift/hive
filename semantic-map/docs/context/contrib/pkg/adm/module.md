@@ -1,28 +1,23 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`contrib/pkg/adm/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides the `adm` cobra subcommand grouping for Hive administration utilities. Currently contains only the `manage-dns` subcommand.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `NewAdmCommand` — NewAdmCommand is the entrypoint to create the 'adm' subcommand
+- `func NewAdmCommand() *cobra.Command` — creates the `adm` subcommand and registers child commands (currently `managedns.NewManageDNSCommand()`)
 
 ## Internal Dependencies
 
-- `github.com/openshift/hive/contrib/pkg/adm/managedns`
-- `github.com/spf13/cobra`
+- `github.com/openshift/hive/contrib/pkg/adm/managedns` — managed DNS subcommand
+- `github.com/spf13/cobra` — CLI framework
 
 ## Capabilities
 
-- **`package`** name(s): **adm**.
-- Go **`import`** edges listed below (2 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/contrib/pkg/adm`.
+- Groups Hive administration subcommands under `hiveutil adm`
+- Delegates to `managedns` for DNS management functionality
 
 ## Understanding Score
 
-0.0
+0.9

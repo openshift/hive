@@ -1,98 +1,51 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/validating-webhooks/hive/v1/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements validating admission webhooks for Hive custom resources. Each webhook hook struct registers a REST resource under `admission.hive.openshift.io/v1`, implements `Initialize`, `ValidatingResource`, and `Validate` methods, and enforces field-level validation rules on CREATE/UPDATE operations.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+Each hook type exposes the same three-method interface (`ValidatingResource`, `Initialize`, `Validate`):
 
-- `ClusterDeploymentCustomizationValidatingAdmissionHook` — ClusterDeploymentCustomizationlValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `ClusterDeploymentCustomizationValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `ClusterDeploymentCustomizationValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `ClusterDeploymentCustomizationValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `ClusterDeploymentValidatingAdmissionHook` — ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `ClusterDeploymentValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `ClusterDeploymentValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `ClusterDeploymentValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `ClusterImageSetValidatingAdmissionHook` — ClusterImageSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `ClusterImageSetValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `ClusterImageSetValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `ClusterImageSetValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `ClusterPoolValidatingAdmissionHook` — ClusterPoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `ClusterPoolValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `ClusterPoolValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `ClusterPoolValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `ClusterProvisionValidatingAdmissionHook` — ClusterProvisionValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `ClusterProvisionValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `ClusterProvisionValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `ClusterProvisionValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `DNSZoneValidatingAdmissionHook` — DNSZoneValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `DNSZoneValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `DNSZoneValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `DNSZoneValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `MachinePoolValidatingAdmissionHook` — MachinePoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `MachinePoolValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `MachinePoolValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `MachinePoolValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `SelectorSyncSetValidatingAdmissionHook` — SelectorSyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `SelectorSyncSetValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `SelectorSyncSetValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `SelectorSyncSetValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
-- `SyncSetValidatingAdmissionHook` — SyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
-- `SyncSetValidatingAdmissionHook.Initialize` — Initialize is called by generic-admission-server on startup to setup any special initialization that your webhook needs.
-- `SyncSetValidatingAdmissionHook.Validate` — Validate is called by generic-admission-server when the registered REST resource above is called with an admission request. Usually it's the kube apiserver that is making the admi…
-- `SyncSetValidatingAdmissionHook.ValidatingResource` — ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the webhook is accessed by the kube apiserver. For example…
+- `NewClusterDeploymentValidatingAdmissionHook(decoder admission.Decoder) *ClusterDeploymentValidatingAdmissionHook` -- validates ClusterDeployment resources; reads managed domains, feature gates, AWS private link config, and supported contracts
+- `NewClusterDeploymentCustomizationValidatingAdmissionHook(decoder admission.Decoder) *ClusterDeploymentCustomizationValidatingAdmissionHook` -- validates ClusterDeploymentCustomization resources
+- `NewClusterImageSetValidatingAdmissionHook(decoder admission.Decoder) *ClusterImageSetValidatingAdmissionHook` -- validates ClusterImageSet resources
+- `NewClusterPoolValidatingAdmissionHook(decoder admission.Decoder) *ClusterPoolValidatingAdmissionHook` -- validates ClusterPool resources
+- `NewClusterProvisionValidatingAdmissionHook(decoder admission.Decoder) *ClusterProvisionValidatingAdmissionHook` -- validates ClusterProvision resources (stage transitions)
+- `NewDNSZoneValidatingAdmissionHook(decoder admission.Decoder) *DNSZoneValidatingAdmissionHook` -- validates DNSZone resources
+- `NewMachinePoolValidatingAdmissionHook(decoder admission.Decoder) *MachinePoolValidatingAdmissionHook` -- validates MachinePool resources (platform-specific rules for AWS, GCP, Azure, IBMCloud, Nutanix, OpenStack, vSphere)
+- `NewSelectorSyncSetValidatingAdmissionHook(decoder admission.Decoder) *SelectorSyncSetValidatingAdmissionHook` -- validates SelectorSyncSet resources
+- `NewSyncSetValidatingAdmissionHook(decoder admission.Decoder) *SyncSetValidatingAdmissionHook` -- validates SyncSet resources (resource apply modes, patch types, forbidden resource groups)
+
+Internal helpers:
+- `featureSet` -- reads enabled feature gates from env var and provides `IsEnabled(featureGate string) bool`
+- `existsOnlyWhenFeatureGate(...)` / `equalOnlyWhenFeatureGate(...)` -- field-level feature gate validation utilities
 
 ## Internal Dependencies
 
-- `encoding/json`
-- `fmt`
-- `github.com/google/go-cmp/cmp`
-- `github.com/google/go-cmp/cmp/cmpopts`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/aws`
-- `github.com/openshift/hive/apis/hive/v1/azure`
-- `github.com/openshift/hive/apis/hive/v1/gcp`
-- `github.com/openshift/hive/apis/hive/v1/ibmcloud`
-- `github.com/openshift/hive/apis/hive/v1/nutanix`
-- `github.com/openshift/hive/apis/hive/v1/openstack`
-- `github.com/openshift/hive/apis/hive/v1/vsphere`
-- `github.com/openshift/hive/apis/hivecontracts/v1alpha1`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/awsprivatelink`
-- `github.com/openshift/hive/pkg/manageddns`
-- `github.com/openshift/hive/pkg/util/contracts`
-- `github.com/sirupsen/logrus`
-- `github.com/stretchr/testify/assert`
-- `k8s.io/api/admission/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/api/validation`
-- `k8s.io/apimachinery/pkg/apis/meta/v1`
-- `k8s.io/apimachinery/pkg/apis/meta/v1/unstructured`
-- `k8s.io/apimachinery/pkg/apis/meta/v1/validation`
-- `k8s.io/apimachinery/pkg/runtime`
-- `k8s.io/apimachinery/pkg/runtime/schema`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/apimachinery/pkg/util/validation`
-- `k8s.io/apimachinery/pkg/util/validation/field`
-- `k8s.io/client-go/rest`
-- `net/http`
-- `os`
-- `regexp`
-- `sigs.k8s.io/controller-runtime/pkg/webhook/admission`
-- `strconv`
-- `strings`
+- `github.com/openshift/hive/apis/hive/v1` -- all Hive CRD types
+- `github.com/openshift/hive/apis/hive/v1/aws`, `azure`, `gcp`, `ibmcloud`, `nutanix`, `openstack`, `vsphere` -- platform-specific types
+- `github.com/openshift/hive/apis/hivecontracts/v1alpha1` -- contract types
+- `github.com/openshift/hive/pkg/constants` -- env vars and constants
+- `github.com/openshift/hive/pkg/controller/awsprivatelink` -- AWS private link config reading
+- `github.com/openshift/hive/pkg/manageddns` -- managed domains file reading
+- `github.com/openshift/hive/pkg/util/contracts` -- contract implementation lookup
+- `k8s.io/api/admission/v1` -- AdmissionRequest/AdmissionResponse
+- `k8s.io/apimachinery/pkg/runtime/schema` -- GVR registration
+- `k8s.io/client-go/rest` -- webhook initialization config
+- `sigs.k8s.io/controller-runtime/pkg/webhook/admission` -- Decoder
 
 ## Capabilities
 
-- **`package`** name(s): **v1**.
-- Go **`import`** edges listed below (37 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/validating-webhooks/hive/v1`.
+- Validate CREATE and UPDATE operations on 9 Hive CRD types
+- Enforce immutability rules on ClusterDeployment fields (mutableFields allowlist)
+- Validate DNS names, label selectors, platform-specific MachinePool configuration
+- Enforce provision stage transition rules on ClusterProvision
+- Validate SyncSet/SelectorSyncSet resource apply modes, patch types, and forbidden resource groups
+- Feature-gate-aware field validation
+- Managed domain validation on ClusterDeployment
 
 ## Understanding Score
 
-0.0
+0.85

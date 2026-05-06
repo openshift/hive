@@ -1,65 +1,50 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/awsclient/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Provides a unified AWS client interface wrapping AWS SDK v2 services (EC2, ELBv2, S3, Route53, STS, Resource Groups Tagging API) with Prometheus metrics, credential loading from Kubernetes Secrets or environment, and support for AssumeRole-based authentication. Tests exist in downstream consumers.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
+**Interfaces:**
+- `Client` -- Unified interface with ~40 methods covering EC2 (VPCs, subnets, route tables, security groups, instances, VPC peering, VPC endpoints), ELBv2 (load balancers), S3 (upload), Route53 (hosted zones, record sets, VPC associations), Resource Tagging (paginated resource queries), STS (caller identity)
+- `IPaginator[Out, OptFn]` -- Generic paginator interface (`HasMorePages`, `NextPage`)
 
-- `AssumeRoleCredentialsSource` — AssumeRole credentials source uses AWS session configured using credentials in the SecretRef, and then uses that to assume the role provided in Role. AWS client is created using t…
-- `Client`
-- `ContainsCredentialProcess`
-- `CredentialsSource` — CredentialsSource defines how the credentials will be loaded. It supports various methods of sourcing credentials. But if none of the supported sources are configured such that th…
-- `ErrCodeEquals` — ErrCodeEquals returns true if the error matches all these conditions: - err is of type smithy.APIError - Error.Code() equals code
-- `IPaginator`
-- `NewAPIError`
-- `Options` — Options provides the means to control how a client is created and what configuration values will be loaded.
-- `Paginator`
-- `SecretCredentialsSource` — Secret credentials source loads the credentials from a secret. It supports static credentials in the secret provided by aws_access_key_id, and aws_access_secret key. It also suppo…
+**Types:**
+- `Options` -- Client creation options (Region, CredentialsSource)
+- `CredentialsSource` -- Credential sourcing config (Secret-based or AssumeRole-based)
+- `SecretCredentialsSource` -- Load credentials from a Kubernetes Secret
+- `AssumeRoleCredentialsSource` -- Assume an IAM role using a secret or environment credentials
+
+**Functions:**
+- `New(kubeClient, Options) (Client, error)` -- Create a Client using the configured credentials source
+- `NewClient(kubeClient, secretName, namespace, region string) (Client, error)` -- Create a Client from a named Secret
+- `NewClientFromSecret(secret *corev1.Secret, region string) (Client, error)` -- Create a Client from a Secret object
+- `NewAPIError(code, message string) error` -- Create a Smithy API error
+- `ErrCodeEquals(err error, code string) bool` -- Check if an error matches an AWS API error code
+- `ContainsCredentialProcess(config []byte) bool` -- Check if AWS config contains forbidden `credential_process`
+- `Paginator[P, Out, OptFn](awsPaginator P, fn func(*Out, bool) bool) error` -- Generic pagination helper for AWS SDK v2 paginators
 
 ## Internal Dependencies
 
-- `bytes`
-- `context`
-- `fmt`
-- `github.com/aws/aws-sdk-go-v2/aws`
-- `github.com/aws/aws-sdk-go-v2/aws/middleware`
-- `github.com/aws/aws-sdk-go-v2/config`
-- `github.com/aws/aws-sdk-go-v2/credentials/stscreds`
-- `github.com/aws/aws-sdk-go-v2/feature/s3/manager`
-- `github.com/aws/aws-sdk-go-v2/service/ec2`
-- `github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2`
-- `github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi`
-- `github.com/aws/aws-sdk-go-v2/service/route53`
-- `github.com/aws/aws-sdk-go-v2/service/s3`
-- `github.com/aws/aws-sdk-go-v2/service/sts`
-- `github.com/aws/smithy-go`
-- `github.com/aws/smithy-go/endpoints`
-- `github.com/aws/smithy-go/middleware`
-- `github.com/openshift/hive/apis/hive/v1/aws`
-- `github.com/openshift/hive/pkg/constants`
-- `github.com/pkg/errors`
-- `github.com/prometheus/client_golang/prometheus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/types`
-- `net/url`
-- `os`
-- `regexp`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/metrics`
-- `strings`
-- `time`
+- `github.com/aws/aws-sdk-go-v2/*` -- AWS SDK v2 (config, ec2, elbv2, s3, route53, sts, resource groups tagging, stscreds)
+- `github.com/aws/smithy-go` -- Error types, endpoint resolution, middleware
+- `github.com/openshift/hive/apis/hive/v1/aws` -- AssumeRole type
+- `github.com/openshift/hive/pkg/constants` -- Secret keys, Route53 region constants
+- `github.com/prometheus/client_golang/prometheus` -- Metrics counter for API calls
+- `sigs.k8s.io/controller-runtime/pkg/client` -- Kubernetes client for secret retrieval
+- `sigs.k8s.io/controller-runtime/pkg/metrics` -- Metrics registry
 
 ## Capabilities
 
-- **`package`** name(s): **awsclient**.
-- Go **`import`** edges listed below (30 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/awsclient`.
+- Wrap all required AWS API calls behind a single mockable interface
+- Track all AWS API calls via Prometheus counter (`hive_aws_api_calls_total`)
+- Load credentials from Kubernetes Secrets (static keys or AWS CLI config), environment, or via STS AssumeRole
+- Reject secrets containing `credential_process` for security
+- Handle AWS China region Route53 endpoint resolution
+- Provide generic pagination helper for AWS SDK v2 paginators
+- Default region to `us-east-1` when unspecified
 
 ## Understanding Score
 
-0.0
+0.9

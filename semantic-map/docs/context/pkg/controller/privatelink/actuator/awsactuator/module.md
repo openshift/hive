@@ -1,64 +1,40 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/controller/privatelink/actuator/awsactuator/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Implements the private link Actuator interface for AWS, managing VPC endpoints, hosted zone records, and endpoint services for AWS PrivateLink connectivity between Hive's management cluster and spoke clusters.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `AWSHubActuator`
-- `AWSHubActuator.Cleanup` — Cleanup is the actuator interface for cleaning up the cloud resources.
-- `AWSHubActuator.CleanupRequired` — CleanupRequired is the actuator interface for determining if cleanup is required.
-- `AWSHubActuator.Reconcile` — Reconcile is the actuator interface for reconciling the cloud resources.
-- `AWSHubActuator.ReconcileHostedZoneRecords`
-- `AWSHubActuator.ShouldSync` — ShouldSync is the actuator interface to determine if there are changes that need to be made.
-- `AssumeRole`
-- `ReadAWSPrivateLinkControllerConfigFile` — ReadAWSPrivateLinkControllerConfigFile reads the configuration from the env and unmarshals. If the env is set to a file but that file doesn't exist it returns a zero-value configu…
+- `AWSHubActuator` -- implements `actuator.Actuator` for AWS hub-side private link
+  - `Cleanup(cd, metadata, logger) error` -- cleans up hosted zone records
+  - `CleanupRequired(cd) bool`
+  - `Reconcile(cd, metadata, dnsRecord, logger) (reconcile.Result, error)` -- reconciles VPC endpoint and DNS
+  - `ReconcileHostedZoneRecords(...)` -- manages Route53 hosted zone records for API endpoint
+  - `ShouldSync(cd) bool`
+- `NewAWSHubActuator(client, config, privateLinkEnabled, awsClientFn, logger) (*AWSHubActuator, error)`
+- `AssumeRole` -- struct for cross-account IAM role assumption
+- `ReadAWSPrivateLinkControllerConfigFile() (*hivev1.AWSPrivateLinkConfig, error)` -- reads legacy config (deprecated)
 
 ## Internal Dependencies
 
-- `context`
-- `encoding/json`
-- `github.com/aws/aws-sdk-go-v2/aws`
-- `github.com/aws/aws-sdk-go-v2/service/ec2`
-- `github.com/aws/aws-sdk-go-v2/service/ec2/types`
-- `github.com/aws/aws-sdk-go-v2/service/route53`
-- `github.com/aws/aws-sdk-go-v2/service/route53/types`
-- `github.com/openshift/hive/apis/hive/v1`
-- `github.com/openshift/hive/apis/hive/v1/aws`
-- `github.com/openshift/hive/pkg/awsclient`
+- `github.com/openshift/hive/apis/hive/v1`, `apis/hive/v1/aws`
+- `github.com/openshift/hive/pkg/awsclient` -- AWS client factory
 - `github.com/openshift/hive/pkg/constants`
-- `github.com/openshift/hive/pkg/controller/privatelink/actuator`
-- `github.com/openshift/hive/pkg/controller/privatelink/conditions`
+- `github.com/openshift/hive/pkg/controller/privatelink/actuator` -- Actuator interface
+- `github.com/openshift/hive/pkg/controller/privatelink/conditions` -- condition helpers
 - `github.com/openshift/hive/pkg/controller/utils`
-- `github.com/pkg/errors`
-- `github.com/sirupsen/logrus`
-- `k8s.io/api/core/v1`
-- `k8s.io/apimachinery/pkg/api/errors`
-- `k8s.io/apimachinery/pkg/types`
-- `k8s.io/apimachinery/pkg/util/sets`
-- `k8s.io/apimachinery/pkg/util/wait`
-- `k8s.io/client-go/rest`
-- `k8s.io/client-go/tools/clientcmd`
-- `k8s.io/client-go/util/retry`
-- `net/url`
-- `os`
-- `sigs.k8s.io/controller-runtime/pkg/client`
-- `sigs.k8s.io/controller-runtime/pkg/reconcile`
-- `sort`
-- `strings`
-- `time`
+- `github.com/aws/aws-sdk-go-v2/service/ec2`, `service/route53` -- AWS API clients
 
 ## Capabilities
 
-- **`package`** name(s): **awsactuator**.
-- Go **`import`** edges listed below (31 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/controller/privatelink/actuator/awsactuator`.
+- Creates/manages VPC endpoints for AWS PrivateLink connections to spoke clusters
+- Manages Route53 private hosted zone records pointing to VPC endpoint DNS
+- Supports cross-account access via IAM AssumeRole
+- Builds AWS clients from Kubernetes secrets with optional assume-role configuration
+- Falls back to legacy AWSPrivateLinkController config file for backwards compatibility
+- Cleans up hosted zone records on ClusterDeployment deletion
 
 ## Understanding Score
 
-0.0
+0.85

@@ -1,31 +1,25 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/logger/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Test utility for creating logrus loggers with attached hooks and asserting that specific log messages were recorded.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `AssertHookContainsMessage`
-- `NewLoggerWithHook` — NewLoggerWithHook creates a new logger with debug loglevel and attaches a hook to it.
+- `NewLoggerWithHook() (*logrus.Logger, *logrustest.Hook)` -- creates a debug-level logger with a test hook attached
+- `AssertHookContainsMessage(t assert.TestingT, hook *logrustest.Hook, message string) bool` -- asserts that the hook captured an entry with the exact given message
 
 ## Internal Dependencies
 
-- `fmt`
 - `github.com/sirupsen/logrus`
 - `github.com/sirupsen/logrus/hooks/test`
 - `github.com/stretchr/testify/assert`
 
 ## Capabilities
 
-- **`package`** name(s): **logger**.
-- Go **`import`** edges listed below (4 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/logger`.
+- Creates pre-configured debug-level logrus loggers for test capture
+- Verifies expected log messages were emitted during test execution
 
 ## Understanding Score
 
-0.0
+0.9

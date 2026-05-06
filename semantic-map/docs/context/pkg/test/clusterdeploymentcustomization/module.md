@@ -1,18 +1,24 @@
-<!-- semantic-map module stub v3 -->
-
 # Module atlas
 
 ## Responsibility
 
-One or more Go packages rooted at **`pkg/test/clusterdeploymentcustomization/**` relative to this repository. Part of module **`github.com/openshift/hive`**.
+Test-only builder utility for constructing `hivev1.ClusterDeploymentCustomization` objects using the functional options pattern.
 
 ## Public Interface/API
 
-Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line doc synopsis where available):
-
-- `Build` — Build runs each of the functions passed in to generate the object.
-- `Builder`
-- `Option` — Option defines a function signature for any function that wants to be passed into Build
+- `type Option func(*hivev1.ClusterDeploymentCustomization)` -- functional option type
+- `type Builder interface` -- chainable builder with `Build`, `Options`, `GenericOptions` methods
+- `Build(opts ...Option) *hivev1.ClusterDeploymentCustomization` -- constructs a CDC from options
+- `BasicBuilder() Builder` -- returns an empty builder
+- `FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder` -- pre-configured with TypeMeta, ResourceVersion, namespace, name
+- `Generic(opt generic.Option) Option` -- adapts a generic option
+- `Available() Option` -- adds Available=True condition
+- `Reserved() Option` -- adds Available=False/Reserved condition
+- `WithInstallConfigPatch(path, op, value string) Option` -- appends an install config patch
+- `WithManifestPatch(glob, path, op, value string) Option` -- appends an installer manifest patch with glob selector
+- `WithApplySucceeded(reason string, change time.Time) Option` -- sets or updates the ApplySucceeded condition
+- `WithPool(name string) Option` -- sets Status.ClusterPoolRef
+- `WithCD(name string) Option` -- sets Status.ClusterDeploymentRef
 
 ## Internal Dependencies
 
@@ -22,14 +28,14 @@ Deterministic exports from **`go/doc`** over **`go/packages`** syntax (one-line 
 - `k8s.io/apimachinery/pkg/api/meta`
 - `k8s.io/apimachinery/pkg/apis/meta/v1`
 - `k8s.io/apimachinery/pkg/runtime`
-- `time`
 
 ## Capabilities
 
-- **`package`** name(s): **clusterdeploymentcustomization**.
-- Go **`import`** edges listed below (7 unique path(s)).
-- Package ID(s): `github.com/openshift/hive/pkg/test/clusterdeploymentcustomization`.
+- Builds `hivev1.ClusterDeploymentCustomization` test fixtures with install config and manifest patches
+- Configures availability/reservation status conditions and ApplySucceeded condition
+- Sets status references to ClusterPool and ClusterDeployment
+- Supports generic metadata options via `pkg/test/generic`
 
 ## Understanding Score
 
-0.0
+0.9

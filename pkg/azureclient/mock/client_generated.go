@@ -11,8 +11,8 @@ import (
 	compute "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	compute0 "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	dns "github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
-	gomock "github.com/golang/mock/gomock"
 	azureclient "github.com/openshift/hive/pkg/azureclient"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.

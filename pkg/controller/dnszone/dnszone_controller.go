@@ -3,12 +3,12 @@ package dnszone
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"reflect"
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -40,7 +40,6 @@ const (
 	zoneResyncDuration              = 2 * time.Hour
 	domainAvailabilityCheckInterval = 30 * time.Second
 	dnsClientTimeout                = 30 * time.Second
-	resolverConfigFile              = "/etc/resolv.conf"
 	zoneCheckDNSServersEnvVar       = "ZONE_CHECK_DNS_SERVERS"
 	accessDeniedReason              = "AccessDenied"
 	accessGrantedReason             = "AccessGranted"
@@ -80,9 +79,9 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileDNSZone {
 	return &ReconcileDNSZone{
-		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-		logger:    log.WithField("controller", ControllerName),
-		soaLookup: lookupSOARecord,
+		Client:   controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+		logger:   log.WithField("controller", ControllerName),
+		nsLookup: lookupNSRecord,
 	}
 }
 
@@ -124,8 +123,8 @@ type ReconcileDNSZone struct {
 
 	logger log.FieldLogger
 
-	// soaLookup is a function that looks up a zone's SOA record
-	soaLookup func(string, log.FieldLogger) (bool, error)
+	// nsLookup is a function that looks up a zone's NS record
+	nsLookup func(string, log.FieldLogger) (bool, error)
 }
 
 // Reconcile reads that state of the cluster for a DNSZone object and makes changes based on the state read
@@ -328,18 +327,18 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 		return reconcile.Result{}, err
 	}
 
-	isZoneSOAAvailable, err := r.soaLookup(dnsZone.Spec.Zone, logger)
+	isZoneNSAvailable, err := r.nsLookup(dnsZone.Spec.Zone, logger)
 	if err != nil {
-		logger.WithError(err).Error("error looking up SOA record for zone")
+		logger.WithError(err).Error("error looking up NS record for zone")
 	}
 
 	reconcileResult := reconcile.Result{}
-	if !isZoneSOAAvailable {
-		logger.Info("SOA record for DNS zone not available")
+	if !isZoneNSAvailable {
+		logger.Info("NS record for DNS zone not available")
 		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
 	}
 
-	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone, logger)
+	return reconcileResult, r.updateStatus(nameServers, isZoneNSAvailable, dnsZone, logger)
 }
 
 func (r *ReconcileDNSZone) removeDNSZoneFinalizer(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
@@ -439,25 +438,25 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 	return nil, errors.New("unable to determine which actuator to use")
 }
 
-func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
+func (r *ReconcileDNSZone) updateStatus(nameServers []string, isNSAvailable bool, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	orig := dnsZone.DeepCopy()
 
 	dnsZone.Status.NameServers = nameServers
 
 	var availableStatus corev1.ConditionStatus
 	var availableReason, availableMessage string
-	if isSOAAvailable {
+	if isNSAvailable {
 		// We need to keep track of the last time we synced to rate limit our dns provider calls.
 		tmpTime := metav1.Now()
 		dnsZone.Status.LastSyncTimestamp = &tmpTime
 
 		availableStatus = corev1.ConditionTrue
 		availableReason = "ZoneAvailable"
-		availableMessage = "DNS SOA record for zone is reachable"
+		availableMessage = "DNS NS record for zone is reachable"
 	} else {
 		availableStatus = corev1.ConditionFalse
 		availableReason = "ZoneUnavailable"
-		availableMessage = "DNS SOA record for zone is not reachable"
+		availableMessage = "DNS NS record for zone is not reachable"
 	}
 	dnsZone.Status.LastSyncGeneration = dnsZone.ObjectMeta.Generation
 	dnsZone.Status.Conditions = controllerutils.SetDNSZoneCondition(
@@ -479,55 +478,50 @@ func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable boo
 	return nil
 }
 
-func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
-	// TODO: determine if there's a better way to obtain resolver endpoints
-	clientConfig, _ := dns.ClientConfigFromFile(resolverConfigFile)
-	client := dns.Client{Timeout: dnsClientTimeout}
+func lookupNSRecord(zone string, logger log.FieldLogger) (bool, error) {
+	resolver := net.DefaultResolver
 
-	dnsServers := []string{}
 	serversFromEnv := os.Getenv(zoneCheckDNSServersEnvVar)
 	if len(serversFromEnv) > 0 {
-		dnsServers = strings.Split(serversFromEnv, ",")
+		dnsServers := strings.Split(serversFromEnv, ",")
 		// Add port to servers with unspecified port
 		for i := range dnsServers {
 			if !strings.Contains(dnsServers[i], ":") {
 				dnsServers[i] = dnsServers[i] + ":53"
 			}
 		}
+		logger.WithField("servers", dnsServers).Info("looking up zone NS records")
+		resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{}
+				for _, s := range dnsServers {
+					conn, err := d.DialContext(ctx, "udp", s)
+					if err == nil {
+						return conn, nil
+					}
+					logger.WithError(err).WithField("server", s).Info("failed to connect to DNS server")
+				}
+				return nil, fmt.Errorf("failed to connect to any configured DNS server")
+			},
+		}
 	} else {
-		for _, s := range clientConfig.Servers {
-			dnsServers = append(dnsServers, fmt.Sprintf("%s:%s", s, clientConfig.Port))
-		}
+		logger.Info("looking up zone NS records using system resolver")
 	}
-	logger.WithField("servers", dnsServers).Info("looking up domain SOA record")
 
-	m := &dns.Msg{}
-	m.SetQuestion(zone+".", dns.TypeSOA)
-	for _, s := range dnsServers {
-		in, rtt, err := client.Exchange(m, s)
-		if err != nil {
-			logger.WithError(err).WithField("server", s).Info("query for SOA record failed")
-			continue
-		}
-		log.WithField("server", s).Infof("SOA query duration: %v", rtt)
-		if len(in.Answer) > 0 {
-			for _, rr := range in.Answer {
-				soa, ok := rr.(*dns.SOA)
-				if !ok {
-					logger.Info("Record returned is not an SOA record: %#v", rr)
-					continue
-				}
-				if soa.Hdr.Name != controllerutils.Dotted(zone) {
-					logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned but it does not match the lookup zone")
-					return false, nil
-				}
-				logger.WithField("zone", soa.Hdr.Name).Info("SOA record returned, zone is reachable")
-				return true, nil
-			}
-		}
-		logger.WithField("server", s).Info("no answer for SOA record returned")
+	ctx, cancel := context.WithTimeout(context.Background(), dnsClientTimeout)
+	defer cancel()
+
+	ns, err := resolver.LookupNS(ctx, zone)
+	if err != nil {
+		logger.WithError(err).Info("query for NS records failed")
 		return false, nil
 	}
+	if len(ns) > 0 {
+		logger.Info("NS records returned, zone is reachable")
+		return true, nil
+	}
+	logger.Info("no NS records returned")
 	return false, nil
 }
 

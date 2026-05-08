@@ -1980,7 +1980,63 @@ func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeploymen
 	if err := injectProviderAdditionalBundle(&ic, cd, m.getPlatformCertificateDir(cd)); err != nil {
 		return nil, err
 	}
-	return yaml.Marshal(ic)
+
+	updatedICData, err := yaml.Marshal(ic)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not marshal InstallConfig")
+	}
+
+	updatedICData, err = removeUnsupportedVSphereDataDisks(&ic, updatedICData)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedICData, nil
+}
+
+// removeUnsupportedVSphereDataDisks strips empty vSphere dataDisks fields that can be
+// added by marshal/unmarshal cycles when using installer types that do not set omitempty.
+// Older installer payloads treat this field as unknown and emit a warning.
+func removeUnsupportedVSphereDataDisks(ic *installertypes.InstallConfig, icData []byte) ([]byte, error) {
+	if ic == nil {
+		return icData, nil
+	}
+
+	patches := make([]hivev1.PatchEntity, 0)
+
+	if ic.ControlPlane != nil && ic.ControlPlane.Platform.VSphere != nil && len(ic.ControlPlane.Platform.VSphere.DataDisks) == 0 {
+		patches = append(patches, hivev1.PatchEntity{
+			Op:   "remove",
+			Path: "/controlPlane/platform/vsphere/dataDisks",
+		})
+	}
+
+	if ic.Arbiter != nil && ic.Arbiter.Platform.VSphere != nil && len(ic.Arbiter.Platform.VSphere.DataDisks) == 0 {
+		patches = append(patches, hivev1.PatchEntity{
+			Op:   "remove",
+			Path: "/arbiter/platform/vsphere/dataDisks",
+		})
+	}
+
+	for i, compute := range ic.Compute {
+		if compute.Platform.VSphere == nil || len(compute.Platform.VSphere.DataDisks) > 0 {
+			continue
+		}
+		patches = append(patches, hivev1.PatchEntity{
+			Op:   "remove",
+			Path: fmt.Sprintf("/compute/%d/platform/vsphere/dataDisks", i),
+		})
+	}
+
+	if len(patches) == 0 {
+		return icData, nil
+	}
+
+	modifiedBytes, err := yamlutils.ApplyPatches(icData, patches)
+	if err != nil {
+		return nil, errors.Wrap(err, "error removing unsupported vSphere dataDisks field from install-config")
+	}
+	return modifiedBytes, nil
 }
 
 func pasteInPullSecret(ic *installertypes.InstallConfig, pullSecretFile string) error {

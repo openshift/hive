@@ -28,6 +28,7 @@ import (
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
@@ -816,6 +817,68 @@ func Test_nutanix_injectProviderCredentials(t *testing.T) {
 			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig output")
 		})
 	}
+}
+
+func Test_removeUnsupportedVSphereDataDisks(t *testing.T) {
+	t.Run("removes empty vSphere dataDisks from compute and controlPlane", func(t *testing.T) {
+		ic := installertypes.InstallConfig{
+			ControlPlane: &installertypes.MachinePool{
+				Name: "master",
+				Platform: installertypes.MachinePoolPlatform{
+					VSphere: &installertypesvsphere.MachinePool{
+						NumCPUs: 4,
+					},
+				},
+			},
+			Compute: []installertypes.MachinePool{
+				{
+					Name: "worker",
+					Platform: installertypes.MachinePoolPlatform{
+						VSphere: &installertypesvsphere.MachinePool{
+							NumCPUs: 2,
+						},
+					},
+				},
+			},
+		}
+
+		icData, err := yaml.Marshal(ic)
+		require.NoError(t, err)
+		require.Contains(t, string(icData), "dataDisks")
+
+		modified, err := removeUnsupportedVSphereDataDisks(&ic, icData)
+		require.NoError(t, err)
+		assert.NotContains(t, string(modified), "dataDisks")
+	})
+
+	t.Run("preserves vSphere dataDisks when explicitly set", func(t *testing.T) {
+		ic := installertypes.InstallConfig{
+			Compute: []installertypes.MachinePool{
+				{
+					Name: "worker",
+					Platform: installertypes.MachinePoolPlatform{
+						VSphere: &installertypesvsphere.MachinePool{
+							NumCPUs: 2,
+							DataDisks: []installertypesvsphere.DataDisk{
+								{
+									Name:    "disk1",
+									SizeGiB: 10,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		icData, err := yaml.Marshal(ic)
+		require.NoError(t, err)
+
+		modified, err := removeUnsupportedVSphereDataDisks(&ic, icData)
+		require.NoError(t, err)
+		assert.Contains(t, string(modified), "dataDisks")
+		assert.Contains(t, string(modified), "disk1")
+	})
 }
 
 func Test_nutanix_injectProviderAdditionalBundle(t *testing.T) {

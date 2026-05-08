@@ -2034,7 +2034,10 @@ func removeUnsupportedVSphereDataDisks(ic *installertypes.InstallConfig, icData 
 
 	modifiedBytes, err := yamlutils.ApplyPatches(icData, patches)
 	if err != nil {
-		return nil, errors.Wrap(err, "error removing unsupported vSphere dataDisks field from install-config")
+		// Best-effort cleanup to suppress warnings on older payloads.
+		// Aborting the install would be worse than the original warning.
+		log.WithError(err).Warn("failed to remove empty vSphere dataDisks from install-config; proceeding with original data")
+		return icData, nil
 	}
 	return modifiedBytes, nil
 }

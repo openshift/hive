@@ -8,7 +8,7 @@ COPY . .
 RUN make -C test/ote build
 
 FROM ${BASE_IMAGE}
-RUN microdnf install -y gzip && microdnf clean all
+RUN microdnf install -y gzip jq && microdnf clean all
 COPY --from=builder /go/src/github.com/openshift/hive/test/ote/bin/hive /usr/bin/openshift-tests-extension
 RUN gzip -f -k /usr/bin/openshift-tests-extension
 

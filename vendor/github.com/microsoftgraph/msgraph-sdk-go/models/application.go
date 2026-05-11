@@ -67,7 +67,7 @@ func (m *Application) GetApplicationTemplateId()(*string) {
     }
     return nil
 }
-// GetAppManagementPolicies gets the appManagementPolicies property value. The appManagementPolicies property
+// GetAppManagementPolicies gets the appManagementPolicies property value. The appManagementPolicy applied to this application.
 func (m *Application) GetAppManagementPolicies()([]AppManagementPolicyable) {
     val, err := m.GetBackingStore().Get("appManagementPolicies")
     if err != nil {
@@ -855,7 +855,7 @@ func (m *Application) GetPublisherDomain()(*string) {
     }
     return nil
 }
-// GetRequestSignatureVerification gets the requestSignatureVerification property value. The requestSignatureVerification property
+// GetRequestSignatureVerification gets the requestSignatureVerification property value. Specifies whether this application requires Azure AD to verify the signed authentication requests.
 func (m *Application) GetRequestSignatureVerification()(RequestSignatureVerificationable) {
     val, err := m.GetBackingStore().Get("requestSignatureVerification")
     if err != nil {
@@ -921,7 +921,7 @@ func (m *Application) GetSpa()(SpaApplicationable) {
     }
     return nil
 }
-// GetTags gets the tags property value. Custom strings that can be used to categorize and identify the application. Not nullable. Supports $filter (eq, not, ge, le, startsWith).
+// GetTags gets the tags property value. Custom strings that can be used to categorize and identify the application. Not nullable. Strings added here will also appear in the tags property of any associated service principals.Supports $filter (eq, not, ge, le, startsWith).
 func (m *Application) GetTags()([]string) {
     val, err := m.GetBackingStore().Get("tags")
     if err != nil {
@@ -1329,7 +1329,7 @@ func (m *Application) SetApplicationTemplateId(value *string)() {
         panic(err)
     }
 }
-// SetAppManagementPolicies sets the appManagementPolicies property value. The appManagementPolicies property
+// SetAppManagementPolicies sets the appManagementPolicies property value. The appManagementPolicy applied to this application.
 func (m *Application) SetAppManagementPolicies(value []AppManagementPolicyable)() {
     err := m.GetBackingStore().Set("appManagementPolicies", value)
     if err != nil {
@@ -1518,7 +1518,7 @@ func (m *Application) SetPublisherDomain(value *string)() {
         panic(err)
     }
 }
-// SetRequestSignatureVerification sets the requestSignatureVerification property value. The requestSignatureVerification property
+// SetRequestSignatureVerification sets the requestSignatureVerification property value. Specifies whether this application requires Azure AD to verify the signed authentication requests.
 func (m *Application) SetRequestSignatureVerification(value RequestSignatureVerificationable)() {
     err := m.GetBackingStore().Set("requestSignatureVerification", value)
     if err != nil {
@@ -1560,7 +1560,7 @@ func (m *Application) SetSpa(value SpaApplicationable)() {
         panic(err)
     }
 }
-// SetTags sets the tags property value. Custom strings that can be used to categorize and identify the application. Not nullable. Supports $filter (eq, not, ge, le, startsWith).
+// SetTags sets the tags property value. Custom strings that can be used to categorize and identify the application. Not nullable. Strings added here will also appear in the tags property of any associated service principals.Supports $filter (eq, not, ge, le, startsWith).
 func (m *Application) SetTags(value []string)() {
     err := m.GetBackingStore().Set("tags", value)
     if err != nil {

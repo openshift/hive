@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hive-operator
+  annotations:
+    hive.openshift.io/netpol-description: "Network policy for hive-operator must allow egress to the APIServer. Since we can't identify hostNetwork pods, we must allow all egress."
+spec:
+  egress:
+  - {}
+  podSelector:
+    matchLabels:
+      hive.openshift.io/component: hive-operator
+  policyTypes:
+  - Egress

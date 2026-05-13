@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hive-controllers
+  annotations:
+    hive.openshift.io/netpol-description: "Network policy for all hive controllers, including clustersync and machinepool. These must allow egress to the APIServer and cloud providers. Since we can't identify hostNetwork pods for the former, or specific targets for the latter, we must allow all egress. Ingress must be available from the APIServer for liveness probes; so, similarly, we must allow all ingress."
+spec:
+  egress:
+  - {}
+  ingress:
+  - {}
+  podSelector:
+    matchExpressions:
+      - key: hive.openshift.io/component
+        operator: In
+        values:
+        - hive-controllers
+        - hive-clustersync
+        - hive-machinepool
+  policyTypes:
+  - Egress
+  - Ingress

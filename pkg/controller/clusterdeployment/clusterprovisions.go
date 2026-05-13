@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -137,6 +138,23 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	if err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 		return reconcile.Result{}, err
+	}
+
+	// NOTE: For strict idempotence, we could requeue if the first return is true,
+	// but there's no real benefit and it's more efficient to keep rolling.
+	_, err = controllerutils.EnsureNetworkPolicy(
+		r,
+		r.scheme,
+		constants.JobTypeProvision,
+		cd,
+		logger,
+		// No ingress
+		nil,
+		// Allow all egress (talk to apiserver & cloud provider)
+		[]networkingv1.NetworkPolicyEgressRule{{}},
+	)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to ensure network policy for provision job")
 	}
 
 	provisionName := apihelpers.GetResourceName(cd.Name, fmt.Sprintf("%d-%s", cd.Status.InstallRestarts, utilrand.String(5)))

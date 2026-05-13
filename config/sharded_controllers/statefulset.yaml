@@ -19,6 +19,7 @@ spec:
       labels:
         control-plane: {{.ControllerName}}
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive- {{- .ControllerName}}
     spec:
       topologySpreadConstraints: # this forces the pods to be on separate nodes.
       - maxSkew: 1

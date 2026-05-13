@@ -20,6 +20,7 @@ spec:
       labels:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive-controllers
     spec:
       serviceAccountName: hive-controllers
       volumes:

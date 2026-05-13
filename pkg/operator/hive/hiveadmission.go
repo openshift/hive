@@ -65,6 +65,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
+		"config/netpol/hiveadmission.yaml",
 	}
 	// In OpenShift, we get the service and kube root CA certs from automatically-generated ConfigMaps
 	if !r.isOpenShift {

@@ -19,6 +19,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -524,6 +525,14 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			LabelSelector: map[string]string{
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
 				constants.SecretTypeLabel:            constants.SecretTypeKubeAdminCreds,
+			},
+			Controlled: false,
+		},
+		{
+			// Parent all ImageSet NetworkPolicy CRs in the CD's namespace to the CD
+			TypeToList: &networkingv1.NetworkPolicyList{},
+			LabelSelector: map[string]string{
+				constants.JobTypeLabel: constants.JobTypeImageSet,
 			},
 			Controlled: false,
 		},
@@ -1444,6 +1453,23 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	case apierrors.IsNotFound(err):
 		if areImagesResolved {
 			return nil, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
+		}
+
+		// NOTE: For strict idempotence, we could requeue if the first return is true,
+		// but there's no real benefit and it's more efficient to keep rolling.
+		_, err := controllerutils.EnsureNetworkPolicy(
+			r,
+			r.scheme,
+			constants.JobTypeImageSet,
+			cd,
+			cdLog,
+			// No ingress
+			nil,
+			// Allow all egress (talk to apiserver)
+			[]networkingv1.NetworkPolicyEgressRule{{}},
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to ensure network policy for imageset job")
 		}
 
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName,

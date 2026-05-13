@@ -7,11 +7,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -169,7 +172,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	instance := &hivev1.ClusterDeprovision{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			rLog.Debug("clusterdeprovision not found, skipping")
@@ -295,6 +298,23 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
+	// NOTE: For strict idempotence, we could requeue if the first return is true,
+	// but there's no real benefit and it's more efficient to keep rolling.
+	_, err = controllerutils.EnsureNetworkPolicy(
+		r,
+		r.scheme,
+		constants.JobTypeDeprovision,
+		cd,
+		rLog,
+		// No ingress
+		nil,
+		// Allow all egress (talk to apiserver & cloud provider)
+		[]networkingv1.NetworkPolicyEgressRule{{}},
+	)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to ensure network policy for deprovision job")
+	}
+
 	// Generate an uninstall job
 	rLog.Debug("generating uninstall job")
 	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance,
@@ -334,7 +354,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	// Check if uninstall job already exists:
 	existingJob := &batchv1.Job{}
 	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apierrors.IsNotFound(err) {
 		rLog.Debug("uninstall job does not exist, creating it")
 		err = r.Create(context.TODO(), uninstallJob)
 		if err != nil {

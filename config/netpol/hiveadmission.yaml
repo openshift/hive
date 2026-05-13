@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hiveadmission
+  annotations:
+    hive.openshift.io/netpol-description: "Network policy for hiveadmission needs both egress to and ingress from the APIServer. Since we can't identify hostNetwork pods, we must allow all."
+spec:
+  egress:
+  - {}
+  ingress:
+  - {}
+  podSelector:
+    matchLabels:
+      hive.openshift.io/component: hiveadmission
+  policyTypes:
+  - Egress
+  - Ingress

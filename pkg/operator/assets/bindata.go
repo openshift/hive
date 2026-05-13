@@ -23,6 +23,8 @@
 // config/controllers/hive_controllers_role_binding.yaml
 // config/controllers/hive_controllers_serviceaccount.yaml
 // config/controllers/service.yaml
+// config/netpol/hive-controllers.yaml
+// config/netpol/hiveadmission.yaml
 // config/rbac/hive_admin_role.yaml
 // config/rbac/hive_admin_role_binding.yaml
 // config/rbac/hive_clusterpool_admin.yaml
@@ -144,6 +146,7 @@ spec:
       labels:
         control-plane: {{.ControllerName}}
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive- {{- .ControllerName}}
     spec:
       topologySpreadConstraints: # this forces the pods to be on separate nodes.
       - maxSkew: 1
@@ -501,6 +504,7 @@ metadata:
   labels:
     app: hiveadmission
     hiveadmission: "true"
+    hive.openshift.io/component: hiveadmission
 spec:
   replicas: 2
   selector:
@@ -517,6 +521,7 @@ spec:
       labels:
         app: hiveadmission
         hiveadmission: "true"
+        hive.openshift.io/component: hiveadmission
     spec:
       serviceAccountName: hiveadmission
       containers:
@@ -940,6 +945,7 @@ metadata:
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
+    hive.openshift.io/component: hive-controllers
 spec:
   selector:
     matchLabels:
@@ -954,6 +960,7 @@ spec:
       labels:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive-controllers
     spec:
       serviceAccountName: hive-controllers
       volumes:
@@ -1127,6 +1134,18 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 `)
 
 func configControllersHive_controllers_roleYamlBytes() ([]byte, error) {
@@ -1230,6 +1249,79 @@ func configControllersServiceYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/controllers/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configNetpolHiveControllersYaml = []byte(`apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hive-controllers
+  annotations:
+    hive.openshift.io/netpol-description: "Network policy for all hive controllers, including clustersync and machinepool. These must allow egress to the APIServer and cloud providers. Since we can't identify hostNetwork pods for the former, or specific targets for the latter, we must allow all egress. Ingress must be available from the APIServer for liveness probes; so, similarly, we must allow all ingress."
+spec:
+  egress:
+  - {}
+  ingress:
+  - {}
+  podSelector:
+    matchExpressions:
+      - key: hive.openshift.io/component
+        operator: In
+        values:
+        - hive-controllers
+        - hive-clustersync
+        - hive-machinepool
+  policyTypes:
+  - Egress
+  - Ingress
+`)
+
+func configNetpolHiveControllersYamlBytes() ([]byte, error) {
+	return _configNetpolHiveControllersYaml, nil
+}
+
+func configNetpolHiveControllersYaml() (*asset, error) {
+	bytes, err := configNetpolHiveControllersYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/netpol/hive-controllers.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configNetpolHiveadmissionYaml = []byte(`apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hiveadmission
+  annotations:
+    hive.openshift.io/netpol-description: "Network policy for hiveadmission needs both egress to and ingress from the APIServer. Since we can't identify hostNetwork pods, we must allow all."
+spec:
+  egress:
+  - {}
+  ingress:
+  - {}
+  podSelector:
+    matchLabels:
+      hive.openshift.io/component: hiveadmission
+  policyTypes:
+  - Egress
+  - Ingress
+`)
+
+func configNetpolHiveadmissionYamlBytes() ([]byte, error) {
+	return _configNetpolHiveadmissionYaml, nil
+}
+
+func configNetpolHiveadmissionYaml() (*asset, error) {
+	bytes, err := configNetpolHiveadmissionYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/netpol/hiveadmission.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2207,6 +2299,8 @@ var _bindata = map[string]func() (*asset, error){
 	"config/controllers/hive_controllers_role_binding.yaml":            configControllersHive_controllers_role_bindingYaml,
 	"config/controllers/hive_controllers_serviceaccount.yaml":          configControllersHive_controllers_serviceaccountYaml,
 	"config/controllers/service.yaml":                                  configControllersServiceYaml,
+	"config/netpol/hive-controllers.yaml":                              configNetpolHiveControllersYaml,
+	"config/netpol/hiveadmission.yaml":                                 configNetpolHiveadmissionYaml,
 	"config/rbac/hive_admin_role.yaml":                                 configRbacHive_admin_roleYaml,
 	"config/rbac/hive_admin_role_binding.yaml":                         configRbacHive_admin_role_bindingYaml,
 	"config/rbac/hive_clusterpool_admin.yaml":                          configRbacHive_clusterpool_adminYaml,
@@ -2289,6 +2383,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service-account.yaml":                        {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
 			"service.yaml":                                {configHiveadmissionServiceYaml, map[string]*bintree{}},
 			"syncset-webhook.yaml":                        {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
+		}},
+		"netpol": {nil, map[string]*bintree{
+			"hive-controllers.yaml": {configNetpolHiveControllersYaml, map[string]*bintree{}},
+			"hiveadmission.yaml":    {configNetpolHiveadmissionYaml, map[string]*bintree{}},
 		}},
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},

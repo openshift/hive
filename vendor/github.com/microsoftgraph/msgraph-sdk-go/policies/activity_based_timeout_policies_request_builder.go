@@ -9,7 +9,12 @@ import (
 
 // ActivityBasedTimeoutPoliciesRequestBuilder provides operations to manage the activityBasedTimeoutPolicies property of the microsoft.graph.policyRoot entity.
 type ActivityBasedTimeoutPoliciesRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ActivityBasedTimeoutPoliciesRequestBuilderGetQueryParameters get a list of activityBasedTimeoutPolicy objects.
 type ActivityBasedTimeoutPoliciesRequestBuilderGetQueryParameters struct {
@@ -49,8 +54,14 @@ type ActivityBasedTimeoutPoliciesRequestBuilderPostRequestConfiguration struct {
 // NewActivityBasedTimeoutPoliciesRequestBuilderInternal instantiates a new ActivityBasedTimeoutPoliciesRequestBuilder and sets the default values.
 func NewActivityBasedTimeoutPoliciesRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ActivityBasedTimeoutPoliciesRequestBuilder) {
     m := &ActivityBasedTimeoutPoliciesRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/policies/activityBasedTimeoutPolicies{?%24top,%24skip,%24search,%24filter,%24count,%24orderby,%24select,%24expand}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/policies/activityBasedTimeoutPolicies{?%24top,%24skip,%24search,%24filter,%24count,%24orderby,%24select,%24expand}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewActivityBasedTimeoutPoliciesRequestBuilder instantiates a new ActivityBasedTimeoutPoliciesRequestBuilder and sets the default values.
@@ -61,7 +72,7 @@ func NewActivityBasedTimeoutPoliciesRequestBuilder(rawUrl string, requestAdapter
 }
 // Count provides operations to count the resources in the collection.
 func (m *ActivityBasedTimeoutPoliciesRequestBuilder) Count()(*ActivityBasedTimeoutPoliciesCountRequestBuilder) {
-    return NewActivityBasedTimeoutPoliciesCountRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewActivityBasedTimeoutPoliciesCountRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Get get a list of activityBasedTimeoutPolicy objects.
 // [Find more info here]
@@ -76,7 +87,7 @@ func (m *ActivityBasedTimeoutPoliciesRequestBuilder) Get(ctx context.Context, re
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateActivityBasedTimeoutPolicyCollectionResponseFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateActivityBasedTimeoutPolicyCollectionResponseFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -98,7 +109,7 @@ func (m *ActivityBasedTimeoutPoliciesRequestBuilder) Post(ctx context.Context, b
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateActivityBasedTimeoutPolicyFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateActivityBasedTimeoutPolicyFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -110,8 +121,8 @@ func (m *ActivityBasedTimeoutPoliciesRequestBuilder) Post(ctx context.Context, b
 // ToGetRequestInformation get a list of activityBasedTimeoutPolicy objects.
 func (m *ActivityBasedTimeoutPoliciesRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *ActivityBasedTimeoutPoliciesRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {
@@ -126,11 +137,11 @@ func (m *ActivityBasedTimeoutPoliciesRequestBuilder) ToGetRequestInformation(ctx
 // ToPostRequestInformation create a new activityBasedTimeoutPolicy object.
 func (m *ActivityBasedTimeoutPoliciesRequestBuilder) ToPostRequestInformation(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.ActivityBasedTimeoutPolicyable, requestConfiguration *ActivityBasedTimeoutPoliciesRequestBuilderPostRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.POST
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

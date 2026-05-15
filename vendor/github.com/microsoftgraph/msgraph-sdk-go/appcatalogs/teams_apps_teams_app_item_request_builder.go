@@ -9,7 +9,12 @@ import (
 
 // TeamsAppsTeamsAppItemRequestBuilder provides operations to manage the teamsApps property of the microsoft.graph.appCatalogs entity.
 type TeamsAppsTeamsAppItemRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // TeamsAppsTeamsAppItemRequestBuilderDeleteRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type TeamsAppsTeamsAppItemRequestBuilderDeleteRequestConfiguration struct {
@@ -43,24 +48,30 @@ type TeamsAppsTeamsAppItemRequestBuilderPatchRequestConfiguration struct {
 }
 // AppDefinitions provides operations to manage the appDefinitions property of the microsoft.graph.teamsApp entity.
 func (m *TeamsAppsTeamsAppItemRequestBuilder) AppDefinitions()(*TeamsAppsItemAppDefinitionsRequestBuilder) {
-    return NewTeamsAppsItemAppDefinitionsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewTeamsAppsItemAppDefinitionsRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // AppDefinitionsById provides operations to manage the appDefinitions property of the microsoft.graph.teamsApp entity.
 func (m *TeamsAppsTeamsAppItemRequestBuilder) AppDefinitionsById(id string)(*TeamsAppsItemAppDefinitionsTeamsAppDefinitionItemRequestBuilder) {
     urlTplParams := make(map[string]string)
-    for idx, item := range m.BaseRequestBuilder.PathParameters {
+    for idx, item := range m.pathParameters {
         urlTplParams[idx] = item
     }
     if id != "" {
         urlTplParams["teamsAppDefinition%2Did"] = id
     }
-    return NewTeamsAppsItemAppDefinitionsTeamsAppDefinitionItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
+    return NewTeamsAppsItemAppDefinitionsTeamsAppDefinitionItemRequestBuilderInternal(urlTplParams, m.requestAdapter)
 }
 // NewTeamsAppsTeamsAppItemRequestBuilderInternal instantiates a new TeamsAppItemRequestBuilder and sets the default values.
 func NewTeamsAppsTeamsAppItemRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*TeamsAppsTeamsAppItemRequestBuilder) {
     m := &TeamsAppsTeamsAppItemRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/appCatalogs/teamsApps/{teamsApp%2Did}{?%24select,%24expand}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/appCatalogs/teamsApps/{teamsApp%2Did}{?%24select,%24expand}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewTeamsAppsTeamsAppItemRequestBuilder instantiates a new TeamsAppItemRequestBuilder and sets the default values.
@@ -79,7 +90,7 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) Delete(ctx context.Context, reques
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    err = m.BaseRequestBuilder.RequestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
+    err = m.requestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
     if err != nil {
         return err
     }
@@ -95,7 +106,7 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) Get(ctx context.Context, requestCo
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateTeamsAppFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateTeamsAppFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -114,7 +125,7 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) Patch(ctx context.Context, body ia
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateTeamsAppFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateTeamsAppFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -126,8 +137,8 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) Patch(ctx context.Context, body ia
 // ToDeleteRequestInformation delete navigation property teamsApps for appCatalogs
 func (m *TeamsAppsTeamsAppItemRequestBuilder) ToDeleteRequestInformation(ctx context.Context, requestConfiguration *TeamsAppsTeamsAppItemRequestBuilderDeleteRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.DELETE
     if requestConfiguration != nil {
         requestInfo.Headers.AddAll(requestConfiguration.Headers)
@@ -138,8 +149,8 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) ToDeleteRequestInformation(ctx con
 // ToGetRequestInformation get teamsApps from appCatalogs
 func (m *TeamsAppsTeamsAppItemRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *TeamsAppsTeamsAppItemRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {
@@ -154,11 +165,11 @@ func (m *TeamsAppsTeamsAppItemRequestBuilder) ToGetRequestInformation(ctx contex
 // ToPatchRequestInformation update the navigation property teamsApps in appCatalogs
 func (m *TeamsAppsTeamsAppItemRequestBuilder) ToPatchRequestInformation(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.TeamsAppable, requestConfiguration *TeamsAppsTeamsAppItemRequestBuilderPatchRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.PATCH
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

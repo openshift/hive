@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
@@ -23,8 +24,9 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 	scheme := scheme.GetScheme()
 
 	internalCache, err := cache.New(cfg, cache.Options{
-		DefaultNamespaces: map[string]cache.Config{"openshift-machine-api": {}},
-		Scheme:            scheme,
+		DefaultNamespaces:           map[string]cache.Config{"openshift-machine-api": {}},
+		Scheme:                      scheme,
+		DefaultEnableWatchBookmarks: ptr.To(true),
 	})
 	if err != nil {
 		return err

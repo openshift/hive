@@ -8,7 +8,12 @@ import (
 
 // ItemRejectedSendersItemRefRequestBuilder provides operations to manage the collection of group entities.
 type ItemRejectedSendersItemRefRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemRejectedSendersItemRefRequestBuilderDeleteQueryParameters delete ref of navigation property rejectedSenders for groups
 type ItemRejectedSendersItemRefRequestBuilderDeleteQueryParameters struct {
@@ -27,8 +32,14 @@ type ItemRejectedSendersItemRefRequestBuilderDeleteRequestConfiguration struct {
 // NewItemRejectedSendersItemRefRequestBuilderInternal instantiates a new RefRequestBuilder and sets the default values.
 func NewItemRejectedSendersItemRefRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ItemRejectedSendersItemRefRequestBuilder) {
     m := &ItemRejectedSendersItemRefRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/groups/{group%2Did}/rejectedSenders/{directoryObject%2Did}/$ref{?%40id*}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/groups/{group%2Did}/rejectedSenders/{directoryObject%2Did}/$ref{?%40id*}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemRejectedSendersItemRefRequestBuilder instantiates a new RefRequestBuilder and sets the default values.
@@ -47,7 +58,7 @@ func (m *ItemRejectedSendersItemRefRequestBuilder) Delete(ctx context.Context, r
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    err = m.BaseRequestBuilder.RequestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
+    err = m.requestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
     if err != nil {
         return err
     }
@@ -56,8 +67,8 @@ func (m *ItemRejectedSendersItemRefRequestBuilder) Delete(ctx context.Context, r
 // ToDeleteRequestInformation delete ref of navigation property rejectedSenders for groups
 func (m *ItemRejectedSendersItemRefRequestBuilder) ToDeleteRequestInformation(ctx context.Context, requestConfiguration *ItemRejectedSendersItemRefRequestBuilderDeleteRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.DELETE
     if requestConfiguration != nil {
         if requestConfiguration.QueryParameters != nil {

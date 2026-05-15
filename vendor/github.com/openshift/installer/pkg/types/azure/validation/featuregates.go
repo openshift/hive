@@ -5,7 +5,6 @@ import (
 
 	features "github.com/openshift/api/features"
 	"github.com/openshift/installer/pkg/types"
-	"github.com/openshift/installer/pkg/types/dns"
 	"github.com/openshift/installer/pkg/types/featuregates"
 )
 
@@ -53,9 +52,9 @@ func GatedFeatures(c *types.InstallConfig) []featuregates.GatedInstallConfigFeat
 			Field: field.NewPath("compute", "azure", "dataDisks"),
 		},
 		{
-			FeatureGateName: features.FeatureGateAzureClusterHostedDNSInstall,
-			Condition:       azure.UserProvisionedDNS == dns.UserProvisionedDNSEnabled,
-			Field:           field.NewPath("platform", "azure", "userProvisionedDNS"),
+			FeatureGateName: features.FeatureGateAzureDualStackInstall,
+			Condition:       azure.IPFamily.DualStackEnabled(),
+			Field:           field.NewPath("platform", "azure", "ipFamily"),
 		},
 	}
 }

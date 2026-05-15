@@ -466,7 +466,15 @@ func waitForSyncSetApplied(namespace, cdName, syncsetname, syncsettype string) e
 	if err != nil {
 		return err
 	}
-	listWatcher := cache.NewListWatchFromClient(restClient, "clustersyncs", namespace, fields.OneTermEqualSelector("metadata.name", cdName))
+	listWatcher := cache.NewFilteredListWatchFromClient(
+		restClient,
+		"clustersyncs",
+		namespace,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", cdName).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	syncSetApplied := func(event watch.Event) (bool, error) {
 		if event.Type != watch.Added && event.Type != watch.Modified {
 			return false, nil
@@ -513,7 +521,15 @@ func waitForSyncSetDeleted(namespace, syncsetname string) error {
 	if err != nil {
 		return err
 	}
-	listWatcher := cache.NewListWatchFromClient(restClient, "syncsets", namespace, fields.OneTermEqualSelector("metadata.name", syncsetname))
+	listWatcher := cache.NewFilteredListWatchFromClient(
+		restClient,
+		"syncsets",
+		namespace,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", syncsetname).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	_, err = clientwatch.UntilWithSync(
 		ctx,
 		listWatcher,
@@ -544,7 +560,15 @@ func waitForSyncSetDisassociated(namespace, cdName, syncsetname, syncsettype str
 	if err != nil {
 		return err
 	}
-	listWatcher := cache.NewListWatchFromClient(restClient, "clustersyncs", namespace, fields.OneTermEqualSelector("metadata.name", cdName))
+	listWatcher := cache.NewFilteredListWatchFromClient(
+		restClient,
+		"clustersyncs",
+		namespace,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", cdName).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	syncSetDisassociated := func(event watch.Event) (bool, error) {
 		if event.Type != watch.Added && event.Type != watch.Modified {
 			return false, nil

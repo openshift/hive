@@ -9,7 +9,12 @@ import (
 
 // SharedDriveItemItemRequestBuilder provides operations to manage the collection of sharedDriveItem entities.
 type SharedDriveItemItemRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // SharedDriveItemItemRequestBuilderDeleteRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type SharedDriveItemItemRequestBuilderDeleteRequestConfiguration struct {
@@ -44,8 +49,14 @@ type SharedDriveItemItemRequestBuilderPatchRequestConfiguration struct {
 // NewSharedDriveItemItemRequestBuilderInternal instantiates a new SharedDriveItemItemRequestBuilder and sets the default values.
 func NewSharedDriveItemItemRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*SharedDriveItemItemRequestBuilder) {
     m := &SharedDriveItemItemRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/shares/{sharedDriveItem%2Did}{?%24select,%24expand}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/shares/{sharedDriveItem%2Did}{?%24select,%24expand}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewSharedDriveItemItemRequestBuilder instantiates a new SharedDriveItemItemRequestBuilder and sets the default values.
@@ -64,7 +75,7 @@ func (m *SharedDriveItemItemRequestBuilder) Delete(ctx context.Context, requestC
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    err = m.BaseRequestBuilder.RequestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
+    err = m.requestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
     if err != nil {
         return err
     }
@@ -72,7 +83,7 @@ func (m *SharedDriveItemItemRequestBuilder) Delete(ctx context.Context, requestC
 }
 // DriveItem provides operations to manage the driveItem property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) DriveItem()(*ItemDriveItemRequestBuilder) {
-    return NewItemDriveItemRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemDriveItemRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Get access a shared DriveItem or a collection of shared items by using a **shareId** or sharing URL. To use a sharing URL with this API, your app needs to transform the URL into a sharing token.
 // [Find more info here]
@@ -87,7 +98,7 @@ func (m *SharedDriveItemItemRequestBuilder) Get(ctx context.Context, requestConf
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateSharedDriveItemFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateSharedDriveItemFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -98,26 +109,26 @@ func (m *SharedDriveItemItemRequestBuilder) Get(ctx context.Context, requestConf
 }
 // Items provides operations to manage the items property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) Items()(*ItemItemsRequestBuilder) {
-    return NewItemItemsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // ItemsById provides operations to manage the items property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) ItemsById(id string)(*ItemItemsDriveItemItemRequestBuilder) {
     urlTplParams := make(map[string]string)
-    for idx, item := range m.BaseRequestBuilder.PathParameters {
+    for idx, item := range m.pathParameters {
         urlTplParams[idx] = item
     }
     if id != "" {
         urlTplParams["driveItem%2Did"] = id
     }
-    return NewItemItemsDriveItemItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsDriveItemItemRequestBuilderInternal(urlTplParams, m.requestAdapter)
 }
 // List provides operations to manage the list property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) List()(*ItemListRequestBuilder) {
-    return NewItemListRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemListRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // ListItem provides operations to manage the listItem property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) ListItem()(*ItemListItemRequestBuilder) {
-    return NewItemListItemRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemListItemRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Patch update entity in shares
 func (m *SharedDriveItemItemRequestBuilder) Patch(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.SharedDriveItemable, requestConfiguration *SharedDriveItemItemRequestBuilderPatchRequestConfiguration)(iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.SharedDriveItemable, error) {
@@ -129,7 +140,7 @@ func (m *SharedDriveItemItemRequestBuilder) Patch(ctx context.Context, body iadc
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateSharedDriveItemFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateSharedDriveItemFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -140,21 +151,21 @@ func (m *SharedDriveItemItemRequestBuilder) Patch(ctx context.Context, body iadc
 }
 // Permission provides operations to manage the permission property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) Permission()(*ItemPermissionRequestBuilder) {
-    return NewItemPermissionRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemPermissionRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Root provides operations to manage the root property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) Root()(*ItemRootRequestBuilder) {
-    return NewItemRootRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemRootRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Site provides operations to manage the site property of the microsoft.graph.sharedDriveItem entity.
 func (m *SharedDriveItemItemRequestBuilder) Site()(*ItemSiteRequestBuilder) {
-    return NewItemSiteRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemSiteRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // ToDeleteRequestInformation delete entity from shares
 func (m *SharedDriveItemItemRequestBuilder) ToDeleteRequestInformation(ctx context.Context, requestConfiguration *SharedDriveItemItemRequestBuilderDeleteRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.DELETE
     if requestConfiguration != nil {
         requestInfo.Headers.AddAll(requestConfiguration.Headers)
@@ -165,8 +176,8 @@ func (m *SharedDriveItemItemRequestBuilder) ToDeleteRequestInformation(ctx conte
 // ToGetRequestInformation access a shared DriveItem or a collection of shared items by using a **shareId** or sharing URL. To use a sharing URL with this API, your app needs to transform the URL into a sharing token.
 func (m *SharedDriveItemItemRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *SharedDriveItemItemRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {
@@ -181,11 +192,11 @@ func (m *SharedDriveItemItemRequestBuilder) ToGetRequestInformation(ctx context.
 // ToPatchRequestInformation update entity in shares
 func (m *SharedDriveItemItemRequestBuilder) ToPatchRequestInformation(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.SharedDriveItemable, requestConfiguration *SharedDriveItemItemRequestBuilderPatchRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.PATCH
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

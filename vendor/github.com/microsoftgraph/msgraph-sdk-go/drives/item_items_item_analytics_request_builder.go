@@ -9,7 +9,12 @@ import (
 
 // ItemItemsItemAnalyticsRequestBuilder provides operations to manage the analytics property of the microsoft.graph.driveItem entity.
 type ItemItemsItemAnalyticsRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemItemsItemAnalyticsRequestBuilderDeleteRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type ItemItemsItemAnalyticsRequestBuilderDeleteRequestConfiguration struct {
@@ -43,13 +48,19 @@ type ItemItemsItemAnalyticsRequestBuilderPatchRequestConfiguration struct {
 }
 // AllTime provides operations to manage the allTime property of the microsoft.graph.itemAnalytics entity.
 func (m *ItemItemsItemAnalyticsRequestBuilder) AllTime()(*ItemItemsItemAnalyticsAllTimeRequestBuilder) {
-    return NewItemItemsItemAnalyticsAllTimeRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsItemAnalyticsAllTimeRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // NewItemItemsItemAnalyticsRequestBuilderInternal instantiates a new AnalyticsRequestBuilder and sets the default values.
 func NewItemItemsItemAnalyticsRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ItemItemsItemAnalyticsRequestBuilder) {
     m := &ItemItemsItemAnalyticsRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/drives/{drive%2Did}/items/{driveItem%2Did}/analytics{?%24select,%24expand}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/drives/{drive%2Did}/items/{driveItem%2Did}/analytics{?%24select,%24expand}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemItemsItemAnalyticsRequestBuilder instantiates a new AnalyticsRequestBuilder and sets the default values.
@@ -68,7 +79,7 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) Delete(ctx context.Context, reque
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    err = m.BaseRequestBuilder.RequestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
+    err = m.requestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
     if err != nil {
         return err
     }
@@ -84,7 +95,7 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) Get(ctx context.Context, requestC
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateItemAnalyticsFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateItemAnalyticsFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -95,22 +106,22 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) Get(ctx context.Context, requestC
 }
 // ItemActivityStats provides operations to manage the itemActivityStats property of the microsoft.graph.itemAnalytics entity.
 func (m *ItemItemsItemAnalyticsRequestBuilder) ItemActivityStats()(*ItemItemsItemAnalyticsItemActivityStatsRequestBuilder) {
-    return NewItemItemsItemAnalyticsItemActivityStatsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsItemAnalyticsItemActivityStatsRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // ItemActivityStatsById provides operations to manage the itemActivityStats property of the microsoft.graph.itemAnalytics entity.
 func (m *ItemItemsItemAnalyticsRequestBuilder) ItemActivityStatsById(id string)(*ItemItemsItemAnalyticsItemActivityStatsItemActivityStatItemRequestBuilder) {
     urlTplParams := make(map[string]string)
-    for idx, item := range m.BaseRequestBuilder.PathParameters {
+    for idx, item := range m.pathParameters {
         urlTplParams[idx] = item
     }
     if id != "" {
         urlTplParams["itemActivityStat%2Did"] = id
     }
-    return NewItemItemsItemAnalyticsItemActivityStatsItemActivityStatItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsItemAnalyticsItemActivityStatsItemActivityStatItemRequestBuilderInternal(urlTplParams, m.requestAdapter)
 }
 // LastSevenDays provides operations to manage the lastSevenDays property of the microsoft.graph.itemAnalytics entity.
 func (m *ItemItemsItemAnalyticsRequestBuilder) LastSevenDays()(*ItemItemsItemAnalyticsLastSevenDaysRequestBuilder) {
-    return NewItemItemsItemAnalyticsLastSevenDaysRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsItemAnalyticsLastSevenDaysRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Patch update the navigation property analytics in drives
 func (m *ItemItemsItemAnalyticsRequestBuilder) Patch(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.ItemAnalyticsable, requestConfiguration *ItemItemsItemAnalyticsRequestBuilderPatchRequestConfiguration)(iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.ItemAnalyticsable, error) {
@@ -122,7 +133,7 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) Patch(ctx context.Context, body i
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateItemAnalyticsFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateItemAnalyticsFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -134,8 +145,8 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) Patch(ctx context.Context, body i
 // ToDeleteRequestInformation delete navigation property analytics for drives
 func (m *ItemItemsItemAnalyticsRequestBuilder) ToDeleteRequestInformation(ctx context.Context, requestConfiguration *ItemItemsItemAnalyticsRequestBuilderDeleteRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.DELETE
     if requestConfiguration != nil {
         requestInfo.Headers.AddAll(requestConfiguration.Headers)
@@ -146,8 +157,8 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) ToDeleteRequestInformation(ctx co
 // ToGetRequestInformation analytics about the view activities that took place on this item.
 func (m *ItemItemsItemAnalyticsRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *ItemItemsItemAnalyticsRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {
@@ -162,11 +173,11 @@ func (m *ItemItemsItemAnalyticsRequestBuilder) ToGetRequestInformation(ctx conte
 // ToPatchRequestInformation update the navigation property analytics in drives
 func (m *ItemItemsItemAnalyticsRequestBuilder) ToPatchRequestInformation(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.ItemAnalyticsable, requestConfiguration *ItemItemsItemAnalyticsRequestBuilderPatchRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.PATCH
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

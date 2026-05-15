@@ -8,7 +8,12 @@ import (
 
 // CasesEdiscoveryCasesItemSecurityReopenRequestBuilder provides operations to call the reopen method.
 type CasesEdiscoveryCasesItemSecurityReopenRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // CasesEdiscoveryCasesItemSecurityReopenRequestBuilderPostRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type CasesEdiscoveryCasesItemSecurityReopenRequestBuilderPostRequestConfiguration struct {
@@ -20,8 +25,14 @@ type CasesEdiscoveryCasesItemSecurityReopenRequestBuilderPostRequestConfiguratio
 // NewCasesEdiscoveryCasesItemSecurityReopenRequestBuilderInternal instantiates a new SecurityReopenRequestBuilder and sets the default values.
 func NewCasesEdiscoveryCasesItemSecurityReopenRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*CasesEdiscoveryCasesItemSecurityReopenRequestBuilder) {
     m := &CasesEdiscoveryCasesItemSecurityReopenRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/security/cases/ediscoveryCases/{ediscoveryCase%2Did}/security.reopen", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/security/cases/ediscoveryCases/{ediscoveryCase%2Did}/security.reopen";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewCasesEdiscoveryCasesItemSecurityReopenRequestBuilder instantiates a new SecurityReopenRequestBuilder and sets the default values.
@@ -43,7 +54,7 @@ func (m *CasesEdiscoveryCasesItemSecurityReopenRequestBuilder) Post(ctx context.
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    err = m.BaseRequestBuilder.RequestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
+    err = m.requestAdapter.SendNoContent(ctx, requestInfo, errorMapping)
     if err != nil {
         return err
     }
@@ -52,8 +63,8 @@ func (m *CasesEdiscoveryCasesItemSecurityReopenRequestBuilder) Post(ctx context.
 // ToPostRequestInformation reopen an eDiscovery case that was closed. For details, see Reopen a closed case.
 func (m *CasesEdiscoveryCasesItemSecurityReopenRequestBuilder) ToPostRequestInformation(ctx context.Context, requestConfiguration *CasesEdiscoveryCasesItemSecurityReopenRequestBuilderPostRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.POST
     if requestConfiguration != nil {
         requestInfo.Headers.AddAll(requestConfiguration.Headers)

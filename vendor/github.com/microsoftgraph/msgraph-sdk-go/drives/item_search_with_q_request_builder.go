@@ -8,7 +8,12 @@ import (
 
 // ItemSearchWithQRequestBuilder provides operations to call the search method.
 type ItemSearchWithQRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemSearchWithQRequestBuilderGetQueryParameters invoke function search
 type ItemSearchWithQRequestBuilderGetQueryParameters struct {
@@ -39,11 +44,17 @@ type ItemSearchWithQRequestBuilderGetRequestConfiguration struct {
 // NewItemSearchWithQRequestBuilderInternal instantiates a new SearchWithQRequestBuilder and sets the default values.
 func NewItemSearchWithQRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter, q *string)(*ItemSearchWithQRequestBuilder) {
     m := &ItemSearchWithQRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/drives/{drive%2Did}/search(q='{q}'){?%24top,%24skip,%24search,%24filter,%24count,%24select,%24orderby}", pathParameters),
+    }
+    m.urlTemplate = "{+baseurl}/drives/{drive%2Did}/search(q='{q}'){?%24top,%24skip,%24search,%24filter,%24count,%24select,%24orderby}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
     }
     if q != nil {
-        m.BaseRequestBuilder.PathParameters["q"] = *q
+        urlTplParams["q"] = *q
     }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemSearchWithQRequestBuilder instantiates a new SearchWithQRequestBuilder and sets the default values.
@@ -62,7 +73,7 @@ func (m *ItemSearchWithQRequestBuilder) Get(ctx context.Context, requestConfigur
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, CreateItemSearchWithQResponseFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, CreateItemSearchWithQResponseFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -74,8 +85,8 @@ func (m *ItemSearchWithQRequestBuilder) Get(ctx context.Context, requestConfigur
 // ToGetRequestInformation invoke function search
 func (m *ItemSearchWithQRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *ItemSearchWithQRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {

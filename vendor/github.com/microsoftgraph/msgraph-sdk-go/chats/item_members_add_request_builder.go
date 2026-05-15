@@ -8,7 +8,12 @@ import (
 
 // ItemMembersAddRequestBuilder provides operations to call the add method.
 type ItemMembersAddRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemMembersAddRequestBuilderPostRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type ItemMembersAddRequestBuilderPostRequestConfiguration struct {
@@ -20,8 +25,14 @@ type ItemMembersAddRequestBuilderPostRequestConfiguration struct {
 // NewItemMembersAddRequestBuilderInternal instantiates a new AddRequestBuilder and sets the default values.
 func NewItemMembersAddRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ItemMembersAddRequestBuilder) {
     m := &ItemMembersAddRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/chats/{chat%2Did}/members/add", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/chats/{chat%2Did}/members/add";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemMembersAddRequestBuilder instantiates a new AddRequestBuilder and sets the default values.
@@ -43,7 +54,7 @@ func (m *ItemMembersAddRequestBuilder) Post(ctx context.Context, body ItemMember
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, CreateItemMembersAddResponseFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, CreateItemMembersAddResponseFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -55,11 +66,11 @@ func (m *ItemMembersAddRequestBuilder) Post(ctx context.Context, body ItemMember
 // ToPostRequestInformation add multiple members in a single request to a team. The response provides details about which memberships could and couldn't be created.
 func (m *ItemMembersAddRequestBuilder) ToPostRequestInformation(ctx context.Context, body ItemMembersAddPostRequestBodyable, requestConfiguration *ItemMembersAddRequestBuilderPostRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.POST
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

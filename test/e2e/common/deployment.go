@@ -8,6 +8,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -46,7 +47,15 @@ func WaitForDeployment(c kclient.Interface, namespace, name string, testFunc fun
 			done <- struct{}{}
 		}
 	}
-	watchList := cache.NewListWatchFromClient(c.AppsV1().RESTClient(), "deployments", namespace, fields.OneTermEqualSelector("metadata.name", name))
+	watchList := cache.NewFilteredListWatchFromClient(
+		c.AppsV1().RESTClient(),
+		"deployments",
+		namespace,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
 		ListerWatcher: watchList,
 		ObjectType:    &appsv1.Deployment{},

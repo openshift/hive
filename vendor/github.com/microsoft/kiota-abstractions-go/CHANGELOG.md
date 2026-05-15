@@ -2,13 +2,6 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.9.3](https://github.com/microsoft/kiota-abstractions-go/compare/v1.9.2...v1.9.3) (2025-07-16)
-
-
-### Bug Fixes
-
-* for timeOnly to support string with nanosecond precision ([#206](https://github.com/microsoft/kiota-abstractions-go/issues/206)) ([fbc2113](https://github.com/microsoft/kiota-abstractions-go/commit/fbc21133d031ef3e09b6aeda2de54033bd8533ce))
-
 ## [1.9.2](https://github.com/microsoft/kiota-abstractions-go/compare/v1.9.1...v1.9.2) (2025-04-02)
 
 

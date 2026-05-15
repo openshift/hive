@@ -13,8 +13,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
@@ -214,31 +216,38 @@ func (o *Options) waitForHiveAdmissionPods(hiveNSName string) error {
 
 	statusViewer := &polymorphichelpers.DeploymentStatusViewer{}
 
-	opts := []client.ListOption{
-		client.InNamespace(hiveNSName),
-		client.MatchingFields{"metadata.name": hiveAdmissionDeployment},
+	// Deployment GVR
+	deploymentGVR := schema.GroupVersionResource{
+		Group:    "apps",
+		Version:  "v1",
+		Resource: "deployments",
 	}
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			dlist := &appsv1.DeploymentList{}
-			err := o.hiveClient.List(context.TODO(), dlist, opts...)
-			return dlist, err
-
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			dlist := &appsv1.DeploymentList{}
-			return o.hiveClient.Watch(context.TODO(), dlist, opts...)
-		},
+	lw, err := newDynamicListWatchWithBookmarks(deploymentGVR, hiveNSName, hiveAdmissionDeployment)
+	if err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), waitTime)
 	defer cancel()
 
-	_, err := clientwatch.UntilWithSync(ctx, lw, &appsv1.Deployment{}, nil, func(e watch.Event) (bool, error) {
+	_, err = clientwatch.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
 		switch t := e.Type; t {
 		case watch.Added, watch.Modified:
-			unstObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(e.Object)
+			obj, ok := e.Object.(*unstructured.Unstructured)
+			if !ok {
+				return true, fmt.Errorf("failed to convert event object to unstructured")
+			}
+
+			// Convert unstructured to typed Deployment
+			var deployment appsv1.Deployment
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &deployment)
+			if err != nil {
+				return true, fmt.Errorf("failed to convert to Deployment: %w", err)
+			}
+
+			// Convert back to unstructured for status viewer
+			unstObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&deployment)
 			if err != nil {
 				return true, fmt.Errorf("failed to convert to unstructured runtime object: %v", err)
 			}
@@ -265,32 +274,36 @@ func (o *Options) waitForHiveAdmissionPods(hiveNSName string) error {
 // wiatForHiveConfigToBeProcessed will wait for the HiveConfig.Status.ObservedGeneration to match
 // the HiveConfig's Generation (and status showing ConfigApplied == true).
 func (o *Options) waitForHiveConfigToBeProcessed() error {
-	opts := []client.ListOption{
-		client.MatchingFields{"metadata.name": hiveConfigName},
+	// HiveConfig GVR
+	hiveConfigGVR := schema.GroupVersionResource{
+		Group:    "hive.openshift.io",
+		Version:  "v1",
+		Resource: "hiveconfigs",
 	}
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			hcl := &hivev1.HiveConfigList{}
-			err := o.hiveClient.List(context.TODO(), hcl, opts...)
-			return hcl, err
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			hcl := &hivev1.HiveConfigList{}
-			return o.hiveClient.Watch(context.TODO(), hcl, opts...)
-		},
+	lw, err := newDynamicListWatchWithBookmarks(hiveConfigGVR, "", hiveConfigName)
+	if err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), waitTime)
 	defer cancel()
 
-	_, err := clientwatch.UntilWithSync(ctx, lw, &hivev1.HiveConfig{}, nil, func(e watch.Event) (bool, error) {
+	_, err = clientwatch.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
 		switch t := e.Type; t {
 		case watch.Added, watch.Modified:
-			hc, ok := e.Object.(*hivev1.HiveConfig)
+			obj, ok := e.Object.(*unstructured.Unstructured)
 			if !ok {
-				return true, fmt.Errorf("failed to convert event object into HiveConfig")
+				return true, fmt.Errorf("failed to convert event object to unstructured")
 			}
+
+			// Convert unstructured to typed HiveConfig
+			var hc hivev1.HiveConfig
+			err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &hc)
+			if err != nil {
+				return true, fmt.Errorf("failed to convert to HiveConfig: %w", err)
+			}
+
 			if hc.Generation == hc.Status.ObservedGeneration && hc.Status.ConfigApplied {
 				return true, nil
 			}
@@ -305,6 +318,38 @@ func (o *Options) waitForHiveConfigToBeProcessed() error {
 
 	log.Debug("done waiting for hiveconfig to be processed")
 	return err
+}
+
+// newDynamicListWatchWithBookmarks creates a ListWatch for the given GVR with field selector and bookmarks enabled.
+// If namespace is empty, it watches cluster-scoped resources.
+func newDynamicListWatchWithBookmarks(gvr schema.GroupVersionResource, namespace, name string) (*cache.ListWatch, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get REST config: %w", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
+	return &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = "metadata.name=" + name
+			if namespace == "" {
+				return dynamicClient.Resource(gvr).List(context.Background(), options)
+			}
+			return dynamicClient.Resource(gvr).Namespace(namespace).List(context.Background(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.AllowWatchBookmarks = true
+			options.FieldSelector = "metadata.name=" + name
+			if namespace == "" {
+				return dynamicClient.Resource(gvr).Watch(context.Background(), options)
+			}
+			return dynamicClient.Resource(gvr).Namespace(namespace).Watch(context.Background(), options)
+		},
+	}, nil
 }
 
 func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {

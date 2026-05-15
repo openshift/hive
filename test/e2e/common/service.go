@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -27,7 +28,15 @@ func WaitForService(c kclient.Interface, namespace, name string, testFunc func(*
 			done <- struct{}{}
 		}
 	}
-	watchList := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "services", namespace, fields.OneTermEqualSelector("metadata.name", name))
+	watchList := cache.NewFilteredListWatchFromClient(
+		c.CoreV1().RESTClient(),
+		"services",
+		namespace,
+		func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", name).String()
+			options.AllowWatchBookmarks = true
+		},
+	)
 	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
 		ListerWatcher: watchList,
 		ObjectType:    &corev1.Service{},

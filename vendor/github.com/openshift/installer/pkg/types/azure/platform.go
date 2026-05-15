@@ -7,6 +7,7 @@ import (
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
 	"github.com/openshift/installer/pkg/types/dns"
+	"github.com/openshift/installer/pkg/types/network"
 )
 
 // aro is a setting to enable aro-only modifications
@@ -49,6 +50,13 @@ type Platform struct {
 	//
 	// +optional
 	BaseDomainResourceGroupName string `json:"baseDomainResourceGroupName,omitempty"`
+
+	// AllowSharedKeyAccess specifies if shared access key should be enabled for the storage account.
+	// Default value is true.
+	// Disabling this will require a new permission "Storage Blob Data Contributor" in azure.
+	//
+	// +optional
+	AllowSharedKeyAccess *bool `json:"allowSharedKeyAccess,omitempty"`
 
 	// DefaultMachinePlatform is the default configuration used when
 	// installing on Azure for machine pools which do not define their own
@@ -120,6 +128,18 @@ type Platform struct {
 	// +default="Disabled"
 	// +kubebuilder:validation:Enum="Enabled";"Disabled"
 	UserProvisionedDNS dns.UserProvisionedDNS `json:"userProvisionedDNS,omitempty"`
+
+	// IPFamily specifies the IP address family for the cluster network.
+	// Use "IPv4" for IPv4-only networking, "DualStackIPv4Primary" for dual-stack networking
+	// with IPv4 as the primary address family, or "DualStackIPv6Primary" for dual-stack
+	// networking with IPv6 as the primary address family. When using dual-stack, the VNet
+	// and subnets must be configured with both IPv4 and IPv6 CIDR blocks.
+	//
+	// +kubebuilder:default:="IPv4"
+	// +default="IPv4"
+	// +kubebuilder:validation:Enum="IPv4";"DualStackIPv4Primary";"DualStackIPv6Primary"
+	// +optional
+	IPFamily network.IPFamily `json:"ipFamily,omitempty"`
 }
 
 // SubnetSpec specifies the properties the subnet needs to be used in the cluster.

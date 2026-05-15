@@ -123,6 +123,7 @@ func (w *waitForJobOpts) waitForJobExecution(client *kubeclient.Clientset, names
 			namespace,
 			func(options *metav1.ListOptions) {
 				options.LabelSelector = labelSet.String()
+				options.AllowWatchBookmarks = true
 			}),
 		&batchv1.Job{},
 		nil,

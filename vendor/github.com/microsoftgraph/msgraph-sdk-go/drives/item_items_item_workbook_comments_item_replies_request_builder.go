@@ -9,7 +9,12 @@ import (
 
 // ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder provides operations to manage the replies property of the microsoft.graph.workbookComment entity.
 type ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderGetQueryParameters get replies from drives
 type ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderGetQueryParameters struct {
@@ -49,8 +54,14 @@ type ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderPostRequestConfigurat
 // NewItemItemsItemWorkbookCommentsItemRepliesRequestBuilderInternal instantiates a new RepliesRequestBuilder and sets the default values.
 func NewItemItemsItemWorkbookCommentsItemRepliesRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) {
     m := &ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/drives/{drive%2Did}/items/{driveItem%2Did}/workbook/comments/{workbookComment%2Did}/replies{?%24top,%24skip,%24search,%24filter,%24count,%24orderby,%24select,%24expand}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/drives/{drive%2Did}/items/{driveItem%2Did}/workbook/comments/{workbookComment%2Did}/replies{?%24top,%24skip,%24search,%24filter,%24count,%24orderby,%24select,%24expand}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemItemsItemWorkbookCommentsItemRepliesRequestBuilder instantiates a new RepliesRequestBuilder and sets the default values.
@@ -61,7 +72,7 @@ func NewItemItemsItemWorkbookCommentsItemRepliesRequestBuilder(rawUrl string, re
 }
 // Count provides operations to count the resources in the collection.
 func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) Count()(*ItemItemsItemWorkbookCommentsItemRepliesCountRequestBuilder) {
-    return NewItemItemsItemWorkbookCommentsItemRepliesCountRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+    return NewItemItemsItemWorkbookCommentsItemRepliesCountRequestBuilderInternal(m.pathParameters, m.requestAdapter)
 }
 // Get get replies from drives
 func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) Get(ctx context.Context, requestConfiguration *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderGetRequestConfiguration)(iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.WorkbookCommentReplyCollectionResponseable, error) {
@@ -73,7 +84,7 @@ func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) Get(ctx context
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateWorkbookCommentReplyCollectionResponseFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateWorkbookCommentReplyCollectionResponseFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -92,7 +103,7 @@ func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) Post(ctx contex
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateWorkbookCommentReplyFromDiscriminatorValue, errorMapping)
+    res, err := m.requestAdapter.Send(ctx, requestInfo, iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.CreateWorkbookCommentReplyFromDiscriminatorValue, errorMapping)
     if err != nil {
         return nil, err
     }
@@ -104,8 +115,8 @@ func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) Post(ctx contex
 // ToGetRequestInformation get replies from drives
 func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "application/json")
     if requestConfiguration != nil {
@@ -120,11 +131,11 @@ func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) ToGetRequestInf
 // ToPostRequestInformation create new navigation property to replies for drives
 func (m *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilder) ToPostRequestInformation(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.WorkbookCommentReplyable, requestConfiguration *ItemItemsItemWorkbookCommentsItemRepliesRequestBuilderPostRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.POST
     requestInfo.Headers.Add("Accept", "application/json")
-    err := requestInfo.SetContentFromParsable(ctx, m.BaseRequestBuilder.RequestAdapter, "application/json", body)
+    err := requestInfo.SetContentFromParsable(ctx, m.requestAdapter, "application/json", body)
     if err != nil {
         return nil, err
     }

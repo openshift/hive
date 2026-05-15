@@ -8,7 +8,12 @@ import (
 
 // ItemSitesItemTermStoresCountRequestBuilder provides operations to count the resources in the collection.
 type ItemSitesItemTermStoresCountRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+    // Path parameters for the request
+    pathParameters map[string]string
+    // The request adapter to use to execute the requests.
+    requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter
+    // Url template to use to build the URL for the current request builder
+    urlTemplate string
 }
 // ItemSitesItemTermStoresCountRequestBuilderGetQueryParameters get the number of the resource
 type ItemSitesItemTermStoresCountRequestBuilderGetQueryParameters struct {
@@ -29,8 +34,14 @@ type ItemSitesItemTermStoresCountRequestBuilderGetRequestConfiguration struct {
 // NewItemSitesItemTermStoresCountRequestBuilderInternal instantiates a new CountRequestBuilder and sets the default values.
 func NewItemSitesItemTermStoresCountRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*ItemSitesItemTermStoresCountRequestBuilder) {
     m := &ItemSitesItemTermStoresCountRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/groups/{group%2Did}/sites/{site%2Did}/termStores/$count{?%24search,%24filter}", pathParameters),
     }
+    m.urlTemplate = "{+baseurl}/groups/{group%2Did}/sites/{site%2Did}/termStores/$count{?%24search,%24filter}";
+    urlTplParams := make(map[string]string)
+    for idx, item := range pathParameters {
+        urlTplParams[idx] = item
+    }
+    m.pathParameters = urlTplParams
+    m.requestAdapter = requestAdapter
     return m
 }
 // NewItemSitesItemTermStoresCountRequestBuilder instantiates a new CountRequestBuilder and sets the default values.
@@ -49,7 +60,7 @@ func (m *ItemSitesItemTermStoresCountRequestBuilder) Get(ctx context.Context, re
         "4XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
         "5XX": ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a.CreateODataErrorFromDiscriminatorValue,
     }
-    res, err := m.BaseRequestBuilder.RequestAdapter.SendPrimitive(ctx, requestInfo, "int32", errorMapping)
+    res, err := m.requestAdapter.SendPrimitive(ctx, requestInfo, "int32", errorMapping)
     if err != nil {
         return nil, err
     }
@@ -61,8 +72,8 @@ func (m *ItemSitesItemTermStoresCountRequestBuilder) Get(ctx context.Context, re
 // ToGetRequestInformation get the number of the resource
 func (m *ItemSitesItemTermStoresCountRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *ItemSitesItemTermStoresCountRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformation()
-    requestInfo.UrlTemplate = m.BaseRequestBuilder.UrlTemplate
-    requestInfo.PathParameters = m.BaseRequestBuilder.PathParameters
+    requestInfo.UrlTemplate = m.urlTemplate
+    requestInfo.PathParameters = m.pathParameters
     requestInfo.Method = i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET
     requestInfo.Headers.Add("Accept", "text/plain")
     if requestConfiguration != nil {

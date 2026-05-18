@@ -2515,7 +2515,20 @@ func (r *ReconcileClusterDeployment) ensurePrivateImagePullSecret(cd *hivev1.Clu
 	src := types.NamespacedName{Name: secretName, Namespace: srcNamespace}
 	dest := types.NamespacedName{Name: secretName, Namespace: destNamespace}
 
-	return controllerutils.CopySecret(r, src, dest, cd, r.scheme)
+	requeue, err := controllerutils.CopySecret(r, src, dest, cd, r.scheme)
+	if err != nil {
+		deleted, err2 := r.namespaceTerminated(cd.Namespace)
+		if deleted {
+			cdLog.Warn("detected deleted namespace; skipping private image pull secret copy")
+			return false, nil
+		}
+		if err2 != nil {
+			cdLog.WithError(err).Warn("Error copying private image pull secret")
+			return false, errors.Wrapf(err2, "failed to discover whether namespace %s is marked for deletion", cd.Namespace)
+		}
+		return false, errors.Wrap(err, "Error copying private image pull secret")
+	}
+	return requeue, nil
 }
 
 func configureTrustedCABundleConfigMap(cm *corev1.ConfigMap) bool {

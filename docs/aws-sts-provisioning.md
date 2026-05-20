@@ -46,14 +46,80 @@ Create a ClusterDeployment normally with the following changes:
   ```
   kubectl create secret generic bound-service-account-signing-key --from-file=bound-service-account-signing-key.key=_output/serviceaccount-signer.private
   ```
-  1. Create a Secret for your installer manifests (credential role Secrets, Authentication config)
+  1. Create a Secret for your installer manifests (credential role Secrets, Authentication config).
+  The recommended approach is `--from-file` pointed at the `ccoctl` output directory, which
+  automatically preserves the original filenames as secret keys:
   ```
   kubectl create secret generic cluster-manifests --from-file=_output/manifests/
   ```
+
+  > **WARNING: Authentication CR key name requirement**
+  >
+  > The secret key for the Authentication CR **must** be exactly
+  > `cluster-authentication-02-config.yaml`. During bootstrap, the
+  > kube-apiserver render step reads this manifest from a hardcoded path
+  > (`/assets/manifests/cluster-authentication-02-config.yaml`). If the
+  > key name in the manifest secret differs from this, the file will not
+  > be found and the kube-apiserver will silently start with the default
+  > `serviceAccountIssuer` (`https://kubernetes.default.svc`) instead of
+  > your custom S3 OIDC issuer. This causes `machine-api-controllers` to
+  > receive tokens with the wrong issuer, and AWS STS rejects them with
+  > `InvalidIdentityToken: Token issuer does not match provider`. Workers
+  > will never provision and the install will time out.
+  >
+  > Using `--from-file=_output/manifests/` as shown above preserves the
+  > canonical filename automatically. If you create the secret manually
+  > (e.g. with `stringData` in YAML), ensure the Authentication CR entry
+  > uses the key `cluster-authentication-02-config.yaml`.
+  >
+  > Other credential manifests (operator Secrets for machine-api, ingress,
+  > image-registry, etc.) are not affected by this requirement — they are
+  > applied by their Kubernetes GVK and content, not by filename.
+
   1. In your InstallConfig set `credentialsMode: Manual`
   1. In your ClusterDeployment set `spec.boundServiceAccountSigningKeySecretRef.name` to point to the Secret created above (`bound-service-account-signing-key`).
   1. In your ClusterDeployment set `spec.provisioning.manifestsSecretRef` to point to the Secret created above (`cluster-manifests`).
   1. Create your ClusterDeployment + InstallConfig to provision your STS cluster.
+
+## Troubleshooting
+
+### Install times out with `InvalidIdentityToken`
+
+If your STS cluster install times out and `machine-api-controllers` logs show:
+
+```
+error assuming role: InvalidIdentityToken: Token issuer does not match provider
+```
+
+The kube-apiserver is likely using the default `serviceAccountIssuer` instead of your custom S3 OIDC issuer.
+
+**Check the issuer on the running cluster:**
+
+```bash
+oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}'
+```
+
+If this returns your S3 OIDC URL (e.g. `https://<name>-oidc.s3.<region>.amazonaws.com`) but the
+kube-apiserver started with `https://kubernetes.default.svc`, the Authentication CR manifest was
+not picked up during bootstrap.
+
+**Verify the manifest secret key names:**
+
+```bash
+oc get secret cluster-manifests -n <namespace> -o jsonpath='{range .data}{@.key}{"\n"}{end}'
+```
+
+Look for `cluster-authentication-02-config.yaml` as an exact key name. If the Authentication CR
+is stored under a different key (e.g. `00-cluster-authentication-config.yaml` or
+`authentication.yaml`), recreate the secret with the correct key name.
+
+The simplest fix is to recreate the manifest secret using `--from-file` pointed at the `ccoctl`
+output directory:
+
+```bash
+oc delete secret cluster-manifests -n <namespace>
+oc create secret generic cluster-manifests -n <namespace> --from-file=_output/manifests/
+```
 
 ## Note: Cleanup AWS resources after uninstalling the cluster
 Make sure you clean up the following resources after you uninstall your cluster. To delete resources created by ccoctl, run

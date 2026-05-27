@@ -652,6 +652,15 @@ func (sub *subscription) create(oc *exutil.CLI) {
 
 // Create subscription for Hive if not exist and wait for resource is ready
 func (sub *subscription) createIfNotExist(oc *exutil.CLI) {
+	// If hive-operator is already deployed (e.g. via CI deploy-hive step using kustomize),
+	// skip OLM subscription creation to avoid overwriting the pre-deployed image.
+	deployOutput, _ := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "hive-operator", "-n", sub.namespace).Output()
+	if !strings.Contains(deployOutput, "NotFound") && !strings.Contains(deployOutput, "not found") {
+		e2e.Logf("hive-operator deployment already exists, skipping OLM subscription creation.")
+		newCheck("expect", "get", asAdmin, withoutNamespace, compare, "Running", ok, 5*DefaultTimeout, []string{"pod", "--selector=control-plane=hive-operator", "-n",
+			sub.namespace, "-o=jsonpath={.items[0].status.phase}"}).check(oc)
+		return
+	}
 
 	output, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("sub", "-n", sub.namespace).Output()
 	if strings.Contains(output, "NotFound") || strings.Contains(output, "No resources") || err != nil {

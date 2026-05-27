@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.5](https://github.com/microsoft/kiota-http-go/compare/v1.5.4...v1.5.5) (2026-03-02)
+
+
+### Bug Fixes
+
+* adding senstive headers scrub function ([fba6ba4](https://github.com/microsoft/kiota-http-go/commit/fba6ba4a45f41dab6389e16381876ab62123c638))
+* adding senstive headers scrub function ([39fa46c](https://github.com/microsoft/kiota-http-go/commit/39fa46c19038131f381eda945f3d724e4999befb))
+* adding senstive headers scrub function ([ce4f0dc](https://github.com/microsoft/kiota-http-go/commit/ce4f0dcb070d5236f1c017c22539fec4927360ec))
+* adding senstive headers scrub function ([e68b9e1](https://github.com/microsoft/kiota-http-go/commit/e68b9e1662f2b8bb3d771c66760f6fbf2ff80cf4))
+
 ## [1.5.4](https://github.com/microsoft/kiota-http-go/compare/v1.5.3...v1.5.4) (2025-06-06)
 
 

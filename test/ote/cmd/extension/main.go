@@ -47,12 +47,16 @@ func main() {
 	})
 
 	selectFns := []et.SelectFunction{hiveTestsOnly()}
+	if fn := tagTests(); fn != nil {
+		selectFns = append(selectFns, fn)
+	}
 	if shard := shardTests(); shard != nil {
 		selectFns = append(selectFns, shard)
 	}
 	if limit := limitTests(); limit != nil {
 		selectFns = append(selectFns, limit)
 	}
+
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(selectFns...)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
@@ -180,5 +184,15 @@ func shardTests() et.SelectFunction {
 		mine := position%total == index
 		position++
 		return mine
+	}
+}
+
+func tagTests() et.SelectFunction {
+	tag := os.Getenv("TEST_TAG")
+	if tag == "" {
+		return nil
+	}
+	return func(spec *et.ExtensionTestSpec) bool {
+		return strings.Contains(spec.Name, tag)
 	}
 }

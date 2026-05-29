@@ -14,23 +14,40 @@ const (
 )
 
 type options struct {
-	fix bool
+	fix   bool
+	gomod string
 }
 
 func parseArgs() *options {
 	opts := &options{}
-	flag.BoolVar(&opts.fix, "fix", false, "Fix mismatches by updating apis/go.mod")
+	flag.BoolVar(&opts.fix, "fix", false, "Fix mismatches by updating the target go.mod")
+	flag.StringVar(&opts.gomod, "gomod", apispath, "Path to go.mod file to check/fix")
 	flag.Parse()
 	return opts
+}
+
+func (o *options) validate() error {
+	if _, err := os.Stat(o.gomod); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("specified go.mod file does not exist: %s", o.gomod)
+		}
+		return fmt.Errorf("cannot access go.mod file %s: %v", o.gomod, err)
+	}
+	return nil
 }
 
 func main() {
 	opts := parseArgs()
 
+	if err := opts.validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(2)
+	}
+
 	rootgmf := readGoMod(rootpath)
-	apisgmf := readGoMod(apispath)
+	targetgmf := readGoMod(opts.gomod)
 	needWrite := false
-	insync, err := opts.processRequire(*apisgmf, mapRequire(rootgmf.Require), mapRequire(apisgmf.Require))
+	insync, err := opts.processRequire(*targetgmf, mapRequire(rootgmf.Require), mapRequire(targetgmf.Require))
 	if err != nil {
 		// processRequire() printed the error
 		os.Exit(2)
@@ -43,32 +60,32 @@ func main() {
 	}
 
 	// TODO: Make these respond to opts.fix
-	insync = cmpExclude(mapExclude(rootgmf.Exclude), mapExclude(apisgmf.Exclude)) && insync
-	insync = cmpReplace(mapReplace(rootgmf.Replace), mapReplace(apisgmf.Replace)) && insync
+	insync = cmpExclude(mapExclude(rootgmf.Exclude), mapExclude(targetgmf.Exclude)) && insync
+	insync = cmpReplace(mapReplace(rootgmf.Replace), mapReplace(targetgmf.Replace)) && insync
 
 	if needWrite {
-		fmt.Printf("Writing modified %s\n", apispath)
-		apisgmf.Cleanup()
-		b, err := apisgmf.Format()
+		fmt.Printf("Writing modified %s\n", opts.gomod)
+		targetgmf.Cleanup()
+		b, err := targetgmf.Format()
 		if err != nil {
-			fmt.Printf("Couldn't format modified %s: %s\n", apispath, err)
+			fmt.Printf("Couldn't format modified %s: %s\n", opts.gomod, err)
 			os.Exit(2)
 		}
-		if err = os.WriteFile(apispath, b, 0); err != nil {
-			fmt.Printf("Failed to write modified %s: %s\n", apispath, err)
+		if err = os.WriteFile(opts.gomod, b, 0); err != nil {
+			fmt.Printf("Failed to write modified %s: %s\n", opts.gomod, err)
 			os.Exit(2)
 		}
 		fmt.Printf("\tDone\n")
 	}
 
 	if insync {
-		fmt.Printf("%s is in sync\n", apispath)
+		fmt.Printf("%s is in sync\n", opts.gomod)
 		if needWrite {
 			fmt.Printf("\t(after fixing)\n")
 		}
 		os.Exit(0)
 	} else {
-		fmt.Printf("\n%s is out of sync\n", apispath)
+		fmt.Printf("\n%s is out of sync\n", opts.gomod)
 		if needWrite {
 			fmt.Printf("\t(despite partial fixing)\n")
 		}
@@ -140,29 +157,29 @@ func mapReplace(theList []*modfile.Replace) map[string]replacement {
 	return ret
 }
 
-func (o *options) processRequire(apisfile modfile.File, root, apis map[string]string) (bool, error) {
+func (o *options) processRequire(targetfile modfile.File, root, target map[string]string) (bool, error) {
 	// insync indicates whether the require versions were in sync *to start*. I.e. if fixing,
 	// false indicates that we fixed something (so the files are *now* in sync, pending write).
 	insync := true
 	for path, rootver := range root {
-		apisver, ok := apis[path]
+		targetver, ok := target[path]
 		if !ok {
 			// For a future "verbose mode":
-			// fmt.Printf("\t(path in root but not apis: %s)\n", path)
+			// fmt.Printf("\t(path in root but not target: %s)\n", path)
 			continue
 		}
-		if rootver == apisver {
+		if rootver == targetver {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootver)
 		} else {
-			fmt.Printf("XX require %s: root(%s) apis(%s)\n", path, rootver, apisver)
+			fmt.Printf("XX require %s: root(%s) target(%s)\n", path, rootver, targetver)
 			insync = false
 			if o.fix {
-				if err := apisfile.DropRequire(path); err != nil {
+				if err := targetfile.DropRequire(path); err != nil {
 					fmt.Printf("Error dropping requirement for %s: %s\n", path, err)
 					return false, err
 				}
-				if err := apisfile.AddRequire(path, rootver); err != nil {
+				if err := targetfile.AddRequire(path, rootver); err != nil {
 					fmt.Printf("Error adding requirement for %s: %s\n", path, err)
 					return false, err
 				}
@@ -173,40 +190,40 @@ func (o *options) processRequire(apisfile modfile.File, root, apis map[string]st
 	return insync, nil
 }
 
-func cmpExclude(root, apis map[string]string) bool {
+func cmpExclude(root, target map[string]string) bool {
 	insync := true
 	for path, rootver := range root {
-		apisver, ok := apis[path]
+		targetver, ok := target[path]
 		if !ok {
 			// For a future "verbose mode":
-			// fmt.Printf("\t(path in root but not apis: %s)\n", path)
+			// fmt.Printf("\t(path in root but not target: %s)\n", path)
 			continue
 		}
-		if rootver == apisver {
+		if rootver == targetver {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootver)
 		} else {
-			fmt.Printf("XX exclude %s: root(%s) apis(%s)\n", path, rootver, apisver)
+			fmt.Printf("XX exclude %s: root(%s) target(%s)\n", path, rootver, targetver)
 			insync = false
 		}
 	}
 	return insync
 }
 
-func cmpReplace(root, apis map[string]replacement) bool {
+func cmpReplace(root, target map[string]replacement) bool {
 	insync := true
 	for path, rootrepl := range root {
-		apisrepl, ok := apis[path]
+		targetrepl, ok := target[path]
 		if !ok {
 			// For a future "verbose mode":
-			// fmt.Printf("\t(path in root but not apis: %s)\n", path)
+			// fmt.Printf("\t(path in root but not target: %s)\n", path)
 			continue
 		}
-		if rootrepl == apisrepl {
+		if rootrepl == targetrepl {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootrepl)
 		} else {
-			fmt.Printf("XX replace %s: root(%s) apis(%s)\n", path, rootrepl, apisrepl)
+			fmt.Printf("XX replace %s: root(%s) target(%s)\n", path, rootrepl, targetrepl)
 			insync = false
 		}
 	}

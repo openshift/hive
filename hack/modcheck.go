@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -12,30 +13,36 @@ const (
 	apispath = "apis/go.mod"
 )
 
-// TODO: un-global
-var doFix bool
+type options struct {
+	fix bool
+}
+
+func parseArgs() *options {
+	opts := &options{}
+	flag.BoolVar(&opts.fix, "fix", false, "Fix mismatches by updating apis/go.mod")
+	flag.Parse()
+	return opts
+}
 
 func main() {
-	// TODO: Actual arg parsing
-	if len(os.Args) > 1 && os.Args[1] == "-f" {
-		doFix = true
-	}
+	opts := parseArgs()
+
 	rootgmf := readGoMod(rootpath)
 	apisgmf := readGoMod(apispath)
 	needWrite := false
-	insync, err := processRequire(*apisgmf, mapRequire(rootgmf.Require), mapRequire(apisgmf.Require))
+	insync, err := opts.processRequire(*apisgmf, mapRequire(rootgmf.Require), mapRequire(apisgmf.Require))
 	if err != nil {
 		// processRequire() printed the error
 		os.Exit(2)
 	}
-	if doFix && !insync {
+	if opts.fix && !insync {
 		needWrite = true
 		// *Now* the files are in sync. This informs the exit code, which should be "success"
 		// if we fully fixed the file. (May still be "failure" if other mismatches are found.)
 		insync = true
 	}
 
-	// TODO: Make these respond to doFix
+	// TODO: Make these respond to opts.fix
 	insync = cmpExclude(mapExclude(rootgmf.Exclude), mapExclude(apisgmf.Exclude)) && insync
 	insync = cmpReplace(mapReplace(rootgmf.Replace), mapReplace(apisgmf.Replace)) && insync
 
@@ -133,7 +140,7 @@ func mapReplace(theList []*modfile.Replace) map[string]replacement {
 	return ret
 }
 
-func processRequire(apisfile modfile.File, root, apis map[string]string) (bool, error) {
+func (o *options) processRequire(apisfile modfile.File, root, apis map[string]string) (bool, error) {
 	// insync indicates whether the require versions were in sync *to start*. I.e. if fixing,
 	// false indicates that we fixed something (so the files are *now* in sync, pending write).
 	insync := true
@@ -150,7 +157,7 @@ func processRequire(apisfile modfile.File, root, apis map[string]string) (bool, 
 		} else {
 			fmt.Printf("XX require %s: root(%s) apis(%s)\n", path, rootver, apisver)
 			insync = false
-			if doFix {
+			if o.fix {
 				if err := apisfile.DropRequire(path); err != nil {
 					fmt.Printf("Error dropping requirement for %s: %s\n", path, err)
 					return false, err

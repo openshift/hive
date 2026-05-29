@@ -381,7 +381,7 @@ verify: modcheck
 
 .PHONY: modfix
 modfix:
-	go run ./hack/modcheck.go -f
+	go run ./hack/modcheck.go --fix
 
 .PHONY: install-tools
 install-tools:

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -14,14 +15,16 @@ const (
 )
 
 type options struct {
-	fix   bool
-	gomod string
+	fix            bool
+	gomod          string
+	allowDowngrade bool
 }
 
 func parseArgs() *options {
 	opts := &options{}
 	flag.BoolVar(&opts.fix, "fix", false, "Fix mismatches by updating the target go.mod")
 	flag.StringVar(&opts.gomod, "gomod", apispath, "Path to go.mod file to check/fix")
+	flag.BoolVar(&opts.allowDowngrade, "allow-downgrade", false, "Allow fixing mismatches that would downgrade versions (only valid with --fix)")
 	flag.Parse()
 	return opts
 }
@@ -32,6 +35,9 @@ func (o *options) validate() error {
 			return fmt.Errorf("specified go.mod file does not exist: %s", o.gomod)
 		}
 		return fmt.Errorf("cannot access go.mod file %s: %v", o.gomod, err)
+	}
+	if o.allowDowngrade && !o.fix {
+		return fmt.Errorf("--allow-downgrade is only valid with --fix")
 	}
 	return nil
 }
@@ -46,24 +52,18 @@ func main() {
 
 	rootgmf := readGoMod(rootpath)
 	targetgmf := readGoMod(opts.gomod)
-	needWrite := false
-	insync, err := opts.processRequire(*targetgmf, mapRequire(rootgmf.Require), mapRequire(targetgmf.Require))
+
+	allInSync, madeChanges, err := opts.processRequire(*targetgmf, mapRequire(rootgmf.Require), mapRequire(targetgmf.Require))
 	if err != nil {
 		// processRequire() printed the error
 		os.Exit(2)
 	}
-	if opts.fix && !insync {
-		needWrite = true
-		// *Now* the files are in sync. This informs the exit code, which should be "success"
-		// if we fully fixed the file. (May still be "failure" if other mismatches are found.)
-		insync = true
-	}
 
 	// TODO: Make these respond to opts.fix
-	insync = cmpExclude(mapExclude(rootgmf.Exclude), mapExclude(targetgmf.Exclude)) && insync
-	insync = cmpReplace(mapReplace(rootgmf.Replace), mapReplace(targetgmf.Replace)) && insync
+	allInSync = cmpExclude(mapExclude(rootgmf.Exclude), mapExclude(targetgmf.Exclude)) && allInSync
+	allInSync = cmpReplace(mapReplace(rootgmf.Replace), mapReplace(targetgmf.Replace)) && allInSync
 
-	if needWrite {
+	if madeChanges {
 		fmt.Printf("Writing modified %s\n", opts.gomod)
 		targetgmf.Cleanup()
 		b, err := targetgmf.Format()
@@ -78,15 +78,15 @@ func main() {
 		fmt.Printf("\tDone\n")
 	}
 
-	if insync {
+	if allInSync {
 		fmt.Printf("%s is in sync\n", opts.gomod)
-		if needWrite {
+		if madeChanges {
 			fmt.Printf("\t(after fixing)\n")
 		}
 		os.Exit(0)
 	} else {
 		fmt.Printf("\n%s is out of sync\n", opts.gomod)
-		if needWrite {
+		if madeChanges {
 			fmt.Printf("\t(despite partial fixing)\n")
 		}
 		os.Exit(1)
@@ -103,6 +103,36 @@ func readGoMod(path string) *modfile.File {
 		panic(err)
 	}
 	return f
+}
+
+// compareVersions returns:
+//   - negative if v1 < v2 (v2 is newer)
+//   - 0 if v1 == v2
+//   - positive if v1 > v2 (v1 is newer)
+//
+// Also returns a visual indicator: ">>" for upgrade (target behind), "<<" for downgrade (target ahead), "==" for same
+func compareVersions(v1, v2 string) (int, string) {
+	// semver.Compare requires "v" prefix
+	sv1 := v1
+	if sv1 != "" && sv1[0] != 'v' {
+		sv1 = "v" + sv1
+	}
+	sv2 := v2
+	if sv2 != "" && sv2[0] != 'v' {
+		sv2 = "v" + sv2
+	}
+
+	cmp := semver.Compare(sv1, sv2)
+	var indicator string
+	switch {
+	case cmp < 0:
+		indicator = ">>" // target is behind, would upgrade to root
+	case cmp > 0:
+		indicator = "<<" // target is ahead, would downgrade to root
+	default:
+		indicator = "=="
+	}
+	return cmp, indicator
 }
 
 // TODO: Figure out how to collapse these with generics
@@ -157,10 +187,12 @@ func mapReplace(theList []*modfile.Replace) map[string]replacement {
 	return ret
 }
 
-func (o *options) processRequire(targetfile modfile.File, root, target map[string]string) (bool, error) {
-	// insync indicates whether the require versions were in sync *to start*. I.e. if fixing,
-	// false indicates that we fixed something (so the files are *now* in sync, pending write).
-	insync := true
+func (o *options) processRequire(targetfile modfile.File, root, target map[string]string) (bool, bool, error) {
+	// Returns: (allInSync, madeChanges, error)
+	// - allInSync: true if all deps are in sync (either were already, or we fixed them)
+	// - madeChanges: true if we made any changes that need to be written
+	allInSync := true
+	madeChanges := false
 	for path, rootver := range root {
 		targetver, ok := target[path]
 		if !ok {
@@ -171,23 +203,43 @@ func (o *options) processRequire(targetfile modfile.File, root, target map[strin
 		if rootver == targetver {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootver)
-		} else {
-			fmt.Printf("XX require %s: root(%s) target(%s)\n", path, rootver, targetver)
-			insync = false
-			if o.fix {
-				if err := targetfile.DropRequire(path); err != nil {
-					fmt.Printf("Error dropping requirement for %s: %s\n", path, err)
-					return false, err
-				}
-				if err := targetfile.AddRequire(path, rootver); err != nil {
-					fmt.Printf("Error adding requirement for %s: %s\n", path, err)
-					return false, err
-				}
-				fmt.Printf("\tFixed\n")
-			}
+			continue
 		}
+		// Found a mismatch
+		cmp, indicator := compareVersions(targetver, rootver)
+		fmt.Printf("%s require %s: root(%s) target(%s)\n", indicator, path, rootver, targetver)
+
+		if !o.fix {
+			allInSync = false
+			continue
+		}
+
+		// We're in fix mode
+		// If this would be a downgrade and downgrades aren't allowed, refuse
+		if cmp > 0 && !o.allowDowngrade {
+			fmt.Printf("\tRefused: would downgrade from %s to %s (use --allow-downgrade to override)\n", targetver, rootver)
+			allInSync = false // couldn't fix this one
+			continue
+		}
+
+		// Fix it
+		if err := targetfile.DropRequire(path); err != nil {
+			fmt.Printf("Error dropping requirement for %s: %s\n", path, err)
+			return false, false, err
+		}
+		if err := targetfile.AddRequire(path, rootver); err != nil {
+			fmt.Printf("Error adding requirement for %s: %s\n", path, err)
+			return false, false, err
+		}
+		madeChanges = true
+		if cmp > 0 {
+			fmt.Printf("\tFixed (Downgraded)\n")
+		} else {
+			fmt.Printf("\tFixed\n")
+		}
+		// This one is now in sync, so don't set allInSync = false
 	}
-	return insync, nil
+	return allInSync, madeChanges, nil
 }
 
 func cmpExclude(root, target map[string]string) bool {
@@ -203,7 +255,8 @@ func cmpExclude(root, target map[string]string) bool {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootver)
 		} else {
-			fmt.Printf("XX exclude %s: root(%s) target(%s)\n", path, rootver, targetver)
+			_, indicator := compareVersions(targetver, rootver)
+			fmt.Printf("%s exclude %s: root(%s) target(%s)\n", indicator, path, rootver, targetver)
 			insync = false
 		}
 	}
@@ -223,7 +276,9 @@ func cmpReplace(root, target map[string]replacement) bool {
 			// For a future "verbose mode":
 			// fmt.Printf("\tOK %s %s\n", path, rootrepl)
 		} else {
-			fmt.Printf("XX replace %s: root(%s) target(%s)\n", path, rootrepl, targetrepl)
+			// For replace, compare the new versions
+			_, indicator := compareVersions(targetrepl.newver, rootrepl.newver)
+			fmt.Printf("%s replace %s: root(%s) target(%s)\n", indicator, path, rootrepl, targetrepl)
 			insync = false
 		}
 	}

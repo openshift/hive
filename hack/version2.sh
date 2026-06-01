@@ -32,11 +32,7 @@ log() {
     shift
     local message="$*"
 
-    if [[ "$MODE" == "standalone" ]]; then
-        echo "$message" >&2
-    else
-        echo "$message"
-    fi
+    echo "$message" >&2
 
     if [[ "$level" == "fatal" ]]; then
         exit 1

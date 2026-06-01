@@ -108,10 +108,10 @@ spec:
     spec:
       clusterPermissions:
       - serviceAccountName: hive-operator
-        # Rules will be added here by the bundle-gen.py script.
+        # Rules will be added here by the bundle-gen.sh script.
       deployments:
       - name: hive-operator
-        # Deployment spec will be added here by the bundle-gen.py script.
+        # Deployment spec will be added here by the bundle-gen.sh script.
   customresourcedefinitions:
     owned:
     - description: Configuration for the Hive Operator

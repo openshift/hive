@@ -193,6 +193,14 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 		existingSyncSet = nil
 	}
 
+	// Ensure cert-manager Certificate CRs exist for bundles with Generate=true.
+	// This replaces the external certman-operator: Hive now directly requests
+	// certificates from cert-manager, which handles the ACME/Let's Encrypt lifecycle.
+	if err := r.ensureCertManagerCertificates(ctx, cd, cdLog); err != nil {
+		cdLog.WithError(err).Error("failed to ensure cert-manager Certificates")
+		return reconcile.Result{}, err
+	}
+
 	secrets, secretsAvailable, err := r.getControlPlaneSecrets(cd, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("failed to check cert secret availability")
@@ -231,6 +239,20 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// ensureCertManagerCertificates creates cert-manager Certificate CRs for any
+// CertificateBundles with Generate=true that are referenced by the control plane config.
+func (r *ReconcileControlPlaneCerts) ensureCertManagerCertificates(ctx context.Context, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	for _, bundle := range cd.Spec.CertificateBundles {
+		if !bundle.Generate {
+			continue
+		}
+		if err := controllerutils.EnsureCertManagerCertificate(ctx, r.Client, r.scheme, cd, bundle, cdLog); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ReconcileControlPlaneCerts) getControlPlaneSecrets(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) ([]*corev1.Secret, bool, error) {

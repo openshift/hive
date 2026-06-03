@@ -203,6 +203,12 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, nil
 	}
 
+	// Ensure cert-manager Certificate CRs exist for ingress bundles with Generate=true
+	if err := r.ensureCertManagerCertificates(ctx, cd, cdLog); err != nil {
+		cdLog.WithError(err).Error("failed to ensure cert-manager Certificates for ingress")
+		return reconcile.Result{}, err
+	}
+
 	// can't proceed if the secret(s) referred to doesn't exist
 	certBundleSecrets, err := r.getIngressSecrets(rContext)
 	if err != nil {
@@ -233,6 +239,30 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// ensureCertManagerCertificates creates cert-manager Certificate CRs for any ingress
+// CertificateBundles with Generate=true.
+func (r *ReconcileRemoteClusterIngress) ensureCertManagerCertificates(ctx context.Context, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	seen := map[string]bool{}
+	for _, ingress := range cd.Spec.Ingress {
+		if ingress.ServingCertificate == "" {
+			continue
+		}
+		if seen[ingress.ServingCertificate] {
+			continue
+		}
+		seen[ingress.ServingCertificate] = true
+
+		for _, bundle := range cd.Spec.CertificateBundles {
+			if bundle.Name == ingress.ServingCertificate && bundle.Generate {
+				if err := controllerutils.EnsureCertManagerCertificate(ctx, r.Client, r.scheme, cd, bundle, cdLog); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // GenerateRemoteIngressSyncSetName generates the name of the SyncSet that holds the cluster ingress information to sync.

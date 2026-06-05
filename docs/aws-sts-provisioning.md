@@ -46,14 +46,71 @@ Create a ClusterDeployment normally with the following changes:
   ```
   kubectl create secret generic bound-service-account-signing-key --from-file=bound-service-account-signing-key.key=_output/serviceaccount-signer.private
   ```
-  1. Create a Secret for your installer manifests (credential role Secrets, Authentication config)
+  1. Create a Secret for your installer manifests (credential role Secrets, Authentication config).
+  Use `--from-file` pointed at the `ccoctl` output directory to preserve original filenames as secret keys:
   ```
   kubectl create secret generic cluster-manifests --from-file=_output/manifests/
   ```
+
+  > **WARNING:** Altering the original manifest filenames can cause
+  > [silent install failures](#install-times-out-with-invalididentitytoken).
+  > Use `--from-file=<dir>` as shown above.
+
   1. In your InstallConfig set `credentialsMode: Manual`
   1. In your ClusterDeployment set `spec.boundServiceAccountSigningKeySecretRef.name` to point to the Secret created above (`bound-service-account-signing-key`).
   1. In your ClusterDeployment set `spec.provisioning.manifestsSecretRef` to point to the Secret created above (`cluster-manifests`).
   1. Create your ClusterDeployment + InstallConfig to provision your STS cluster.
+
+## Troubleshooting
+
+### Install times out with `InvalidIdentityToken`
+
+If your STS cluster install times out and `machine-api-controllers` logs show:
+
+```text
+error assuming role: InvalidIdentityToken: Token issuer does not match provider
+```
+
+This typically means the Authentication CR manifest was not picked up during bootstrap.
+
+The secret key for the Authentication CR **must** be exactly
+`cluster-authentication-02-config.yaml`. During bootstrap, the kube-apiserver render step reads
+this manifest from a hardcoded path (`/assets/manifests/cluster-authentication-02-config.yaml`).
+If the key name in the manifest secret differs, the file will not be found and the kube-apiserver
+silently starts with the default `serviceAccountIssuer` (`https://kubernetes.default.svc`)
+instead of your custom S3 OIDC issuer. Tokens issued with the wrong issuer are rejected by AWS
+STS, workers never provision, and the install times out.
+
+Other credential manifests (operator Secrets for machine-api, ingress, image-registry, etc.) are
+not affected — they are applied by their Kubernetes GVK and content, not by filename.
+
+**Check the issuer on the running cluster:**
+
+```bash
+oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}'
+```
+
+If this returns your S3 OIDC URL (e.g. `https://<name>-oidc.s3.<region>.amazonaws.com`) but the
+kube-apiserver started with `https://kubernetes.default.svc`, the Authentication CR manifest was
+not loaded during bootstrap.
+
+**Verify the manifest secret key names:**
+
+```bash
+oc get secret cluster-manifests -n <namespace> -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}'
+```
+
+Look for `cluster-authentication-02-config.yaml` as an exact key name. If the Authentication CR
+is stored under a different key (e.g. `00-cluster-authentication-config.yaml` or
+`authentication.yaml`), recreate the secret with the correct key name.
+
+The simplest fix is to recreate the manifest secret using `--from-file` pointed at the `ccoctl`
+output directory:
+
+```bash
+oc delete secret cluster-manifests -n <namespace>
+oc create secret generic cluster-manifests -n <namespace> --from-file=_output/manifests/
+```
 
 ## Note: Cleanup AWS resources after uninstalling the cluster
 Make sure you clean up the following resources after you uninstall your cluster. To delete resources created by ccoctl, run

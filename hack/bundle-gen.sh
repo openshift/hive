@@ -6,9 +6,7 @@ SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 # shellcheck source=hack/version2.sh
 source "$SCRIPT_DIR/version2.sh"
 
-# ---------------------------------------------------------------------------
 # Constants
-# ---------------------------------------------------------------------------
 readonly HIVE_REPO_DEFAULT="git@github.com:openshift/hive.git"
 # Hive dir within both:
 # https://github.com/redhat-openshift-ecosystem/community-operators-prod
@@ -18,9 +16,7 @@ readonly IMAGE_REPO_DEFAULT="quay.io/openshift-hive/hive"
 readonly COMMUNITY_OPERATORS_UPSTREAM="${COMMUNITY_OPERATORS_UPSTREAM:-git@github.com:redhat-openshift-ecosystem/community-operators-prod.git}"
 readonly CHANNEL_DEFAULT="alpha"
 
-# ---------------------------------------------------------------------------
 # Runtime state — set by parse_args
-# ---------------------------------------------------------------------------
 VERBOSE=false
 DRY_RUN=false
 HOLD=false
@@ -31,16 +27,14 @@ HIVE_REPO="$HIVE_REPO_DEFAULT"
 IMAGE_REPO="$IMAGE_REPO_DEFAULT"
 IMAGE_TAG_OVERRIDE=""
 COMMIT_ISH=""
-DUMMY_BUNDLE=""
+DUMMY_BUNDLE=false
 
 # Temp dirs — populated in main, removed by cleanup trap
 HIVE_REPO_DIR=""
 BUNDLE_DIR=""
 WORK_DIR=""
 
-# ---------------------------------------------------------------------------
 # usage
-# ---------------------------------------------------------------------------
 usage() {
     cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
@@ -80,22 +74,15 @@ OPTIONS:
   --image-tag-override TAG    Override the computed image tag. By default the
                               first 10 digits of the SHA of the commit are used.
   --commit COMMIT-ISH         Commit-ish to build from (default: tip of master).
-                              May be used alone or with --dummy-bundle. Without
-                              --dummy-bundle, generates a bundle for master at
-                              that commit. With --dummy-bundle, targets that
-                              commit on the specified branch. Example:
-                              --dummy-bundle mce-2.1 --commit \$sha
-                              produces a bundle versioned 2.1.\$count-\$sha.
-  --dummy-bundle BRANCH       Generate bundle files locally only — no PRs, no
+                              Accepts any ref resolvable by git rev-parse. In
+                              OperatorHub mode, this should be a commit on master.
+  --dummy-bundle              Generate bundle files locally only — no PRs, no
                               release-config, no version graph directives
-                              (replaces, skipRange, etc.). BRANCH must be
-                              master or a valid mce-* branch; --commit defaults
-                              to the tip of BRANCH if not specified. Version is
-                              computed as X.Y.\$count-\$sha where X.Y is the MCE
-                              version number (or 1.2 for master), \$count is the
-                              number of commits to that point, and \$sha is the
-                              first 7 digits of the commit SHA. Bundle is
-                              written to ./hive-operator-bundle-vVER.
+                              (replaces, skipRange, etc.). Version is computed
+                              as 1.2.\$count-\$sha where \$count is the number of
+                              commits to that point and \$sha is the first 7
+                              digits of the commit SHA. Bundle is written to
+                              ./hive-operator-bundle-vVER.
   --skip-image-validation     Skip checking/building/pushing the image. Note
                               that only quay.io images are validated; non-quay
                               images are always treated as present.
@@ -103,10 +90,8 @@ OPTIONS:
 EOF
 }
 
-# ---------------------------------------------------------------------------
 # require_arg — guard for value-taking flags
 # Exits if the next token is missing or looks like another flag.
-# ---------------------------------------------------------------------------
 require_arg() {
     local flag="$1" value="${2:-}"
     if [[ -z "$value" || "$value" == --* ]]; then
@@ -116,9 +101,7 @@ require_arg() {
     fi
 }
 
-# ---------------------------------------------------------------------------
 # parse_args
-# ---------------------------------------------------------------------------
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -133,7 +116,7 @@ parse_args() {
             --image-repo)            require_arg "$1" "${2:-}"; IMAGE_REPO="$2";         shift ;;
             --image-tag-override)    require_arg "$1" "${2:-}"; IMAGE_TAG_OVERRIDE="$2"; shift ;;
             --commit)                require_arg "$1" "${2:-}"; COMMIT_ISH="$2";         shift ;;
-            --dummy-bundle)          require_arg "$1" "${2:-}"; DUMMY_BUNDLE="$2";       shift ;;
+            --dummy-bundle)          DUMMY_BUNDLE=true ;;
             -h|--help)               usage; exit 0 ;;
             *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
         esac
@@ -141,19 +124,15 @@ parse_args() {
     done
 }
 
-# ---------------------------------------------------------------------------
 # cleanup — registered as EXIT trap
-# ---------------------------------------------------------------------------
 cleanup() {
     [[ -n "$HIVE_REPO_DIR" ]] && rm -rf "$HIVE_REPO_DIR"
     [[ -n "$BUNDLE_DIR"    ]] && rm -rf "$BUNDLE_DIR"
     [[ -n "$WORK_DIR"      ]] && rm -rf "$WORK_DIR"
 }
 
-# ---------------------------------------------------------------------------
 # validate_image
 # Returns 0 if the image exists or validation is skipped; 1 if not found.
-# ---------------------------------------------------------------------------
 validate_image() {
     local image_repo="$1" image_tag="$2"
 
@@ -186,10 +165,8 @@ validate_image() {
     echo "Image validated: ${image_repo}:${image_tag}"
 }
 
-# ---------------------------------------------------------------------------
 # ensure_image — validates; builds and pushes if missing.
 # Must be called from the hive repo root (make target lives there).
-# ---------------------------------------------------------------------------
 ensure_image() {
     local image_repo="$1" image_tag="$2"
     local uri="${image_repo}:${image_tag}"
@@ -208,23 +185,19 @@ ensure_image() {
     podman push "$uri" || { echo "Image push failed" >&2; exit 1; }
 }
 
-# ---------------------------------------------------------------------------
 # semver_gt — returns 0 if $1 > $2 using version-aware sort.
 # Strips the git-hash suffix (everything after the first '-') before comparing
 # so that e.g. "1.2.3200-abc1234" > "1.2.3187-18827f6".
-# ---------------------------------------------------------------------------
 semver_gt() {
     local a="${1%%-*}" b="${2%%-*}"
     [[ "$a" != "$b" ]] && \
         [[ "$(printf '%s\n%s' "$a" "$b" | sort -V | tail -1)" == "$a" ]]
 }
 
-# ---------------------------------------------------------------------------
 # get_previous_version
 # Clones community-operators-prod (reuses clone if present) and returns the
 # highest version present in the given channel on stdout; all other output
 # goes to stderr.
-# ---------------------------------------------------------------------------
 get_previous_version() {
     local channel="$1"
     local repo_path="$WORK_DIR/community-operators-prod"
@@ -268,7 +241,6 @@ get_previous_version() {
     echo "$highest"
 }
 
-# ---------------------------------------------------------------------------
 # generate_bundle
 # Creates the full bundle directory structure under $bundle_dir/$semver_ver:
 #   metadata/annotations.yaml
@@ -276,7 +248,6 @@ get_previous_version() {
 #   manifests/hive-operator.v<semver>.clusterserviceversion.yaml
 #
 # Must be called from the hive repo root (reads config/ relative paths).
-# ---------------------------------------------------------------------------
 generate_bundle() {
     local bundle_dir="$1" image_repo="$2" semver_ver="$3" image_tag="$4"
 
@@ -354,12 +325,10 @@ EOF
     echo "Wrote ClusterServiceVersion: $csv_file"
 }
 
-# ---------------------------------------------------------------------------
 # add_operatorhub_extras
 # Adds OperatorHub-specific content to an already-generated bundle:
 #   - sets spec.replaces in the CSV
 #   - generates release-config.yaml (unless --skip-release-config)
-# ---------------------------------------------------------------------------
 add_operatorhub_extras() {
     local version_dir="$1" semver_ver="$2" prev_version="$3"
 
@@ -379,12 +348,10 @@ EOF
     fi
 }
 
-# ---------------------------------------------------------------------------
 # open_pr
 # Pushes a branch to the user's fork and opens a PR upstream via gh CLI.
 # Reuses an existing local clone when present (community-operators-prod may
 # already be cloned by get_previous_version).
-# ---------------------------------------------------------------------------
 open_pr() {
     local fork_repo="$1" upstream_repo="$2" semver_ver="$3" bundle_dir="$4"
 
@@ -410,14 +377,19 @@ open_pr() {
     echo "Fetching upstream $upstream_repo"
     git -C "$repo_path" fetch upstream
 
-    git -C "$repo_path" checkout upstream/main
+    git -C "$repo_path" switch --detach upstream/main
 
     local branch_name="update-hive-${semver_ver}"
     echo "Creating branch $branch_name"
-    git -C "$repo_path" checkout -B "$branch_name"
+    git -C "$repo_path" switch -C "$branch_name"
 
     echo "Copying bundle"
-    cp -r "$bundle_dir/$semver_ver" "$repo_path/$HIVE_SUB_DIR/$semver_ver"
+    local bundle_dest="$repo_path/$HIVE_SUB_DIR/$semver_ver"
+    if [[ -e "$bundle_dest" ]]; then
+        echo "Error: bundle version $semver_ver already exists in $gh_target" >&2
+        exit 1
+    fi
+    cp -r "$bundle_dir/$semver_ver" "$bundle_dest"
 
     local pr_title="operator hive-operator (${semver_ver})"
     git -C "$repo_path" add "$HIVE_SUB_DIR"
@@ -443,12 +415,20 @@ open_pr() {
         --body "$body"
 }
 
-# ---------------------------------------------------------------------------
 # check_deps — fail fast with a clear message if required tools are missing
-# ---------------------------------------------------------------------------
 check_deps() {
+    local required=(yq git)
+    # jq is only needed to parse the quay.io API response
+    if ! $SKIP_IMAGE_VALIDATION && [[ "${IMAGE_REPO%%/*}" == "quay.io" ]]; then
+        required+=(jq)
+    fi
+    # gh is only needed to open PRs (not in dummy-bundle or dry-run mode)
+    if ! $DUMMY_BUNDLE && ! $DRY_RUN; then
+        required+=(gh)
+    fi
+
     local missing=()
-    for cmd in yq jq git gh; do
+    for cmd in "${required[@]}"; do
         command -v "$cmd" &>/dev/null || missing+=("$cmd")
     done
     if [[ ${#missing[@]} -gt 0 ]]; then
@@ -457,11 +437,15 @@ check_deps() {
         echo "  gh:      https://cli.github.com/" >&2
         exit 1
     fi
+
+    if ! yq --version 2>&1 | grep -q 'version v4'; then
+        echo "Error: yq v4 is required (found: $(yq --version 2>&1))" >&2
+        echo "  yq (v4): https://github.com/mikefarah/yq" >&2
+        exit 1
+    fi
 }
 
-# ---------------------------------------------------------------------------
 # main
-# ---------------------------------------------------------------------------
 main() {
     parse_args "$@"
     check_deps
@@ -480,8 +464,9 @@ main() {
 
     cd "$HIVE_REPO_DIR"
 
-    # version2.sh sets globals: COMMIT, BRANCH_NAME, PREFIX, COMMIT_COUNT
-    version_init "${DUMMY_BUNDLE:-}" "${COMMIT_ISH:-}"
+    # version2.sh sets globals: COMMIT, PREFIX, COMMIT_COUNT
+    # PREFIX is always 1.2 (master branch prefix) regardless of local branch.
+    version_init "$COMMIT_ISH"
 
     local ver_semver image_tag
     ver_semver=$(semver)
@@ -492,19 +477,28 @@ main() {
 
     ensure_image "$IMAGE_REPO" "$image_tag"
 
-    if [[ -n "$DUMMY_BUNDLE" ]]; then
+    if $DUMMY_BUNDLE; then
         # Mode 1: local bundle only — no version graph, no release-config, no PRs
         generate_bundle "$BUNDLE_DIR" "$IMAGE_REPO" "$ver_semver" "$image_tag"
         local dest="$orig_wd/hive-operator-bundle-v${ver_semver}"
+        # Remove any previous output for this version so cp -r replaces it
+        # cleanly rather than nesting the new bundle inside the existing dir.
+        rm -rf "$dest"
         cp -r "$BUNDLE_DIR/$ver_semver" "$dest"
         echo "Wrote bundle to $dest"
     else
         # Mode 2: OperatorHub push — bundle + graph directives + PRs
+
         local prev_version
         prev_version=$(get_previous_version "$CHANNEL_DEFAULT")
 
         if [[ "$ver_semver" == "$prev_version" ]]; then
             echo "Error: version $ver_semver already exists upstream" >&2
+            exit 1
+        fi
+        if ! semver_gt "$ver_semver" "$prev_version"; then
+            echo "Error: version $ver_semver is lower than the current upstream version $prev_version" >&2
+            echo "  A newer bundle has already been published. Target a more recent commit on master." >&2
             exit 1
         fi
 

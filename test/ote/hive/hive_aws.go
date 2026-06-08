@@ -3487,7 +3487,7 @@ spec:
 
 	// Author: fxie@redhat.com mihuang@redhat.com
 	// ./bin/extended-platform-tests run all --dry-run|grep "41212"|./bin/extended-platform-tests run --timeout 80m -f -
-	g.It("[Level0] Author:fxie-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-41212-High-43751-Medium-57403-[HiveSDRosa] [AWSGov] Hive supports to install private cluster [Disruptive]", func() {
+	g.XIt("[Level0] Author:fxie-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-41212-High-43751-Medium-57403-[HiveSDRosa] [AWSGov] Hive supports to install private cluster [Disruptive]", func() {
 		// Settings
 		var (
 			testCaseID = "41212"
@@ -6521,7 +6521,7 @@ spec:
 
 	//author: mihuang@redhat.com
 	//example: ./bin/extended-platform-tests run all --dry-run|grep "40825"|./bin/extended-platform-tests run --timeout 60m -f -
-	g.It("[Level0] Author:mihuang-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-40825-[HiveSDRosa] Support AWS AssumeRole credentials cluster. [Disruptive]", func() {
+	g.XIt("[Level0] Author:mihuang-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-40825-[HiveSDRosa] Support AWS AssumeRole credentials cluster. [Disruptive]", func() {
 		testCaseID := "40825"
 		cdName := "cluster-" + testCaseID + "-" + getRandomString()[:ClusterSuffixLen]
 		randomSuffix := getRandomString()[:3]

@@ -1155,9 +1155,7 @@ func (r *ReconcileClusterDeployment) retrofitMetadataJSON(cd *hivev1.ClusterDepl
 			CloudName:                   installertypesazure.CloudEnvironment(cd.Spec.Platform.Azure.CloudName),
 		}
 		if p := cdMetadata.Platform.Azure; p != nil && p.ResourceGroupName != nil {
-			iMetadata.Azure = &installertypesazure.Metadata{
-				ResourceGroupName: *p.ResourceGroupName,
-			}
+			iMetadata.Azure.ResourceGroupName = *p.ResourceGroupName
 		}
 	case cd.Spec.Platform.GCP != nil:
 		// The project ID is embedded in the credentials.
@@ -2300,7 +2298,10 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	case cd.Spec.Platform.AWS != nil:
 		// If we haven't discovered the HostedZoneRole yet, fail
 		hzrp := controllerutils.AWSHostedZoneRole(cd)
-		if hzrp == nil {
+		// OCPBUGS-85813: Fake CDs set ClusterMetadata in two phases. In rare race conditions, if
+		// the CD is deleted between those phases, this field can be unset in this code path. It's
+		// safe to ignore it for fake clusters.
+		if hzrp == nil && !controllerutils.IsFakeCluster(cd) {
 			return nil, errors.New("AWS HostedZoneRole unset in ClusterMetadata; refusing to deprovision.")
 		}
 		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{
@@ -2312,7 +2313,10 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	case cd.Spec.Platform.Azure != nil:
 		// If we haven't discovered the ResourceGroupName yet, fail
 		rg, err := controllerutils.AzureResourceGroup(cd)
-		if err != nil {
+		// OCPBUGS-85813: Fake CDs set ClusterMetadata in two phases. In rare race conditions, if
+		// the CD is deleted between those phases, this field can be unset in this code path. It's
+		// safe to ignore it for fake clusters.
+		if err != nil && !controllerutils.IsFakeCluster(cd) {
 			return nil, err
 		}
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
@@ -2324,7 +2328,10 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 	case cd.Spec.Platform.GCP != nil:
 		// If we haven't discovered the NetworkProjectID yet, fail
 		npid := controllerutils.GCPNetworkProjectID(cd)
-		if npid == nil {
+		// OCPBUGS-85813: Fake CDs set ClusterMetadata in two phases. In rare race conditions, if
+		// the CD is deleted between those phases, this field can be unset in this code path. It's
+		// safe to ignore it for fake clusters.
+		if npid == nil && !controllerutils.IsFakeCluster(cd) {
 			return nil, errors.New("GCP NetworkProjectID unset it ClusterMetadata; refusing to deprovision.")
 		}
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{

@@ -91,7 +91,7 @@ type ClusterPoolSpec struct {
 
 	// HibernationConfig configures the hibernation/resume behavior of ClusterDeployments owned by the ClusterPool.
 	// +optional
-	HibernationConfig *HibernationConfig `json:"hibernationConfig"`
+	HibernationConfig *HibernationConfig `json:"hibernationConfig,omitempty"`
 
 	// Inventory maintains a list of entries consumed by the ClusterPool
 	// to customize the default ClusterDeployment.

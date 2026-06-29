@@ -79,9 +79,6 @@ endif
 # string based on the most recent repository tag in this branch. That doesn't work for us, since
 # we don't tag versions. Override using the same versioning we apply to OperatorHub builds:
 # v{major}.{minor}.{commitcount}-{sha}
-# Note that building against a local commit may result in {major}.{minor} being rendered as
-# 0.0.x-y if it is an `UnknownBranch`. However, the {commitcount} and {sha}
-# should still be accurate.
 SOURCE_GIT_TAG := $(shell hack/version2.sh)
 
 BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...

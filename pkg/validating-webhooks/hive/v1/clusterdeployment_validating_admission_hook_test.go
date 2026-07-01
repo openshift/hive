@@ -1953,6 +1953,50 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: validVSphereClusterDeployment(),
 			operation: admissionv1.Update,
 		},
+		{
+			name: "vsphere Topology.Template empty to non-empty is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/my-template"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "vsphere Topology.Template change when already set is blocked",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/original-template"
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/different-template"
+				return cd
+			}(),
+			operation: admissionv1.Update,
+		},
+		{
+			name: "vsphere Topology.Template unchanged non-empty is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/same-template"
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/same-template"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {

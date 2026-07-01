@@ -81,7 +81,7 @@ endif
 # v{major}.{minor}.{commitcount}-{sha}
 SOURCE_GIT_TAG := $(shell hack/version2.sh)
 
-BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
+BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/netpol/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 IMAGE_BUILD_EXTRA_FLAGS := --build-arg BASE_IMAGE=$(BASE_IMAGE) --build-arg EL8_BUILD_IMAGE=$(EL8_BUILD_IMAGE) --build-arg EL9_BUILD_IMAGE=$(EL9_BUILD_IMAGE)

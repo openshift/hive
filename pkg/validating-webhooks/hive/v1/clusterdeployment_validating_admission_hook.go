@@ -708,6 +708,24 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		}
 	}
 
+	// Allow setting Topology.Template on failure domains where it was previously blank.
+	// This permits the machinepool controller's backfill to persist and allows customers
+	// to set the template explicitly via CD edit.
+	if oldObject.Spec.Platform.VSphere != nil && oldObject.Spec.Platform.VSphere.Infrastructure != nil &&
+		cd.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+		oldFDs := oldObject.Spec.Platform.VSphere.Infrastructure.FailureDomains
+		newFDs := cd.Spec.Platform.VSphere.Infrastructure.FailureDomains
+		for i := range oldFDs {
+			if i >= len(newFDs) {
+				break
+			}
+			if oldFDs[i].Topology.Template == "" && newFDs[i].Topology.Template != "" {
+				// copy over the value to spoof the immutability checker
+				oldFDs[i].Topology.Template = newFDs[i].Topology.Template
+			}
+		}
+	}
+
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {
 		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec which is immutable except for %s fields. Unsupported change: \n%s", strings.Join(mutableFields, ","), unsupportedDiff)

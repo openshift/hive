@@ -1953,6 +1953,165 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: validVSphereClusterDeployment(),
 			operation: admissionv1.Update,
 		},
+		{
+			name: "vsphere Topology.Template empty to non-empty is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/my-template"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "vsphere Topology.Template change when already set is blocked",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/original-template"
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/different-template"
+				return cd
+			}(),
+			operation: admissionv1.Update,
+		},
+		{
+			name: "vsphere Topology.Template unchanged non-empty is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/same-template"
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/same-template"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "vsphere Topology.Template both empty is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "vsphere Topology.Template clearing non-empty is blocked",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/existing-template"
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				return cd
+			}(),
+			operation: admissionv1.Update,
+		},
+		{
+			name: "vsphere Topology.Template multi-FD mixed: blank to set allowed while set unchanged",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains = append(
+					cd.Spec.Platform.VSphere.Infrastructure.FailureDomains,
+					installervsphere.FailureDomain{
+						Server: "somevcenter.com",
+						Topology: installervsphere.Topology{
+							Datacenter:     "dc1",
+							Datastore:      "vmse-test-2",
+							Folder:         "/dc1/vm/test-2",
+							ComputeCluster: "test-2",
+							Networks:       []string{"Network"},
+						},
+					},
+				)
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/already-set"
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[1].Topology.Template = ""
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains = append(
+					cd.Spec.Platform.VSphere.Infrastructure.FailureDomains,
+					installervsphere.FailureDomain{
+						Server: "somevcenter.com",
+						Topology: installervsphere.Topology{
+							Datacenter:     "dc1",
+							Datastore:      "vmse-test-2",
+							Folder:         "/dc1/vm/test-2",
+							ComputeCluster: "test-2",
+							Networks:       []string{"Network"},
+						},
+					},
+				)
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/already-set"
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[1].Topology.Template = "/dc1/vm/backfilled"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "vsphere Topology.Template multi-FD all blank to all set is allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains = append(
+					cd.Spec.Platform.VSphere.Infrastructure.FailureDomains,
+					installervsphere.FailureDomain{
+						Server: "somevcenter.com",
+						Topology: installervsphere.Topology{
+							Datacenter:     "dc1",
+							Datastore:      "vmse-test-2",
+							Folder:         "/dc1/vm/test-2",
+							ComputeCluster: "test-2",
+							Networks:       []string{"Network"},
+						},
+					},
+				)
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = ""
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[1].Topology.Template = ""
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validVSphereClusterDeployment()
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains = append(
+					cd.Spec.Platform.VSphere.Infrastructure.FailureDomains,
+					installervsphere.FailureDomain{
+						Server: "somevcenter.com",
+						Topology: installervsphere.Topology{
+							Datacenter:     "dc1",
+							Datastore:      "vmse-test-2",
+							Folder:         "/dc1/vm/test-2",
+							ComputeCluster: "test-2",
+							Networks:       []string{"Network"},
+						},
+					},
+				)
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[0].Topology.Template = "/dc1/vm/template-1"
+				cd.Spec.Platform.VSphere.Infrastructure.FailureDomains[1].Topology.Template = "/dc1/vm/template-2"
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {

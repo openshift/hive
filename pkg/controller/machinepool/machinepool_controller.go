@@ -36,6 +36,7 @@ import (
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 	cpms "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 
@@ -1393,7 +1394,15 @@ func (r *ReconcileMachinePool) createActuator(
 	case cd.Spec.Platform.OpenStack != nil:
 		return NewOpenStackActuator(masterMachine, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(masterMachine, r.scheme, logger)
+		var fds []installervsphere.FailureDomain
+		var infraID string
+		if cd.Spec.Platform.VSphere.Infrastructure != nil {
+			fds = cd.Spec.Platform.VSphere.Infrastructure.FailureDomains
+		}
+		if cd.Spec.ClusterMetadata != nil {
+			infraID = cd.Spec.ClusterMetadata.InfraID
+		}
+		return NewVSphereActuator(remoteMachineSets, infraID, fds, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

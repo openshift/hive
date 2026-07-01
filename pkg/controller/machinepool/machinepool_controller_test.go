@@ -1400,7 +1400,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				scheme:                        scheme,
 				logger:                        logger,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				actuatorBuilder: func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
+				actuatorBuilder: func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, infrastructure *configv1.Infrastructure, cdLog log.FieldLogger) (Actuator, error) {
 					return mockActuator, nil
 				},
 				expectations: controllerExpectations,

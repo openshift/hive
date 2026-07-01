@@ -36,6 +36,7 @@ import (
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 	cpms "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 
@@ -113,8 +114,8 @@ func Add(mgr manager.Manager) error {
 		ordinalID:    ordinalID,
 		pollInterval: pollInterval,
 	}
-	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
-		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
+	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (Actuator, error) {
+		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, infrastructure, logger)
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
@@ -193,6 +194,7 @@ type ReconcileMachinePool struct {
 		pool *hivev1.MachinePool,
 		masterMachine *machineapi.Machine,
 		remoteMachineSets []machineapi.MachineSet,
+		infrastructure *configv1.Infrastructure,
 		logger log.FieldLogger,
 	) (Actuator, error)
 
@@ -366,7 +368,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, generatedMachineLabels, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
+	generatedMachineSets, generatedMachineLabels, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, infrastructure, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
 		err := r.updateCondition(
@@ -535,13 +537,14 @@ func (r *ReconcileMachinePool) generateMachineSets(
 	cd *hivev1.ClusterDeployment,
 	masterMachine *machineapi.Machine,
 	remoteMachineSets *machineapi.MachineSetList,
+	infrastructure *configv1.Infrastructure,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, sets.Set[string], bool, error) {
 	if pool.DeletionTimestamp != nil {
 		return nil, nil, true, nil
 	}
 
-	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
+	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, infrastructure, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
 		return nil, nil, false, err
@@ -1331,6 +1334,7 @@ func (r *ReconcileMachinePool) createActuator(
 	pool *hivev1.MachinePool,
 	masterMachine *machineapi.Machine,
 	remoteMachineSets []machineapi.MachineSet,
+	infrastructure *configv1.Infrastructure,
 	logger log.FieldLogger,
 ) (Actuator, error) {
 	switch {
@@ -1393,7 +1397,12 @@ func (r *ReconcileMachinePool) createActuator(
 	case cd.Spec.Platform.OpenStack != nil:
 		return NewOpenStackActuator(masterMachine, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(masterMachine, r.scheme, logger)
+		var fds []installervsphere.FailureDomain
+		if cd.Spec.Platform.VSphere.Infrastructure != nil {
+			fds = cd.Spec.Platform.VSphere.Infrastructure.FailureDomains
+		}
+		vmGroupMap := buildVSphereVMGroupMap(infrastructure)
+		return NewVSphereActuator(remoteMachineSets, vmGroupMap, fds, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

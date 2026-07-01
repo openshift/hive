@@ -51,6 +51,11 @@ version_string() {
 
 # Main
 main() {
+    if [[ $# -gt 1 ]]; then
+        echo "Usage: $(basename "$0") [COMMIT-ISH]" >&2
+        exit 1
+    fi
+
     # Get repo directory (parent of hack/)
     local repo_dir
     repo_dir=$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")
@@ -59,7 +64,7 @@ main() {
     cd "$repo_dir"
 
     # Initialize version
-    version_init
+    version_init "${1:-}"
 
     # Print version string
     version_string
@@ -67,5 +72,5 @@ main() {
 
 # Run main if executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main
+    main "$@"
 fi

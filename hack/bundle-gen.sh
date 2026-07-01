@@ -15,6 +15,7 @@ readonly HIVE_SUB_DIR="operators/hive-operator"
 readonly IMAGE_REPO_DEFAULT="quay.io/openshift-hive/hive"
 readonly COMMUNITY_OPERATORS_UPSTREAM="${COMMUNITY_OPERATORS_UPSTREAM:-git@github.com:redhat-openshift-ecosystem/community-operators-prod.git}"
 readonly CHANNEL_DEFAULT="alpha"
+readonly YQ="${YQ:-yq}"
 
 # Runtime state — set by parse_args
 VERBOSE=false
@@ -47,7 +48,8 @@ This utility will:
   3. Look for a hive image in --image-repo with the tag specified by
      --image-tag-override (default: 10-char SHA of the checked-out commit).
      - If not found, build and push that image.
-     - Skip this step with --skip-image-validation.
+     - Skip this step with --skip-image-validation or if the image
+       repo is not quay.io (non-quay images are always treated as present).
   4. Generate an OperatorHub bundle from the checked-out commit, pointing to
      the image found or built above.
   5. (Without --dummy-bundle) Open PRs with this bundle in the Red Hat and
@@ -220,7 +222,7 @@ get_previous_version() {
         [[ -f "$annotation" ]] || continue
 
         local channels
-        channels=$(yq '.annotations["operators.operatorframework.io.bundle.channels.v1"] // ""' "$annotation")
+        channels=$("$YQ" '.annotations["operators.operatorframework.io.bundle.channels.v1"] // ""' "$annotation")
 
         if [[ ",$channels," == *",$channel,"* ]]; then
             if semver_gt "$version" "$highest"; then
@@ -284,13 +286,13 @@ EOF
         cp "$crd_file" "$manifests_dir/"
 
         local kind version_name crd_name description
-        kind=$(yq '.spec.names.kind' "$crd_file")
-        version_name=$(yq '.spec.versions[0].name' "$crd_file")
-        crd_name=$(yq '.metadata.name' "$crd_file")
-        description=$(yq '.spec.versions[0].schema.openAPIV3Schema.description // ""' "$crd_file")
+        kind=$("$YQ" '.spec.names.kind' "$crd_file")
+        version_name=$("$YQ" '.spec.versions[0].name' "$crd_file")
+        crd_name=$("$YQ" '.metadata.name' "$crd_file")
+        description=$("$YQ" '.spec.versions[0].schema.openAPIV3Schema.description // ""' "$crd_file")
 
         KIND="$kind" VERSION="$version_name" CRD_NAME="$crd_name" DESCRIPTION="$description" \
-            yq -i '. += [{"description": env(DESCRIPTION), "displayName": env(KIND), "kind": env(KIND), "name": env(CRD_NAME), "version": env(VERSION)}]' \
+            "$YQ" -i '. += [{"description": env(DESCRIPTION), "displayName": env(KIND), "kind": env(KIND), "name": env(CRD_NAME), "version": env(VERSION)}]' \
             "$owned_crds_file"
     done < <(find "$crds_dir" -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) | sort)
 
@@ -303,15 +305,15 @@ EOF
     local rules_file="$WORK_DIR/rules.yaml"
     local deploy_spec_file="$WORK_DIR/deploy-spec.yaml"
 
-    yq '.rules' "$operator_role" > "$rules_file"
+    "$YQ" '.rules' "$operator_role" > "$rules_file"
     # operator_deployment.yaml is multi-document; index 1 is the Deployment.
-    yq 'select(document_index == 1) | .spec' "$deployment_spec" > "$deploy_spec_file"
+    "$YQ" 'select(document_index == 1) | .spec' "$deployment_spec" > "$deploy_spec_file"
 
     local image_ref="${image_repo}:${image_tag}"
     local created_at
     created_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
-    yq -i "
+    "$YQ" -i "
         .metadata.name = \"hive-operator.v${semver_ver}\" |
         .spec.version = \"${semver_ver}\" |
         .spec.customresourcedefinitions.owned = load(\"${owned_crds_file}\") |
@@ -333,7 +335,7 @@ add_operatorhub_extras() {
     local version_dir="$1" semver_ver="$2" prev_version="$3"
 
     local csv_file="$version_dir/manifests/hive-operator.v${semver_ver}.clusterserviceversion.yaml"
-    yq -i ".spec.replaces = \"hive-operator.v${prev_version}\"" "$csv_file"
+    "$YQ" -i ".spec.replaces = \"hive-operator.v${prev_version}\"" "$csv_file"
 
     if ! $SKIP_RELEASE_CONFIG; then
         # release-config.yaml is only used by the Red Hat Ecosystem for automatic
@@ -417,8 +419,9 @@ open_pr() {
 
 # check_deps — fail fast with a clear message if required tools are missing
 check_deps() {
-    local required=(yq git)
-    # jq is only needed to parse the quay.io API response
+    local required=("$YQ" git)
+    # jq is only needed to query the quay.io API; skipped for non-quay repos
+    # or when --skip-image-validation is set
     if ! $SKIP_IMAGE_VALIDATION && [[ "${IMAGE_REPO%%/*}" == "quay.io" ]]; then
         required+=(jq)
     fi
@@ -438,8 +441,10 @@ check_deps() {
         exit 1
     fi
 
-    if ! yq --version 2>&1 | grep -q 'version v4'; then
-        echo "Error: yq v4 is required (found: $(yq --version 2>&1))" >&2
+    local yq_version
+    yq_version=$("$YQ" --version 2>&1)
+    if ! grep -q 'version v4' <<<"$yq_version"; then
+        echo "Error: yq v4 is required (found: $yq_version)" >&2
         echo "  yq (v4): https://github.com/mikefarah/yq" >&2
         exit 1
     fi

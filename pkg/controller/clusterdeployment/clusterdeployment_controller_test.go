@@ -5597,3 +5597,105 @@ func (testReleaseVerifier) Verifiers() map[string]openpgp.EntityList {
 
 func (testReleaseVerifier) AddStore(_ store.Store) {
 }
+
+func TestEnsurePrivateImagePullSecret(t *testing.T) {
+	const (
+		privateSecretName = "hive-private-pull-secret"
+		hiveNamespace     = "hive"
+	)
+
+	cases := []struct {
+		name            string
+		existing        []runtime.Object
+		setEnv          bool
+		expectRequeue   bool
+		expectError     bool
+		expectErrSubstr string
+	}{
+		{
+			name:   "no-op when env var is unset",
+			setEnv: false,
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+			},
+		},
+		{
+			name:   "success when source secret exists",
+			setEnv: true,
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, privateSecretName, hiveNamespace, ".dockerconfigjson", "{}"),
+				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}},
+			},
+			expectRequeue: true,
+		},
+		{
+			name:   "copy fails, namespace is terminating",
+			setEnv: true,
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+				// No source secret -> CopySecret will fail
+				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+					Name:              testNamespace,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					Finalizers:        []string{"kubernetes"},
+				}},
+			},
+			expectRequeue: false,
+			expectError:   false,
+		},
+		{
+			name:   "copy fails, namespace is active",
+			setEnv: true,
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+				// No source secret -> CopySecret will fail
+				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}},
+			},
+			expectRequeue:   false,
+			expectError:     true,
+			expectErrSubstr: "Error copying private image pull secret",
+		},
+		{
+			name:   "copy fails, namespace lookup also fails",
+			setEnv: true,
+			existing: []runtime.Object{
+				testEmptyClusterDeployment(),
+				// No source secret -> CopySecret will fail
+				// No namespace object -> namespaceTerminated will also fail
+			},
+			expectRequeue:   false,
+			expectError:     true,
+			expectErrSubstr: "Failed to discover whether namespace",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setEnv {
+				t.Setenv(constants.HivePrivateImagePullSecret, privateSecretName)
+			} else {
+				t.Setenv(constants.HivePrivateImagePullSecret, "")
+			}
+			t.Setenv("HIVE_NS", hiveNamespace)
+
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.existing...).Build()
+			rcd := &ReconcileClusterDeployment{
+				Client:          fakeClient,
+				scheme:          scheme.GetScheme(),
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
+			}
+			cd := testEmptyClusterDeployment()
+			cdLog := log.WithField("test", tc.name)
+
+			requeue, err := rcd.ensurePrivateImagePullSecret(cd, cdLog)
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectErrSubstr)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.expectRequeue, requeue)
+		})
+	}
+}

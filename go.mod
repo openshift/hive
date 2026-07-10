@@ -1,8 +1,8 @@
 module github.com/openshift/hive
 
-go 1.25.0
+go 1.26.0
 
-toolchain go1.25.9
+toolchain go1.26.3
 
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible

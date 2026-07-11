@@ -13,6 +13,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	oappsv1 "github.com/openshift/api/apps/v1"
 	orbacv1 "github.com/openshift/api/authorization/v1"
@@ -70,6 +71,7 @@ func init() {
 	rbacv1.AddToScheme(hive_scheme)
 	routev1.AddToScheme(hive_scheme)
 	velerov1.AddToScheme(hive_scheme)
+	certmanagerv1.AddToScheme(hive_scheme)
 
 }
 

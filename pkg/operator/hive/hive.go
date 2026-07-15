@@ -57,6 +57,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/configmaps/install-log-regexes-configmap.yaml",
 		"config/rbac/hive_frontend_serviceaccount.yaml",
 		"config/controllers/hive_controllers_serviceaccount.yaml",
+		// NOTE: This policy applies to sharded controllers as well.
+		"config/netpol/hive-controllers.yaml",
 	}
 	// Delete the assets from previous target namespaces
 	assetsToClean := append(namespacedAssets, deploymentAsset)

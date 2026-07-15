@@ -8,6 +8,7 @@ metadata:
   labels:
     app: hiveadmission
     hiveadmission: "true"
+    hive.openshift.io/component: hiveadmission
 spec:
   replicas: 2
   selector:
@@ -24,6 +25,7 @@ spec:
       labels:
         app: hiveadmission
         hiveadmission: "true"
+        hive.openshift.io/component: hiveadmission
     spec:
       serviceAccountName: hiveadmission
       containers:

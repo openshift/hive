@@ -10830,6 +10830,18 @@ objects:
           - get
           - list
           - watch
+      - apiGroups:
+          - networking.k8s.io
+        resources:
+          - networkpolicies
+        verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
   - apiVersion: rbac.authorization.k8s.io/v1
     kind: ClusterRoleBinding
     metadata:
@@ -10848,6 +10860,7 @@ objects:
       labels:
         control-plane: hive-operator
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive-operator
       name: hive-operator
     spec:
       replicas: 1
@@ -10863,6 +10876,7 @@ objects:
           labels:
             control-plane: hive-operator
             controller-tools.k8s.io: "1.0"
+            hive.openshift.io/component: hive-operator
         spec:
           containers:
             - command:

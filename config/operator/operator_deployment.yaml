@@ -11,6 +11,7 @@ metadata:
   labels:
     control-plane: hive-operator
     controller-tools.k8s.io: "1.0"
+    hive.openshift.io/component: hive-operator
 spec:
   selector:
     matchLabels:
@@ -25,6 +26,7 @@ spec:
       labels:
         control-plane: hive-operator
         controller-tools.k8s.io: "1.0"
+        hive.openshift.io/component: hive-operator
     spec:
       serviceAccountName: hive-operator
       volumes:

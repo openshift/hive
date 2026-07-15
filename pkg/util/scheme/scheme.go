@@ -12,6 +12,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -65,6 +66,7 @@ func init() {
 	)
 	machinev1beta1.AddToScheme(hive_scheme)
 	monitoringv1.AddToScheme(hive_scheme)
+	netv1.AddToScheme(hive_scheme)
 	oappsv1.Install(hive_scheme)
 	orbacv1.Install(hive_scheme)
 	rbacv1.AddToScheme(hive_scheme)

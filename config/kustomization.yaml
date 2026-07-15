@@ -18,9 +18,10 @@ namespace: hive
 # YAML string, with resources separated by document
 # markers ("---").
 #
-# This kustomize configuration mimic's what is deployed by OLM, essentially *only* what is required
+# This kustomize configuration mimics what is deployed by OLM, essentially *only* what is required
 # for the hive-operator.
 resources:
 - ./operator/operator_role.yaml
 - ./operator/operator_role_binding.yaml
 - ./operator/operator_deployment.yaml
+- ./operator/operator_netpol.yaml

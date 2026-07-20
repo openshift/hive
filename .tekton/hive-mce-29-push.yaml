@@ -34,7 +34,7 @@ spec:
         - linux/x86_64
         - linux/ppc64le
         - linux/s390x
-        - linux/arm64
+        - linux-mxlarge/arm64
     - name: dockerfile
       value: Dockerfile
     - name: path-context

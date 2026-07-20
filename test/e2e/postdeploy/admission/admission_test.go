@@ -2,6 +2,7 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,8 +68,8 @@ func waitForAdmissionRouting(t *testing.T, c dynamic.Interface, gvr schema.Group
 				"kind":    "DNSZone",
 			},
 			"resource": map[string]interface{}{
-				"group":   "hive.openshift.io",
-				"version": "v1",
+				"group":    "hive.openshift.io",
+				"version":  "v1",
 				"resource": "dnszones",
 			},
 			"operation": "CREATE",
@@ -95,10 +96,7 @@ func waitForAdmissionRouting(t *testing.T, c dynamic.Interface, gvr schema.Group
 				t.Logf("Admission routing not ready yet: %v", err)
 				return false, nil
 			}
-			// Any other error is unexpected; keep retrying to be safe,
-			// but log it so we can diagnose if the probe itself is broken.
-			t.Logf("Unexpected error during admission routing probe: %v", err)
-			return false, nil
+			return false, fmt.Errorf("unexpected error during admission routing probe: %w", err)
 		}
 		return true, nil
 	})

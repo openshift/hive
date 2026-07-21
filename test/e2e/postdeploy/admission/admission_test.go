@@ -10,6 +10,7 @@ import (
 	"time"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,8 +47,8 @@ func waitForAdmissionAPIService(t *testing.T) bool {
 	return true
 }
 
-func waitForAdmission(t *testing.T) bool {
-	return waitForAdmissionDeployment(t) && waitForAdmissionAPIService(t)
+func waitForAdmission(t *testing.T, c dynamic.Interface, gvr schema.GroupVersionResource) bool {
+	return waitForAdmissionDeployment(t) && waitForAdmissionAPIService(t) && waitForAdmissionRouting(t, c, gvr)
 }
 
 // waitForAdmissionRouting sends a smoke request to the aggregated API endpoint
@@ -92,7 +93,7 @@ func waitForAdmissionRouting(t *testing.T, c dynamic.Interface, gvr schema.Group
 		if err != nil {
 			// The Forbidden error for system:anonymous means kube-apiserver
 			// has not yet wired up routing to the aggregated API server.
-			if strings.Contains(err.Error(), "is forbidden") {
+			if apierrors.IsForbidden(err) && strings.Contains(err.Error(), "system:anonymous") {
 				t.Logf("Admission routing not ready yet: %v", err)
 				return false, nil
 			}
@@ -111,10 +112,7 @@ func waitForAdmissionRouting(t *testing.T, c dynamic.Interface, gvr schema.Group
 func TestAdmission(t *testing.T) {
 	c := common.MustGetDynamicClient()
 	gvr, _ := (&webhook.DNSZoneValidatingAdmissionHook{}).ValidatingResource()
-	if !waitForAdmission(t) {
-		return
-	}
-	if !waitForAdmissionRouting(t, c, gvr) {
+	if !waitForAdmission(t, c, gvr) {
 		return
 	}
 

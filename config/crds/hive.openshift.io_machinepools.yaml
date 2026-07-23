@@ -260,7 +260,10 @@ spec:
                             - diskSizeGB
                           type: object
                         osImage:
-                          description: OSImage defines the image to use for the OS.
+                          description: |-
+                            OSImage defines the marketplace image to use for the OS. Mutually exclusive with OSImageID;
+                            if both are specified, OSImage is ignored. If neither is specified, the managed cluster will
+                            inject a default.
                           properties:
                             offer:
                               description: Offer is the offer of the image.
@@ -288,6 +291,12 @@ spec:
                             - sku
                             - version
                           type: object
+                        osImageID:
+                          description: |-
+                            OSImageID is the resource path of the managed or gallery image to be used on the VMs.
+                            Mutually exclusive with OSImage; if both are specified, OSImage is ignored. If neither is
+                            specified, the managed cluster will inject a default.
+                          type: string
                         outboundType:
                           description: OutboundType is a strategy for how egress from cluster is achieved. When not specified default is "Loadbalancer".
                           type: string

@@ -40,9 +40,6 @@ type Client interface {
 	ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error)
 	DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error)
 	StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error)
-
-	// Images
-	ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error)
 }
 
 // ResourceSKUsPage is a page of results from listing resource SKUs.

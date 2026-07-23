@@ -14,9 +14,17 @@ type MachinePool struct {
 	// OSDisk defines the storage for instance.
 	OSDisk `json:"osDisk"`
 
-	// OSImage defines the image to use for the OS.
+	// OSImage defines the marketplace image to use for the OS. Mutually exclusive with OSImageID;
+	// if both are specified, OSImage is ignored. If neither is specified, the managed cluster will
+	// inject a default.
 	// +optional
 	OSImage *OSImage `json:"osImage,omitempty"`
+
+	// OSImageID is the URN of the (managed, gallery, or marketplace) image to be used on the VMs.
+	// Mutually exclusive with OSImage; if both are specified, OSImage is ignored. If neither is
+	// specified, the managed cluster will inject a default.
+	// +optional
+	OSImageID string `json:"osImageID,omitempty"`
 
 	// NetworkResourceGroupName specifies the network resource group that contains an existing VNet.
 	// Ignored unless VirtualNetwork is also specified.

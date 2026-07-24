@@ -2,14 +2,20 @@ package admission
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 
 	"github.com/openshift/hive/pkg/util/scheme"
 	webhook "github.com/openshift/hive/pkg/validating-webhooks/hive/v1"
@@ -41,14 +47,72 @@ func waitForAdmissionAPIService(t *testing.T) bool {
 	return true
 }
 
-func waitForAdmission(t *testing.T) bool {
-	return waitForAdmissionDeployment(t) && waitForAdmissionAPIService(t)
+func waitForAdmission(t *testing.T, c dynamic.Interface, gvr schema.GroupVersionResource) bool {
+	return waitForAdmissionDeployment(t) && waitForAdmissionAPIService(t) && waitForAdmissionRouting(t, c, gvr)
+}
+
+// waitForAdmissionRouting sends a smoke request to the aggregated API endpoint
+// in a poll loop, working around a race where kube-apiserver reports the
+// APIService as Available but has not yet fully configured request routing.
+// Until routing is ready the request hits native RBAC and is rejected with
+// Forbidden for system:anonymous.
+func waitForAdmissionRouting(t *testing.T, c dynamic.Interface, gvr schema.GroupVersionResource) bool {
+	// Build a minimal AdmissionReview that the webhook will accept.
+	probe := &unstructured.Unstructured{}
+	probe.SetUnstructuredContent(map[string]interface{}{
+		"apiVersion": "admission.k8s.io/v1",
+		"kind":       "AdmissionReview",
+		"request": map[string]interface{}{
+			"kind": map[string]interface{}{
+				"group":   "hive.openshift.io",
+				"version": "v1",
+				"kind":    "DNSZone",
+			},
+			"resource": map[string]interface{}{
+				"group":    "hive.openshift.io",
+				"version":  "v1",
+				"resource": "dnszones",
+			},
+			"operation": "CREATE",
+			"object": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "routing-probe",
+				},
+				"spec": map[string]interface{}{
+					"zone": "probe.example.com",
+				},
+			},
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+		_, err := c.Resource(gvr).Create(ctx, probe, metav1.CreateOptions{})
+		if err != nil {
+			// The Forbidden error for system:anonymous means kube-apiserver
+			// has not yet wired up routing to the aggregated API server.
+			if apierrors.IsForbidden(err) && strings.Contains(err.Error(), "system:anonymous") {
+				t.Logf("Admission routing not ready yet: %v", err)
+				return false, nil
+			}
+			return false, fmt.Errorf("unexpected error during admission routing probe: %w", err)
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("Timed out waiting for admission routing to be ready: %v", err)
+		return false
+	}
+	t.Log("Admission routing is ready")
+	return true
 }
 
 func TestAdmission(t *testing.T) {
 	c := common.MustGetDynamicClient()
 	gvr, _ := (&webhook.DNSZoneValidatingAdmissionHook{}).ValidatingResource()
-	if !waitForAdmission(t) {
+	if !waitForAdmission(t, c, gvr) {
 		return
 	}
 

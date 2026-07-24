@@ -127,6 +127,12 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		return nil, false, errors.Wrap(err, "error retrieving VM capabilities")
 	}
 
+	// If we leave the rhcosImg empty, installer supplies a default marketplace image.
+	// If we set it to *any value*, installer will use the well-known gallery image URN format that
+	// varies only by HyperVGeneration, which we'll compute below. The value of rhcosImg itself is
+	// *not used*.
+	rhcosImg := ""
+
 	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
 		var plan = installertypesazure.ImageWithPurchasePlan // default value
 		if osImage.Plan != "" {
@@ -141,24 +147,35 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 			Version:   osImage.Version,
 		}
 	} else {
-		// An image was not provided so check if the installer created a "gen2" image
-		// to determine if we should allow resultant machinesets to consume a "gen2" image.
-		gen2ImageExists, err := a.gen2ImageExists(ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
+		// An image was not provided. If a gallery image exists at all, we need to assume the spoke
+		// is old and doesn't have marketplace images. If that's the case, we want to use a gen2
+		// image if available (and compatible with our VM size). If no gen2 image is available, we
+		// dummy down our VM capabilities to force using the gen1 image.
+		// If no gallery image exists, we'll trigger the path in MachineSets() that uses a default
+		// marketplace image.
+		gallery, gen2, err := a.galleryImageExistsAndIsGen2(ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
 		if err != nil {
 			return nil, false, err
 		}
-		if !gen2ImageExists {
-			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()
-			// because a V2 image does not exist.
-			// The HyperVGeneration is germane to the instance/disk type and affects the image used
-			// for the instance. "-gen-2" will be appended to the image name by installazure.MachineSets()
-			// when the HyperVGenerations capability (comma separated list of HyperVGenerations) includes "V2".
-			//
-			// capabilities := map[string]string{
-			//   "HyperVGenerations": "V1,V2",
-			// }
-			//
-			if _, ok := capabilities["HyperVGenerations"]; ok {
+		if gallery {
+			// signal that the installer code should use the gallery URN. This is pretty hacky and
+			// non-future-proof; include a breadcrumb to flag possible future regressions.
+			rhcosImg = "gallery (if you are seeing this string in a Machine[Set], please report a hive bug)"
+			if !gen2 {
+				// Ensure that a V1 image is chosen by installazure.MachineSets() because a V2
+				// image does not exist.
+				// A VM size is capable of running V1, V2, or both, as indicated in its capabilities map:
+				//
+				// capabilities := map[string]string{
+				//   "HyperVGenerations": "V1,V2",
+				// }
+				//
+				// An image is V1 xor V2.
+				// Installer code will assume the highest version in the capabilities map; so if no
+				// V2 image exists, make sure it chooses V1.
+				// (There is still a failure mode here if the VM size doesn't support V1. In that
+				// case, the Machine will fail with an appropriate message, and the user should
+				// choose a VM size that does.)
 				capabilities["HyperVGenerations"] = "V1"
 			}
 		}
@@ -177,14 +194,11 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 	}
 
-	// If we leave the imageID, the image is determined by the installer
-	const imageID = ""
-
 	installerMachineSets, err := installazure.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		installconfig.MakeAsset(ic),
 		computePool,
-		imageID,
+		rhcosImg,
 		workerRole,
 		workerUserDataName,
 		capabilities,
@@ -230,17 +244,25 @@ func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]co
 	return images, err
 }
 
-func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) {
+// galleryImageExistsAndIsGen2 looks for gallery images in the specified RG.
+// The first return indicates that we found *any* such images. If this is false, the caller should
+// use marketplace images.
+// The second return, only relevant if the first is true, indicates whether any of the found images
+// are gen2. If this is false, the caller must assume gen1, validate compatibility with the VM
+// size, and request gen1 accordingly.
+func (a *AzureActuator) galleryImageExistsAndIsGen2(resourceGroupName string) (bool, bool, error) {
 	images, err := a.getImagesByResourceGroup(resourceGroupName)
 	if err != nil {
-		return false, errors.Wrapf(err, "error listing images by resourceGroup: %s", resourceGroupName)
+		// We get 200/[] rather than 404 if there are none, right?
+		return false, false, errors.Wrapf(err, "error listing images by resourceGroup: %s", resourceGroupName)
 	}
+	found := len(images) != 0
 	for _, image := range images {
 		if image.ImageProperties.HyperVGeneration == compute.HyperVGenerationTypesV2 {
-			return true, nil
+			return found, true, nil
 		}
 	}
-	return false, nil
+	return found, false, nil
 }
 
 // getVMCapabilities retrieves the capabilities of an instance type in a specific region. Returns these values

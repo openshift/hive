@@ -7,7 +7,6 @@ import (
 	"time"
 
 	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -127,39 +126,22 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		return nil, false, errors.Wrap(err, "error retrieving VM capabilities")
 	}
 
+	// TODO: le big comment here
 	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
-		var plan = installertypesazure.ImageWithPurchasePlan // default value
-		if osImage.Plan != "" {
-			plan = installertypesazure.ImagePurchasePlan(osImage.Plan)
-		}
+		if pool.Spec.Platform.Azure.OSImageID != "" {
+			logger.Warn("ignoring OSImage since OSImageID was provided")
+		} else {
+			var plan = installertypesazure.ImageWithPurchasePlan // default value
+			if osImage.Plan != "" {
+				plan = installertypesazure.ImagePurchasePlan(osImage.Plan)
+			}
 
-		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
-			Plan:      plan,
-			Publisher: osImage.Publisher,
-			Offer:     osImage.Offer,
-			SKU:       osImage.SKU,
-			Version:   osImage.Version,
-		}
-	} else {
-		// An image was not provided so check if the installer created a "gen2" image
-		// to determine if we should allow resultant machinesets to consume a "gen2" image.
-		gen2ImageExists, err := a.gen2ImageExists(ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
-		if err != nil {
-			return nil, false, err
-		}
-		if !gen2ImageExists {
-			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()
-			// because a V2 image does not exist.
-			// The HyperVGeneration is germane to the instance/disk type and affects the image used
-			// for the instance. "-gen-2" will be appended to the image name by installazure.MachineSets()
-			// when the HyperVGenerations capability (comma separated list of HyperVGenerations) includes "V2".
-			//
-			// capabilities := map[string]string{
-			//   "HyperVGenerations": "V1,V2",
-			// }
-			//
-			if _, ok := capabilities["HyperVGenerations"]; ok {
-				capabilities["HyperVGenerations"] = "V1"
+			computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
+				Plan:      plan,
+				Publisher: osImage.Publisher,
+				Offer:     osImage.Offer,
+				SKU:       osImage.SKU,
+				Version:   osImage.Version,
 			}
 		}
 	}
@@ -177,14 +159,11 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 	}
 
-	// If we leave the imageID, the image is determined by the installer
-	const imageID = ""
-
 	installerMachineSets, err := installazure.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		installconfig.MakeAsset(ic),
 		computePool,
-		imageID,
+		pool.Spec.Platform.Azure.OSImageID,
 		workerRole,
 		workerUserDataName,
 		capabilities,
@@ -214,33 +193,6 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 	}
 
 	return nil, err
-}
-
-func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]compute.Image, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Minute)
-	defer cancel()
-
-	var images []compute.Image
-	var res azureclient.ImageListResultPage
-	var err error
-	for res, err = a.client.ListImagesByResourceGroup(ctx, resourceGroupName); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
-		images = append(images, res.Values()...)
-	}
-
-	return images, err
-}
-
-func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) {
-	images, err := a.getImagesByResourceGroup(resourceGroupName)
-	if err != nil {
-		return false, errors.Wrapf(err, "error listing images by resourceGroup: %s", resourceGroupName)
-	}
-	for _, image := range images {
-		if image.ImageProperties.HyperVGeneration == compute.HyperVGenerationTypesV2 {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // getVMCapabilities retrieves the capabilities of an instance type in a specific region. Returns these values

@@ -2,35 +2,35 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Developing Hive](#developing-hive)
-  - [Prerequisites](#prerequisites)
-    - [External tools](#external-tools)
-  - [Build and run tests](#build-and-run-tests)
-  - [Setting up the development environment](#setting-up-the-development-environment)
-    - [Cloning the repository](#cloning-the-repository)
-  - [Obtaining a Cluster](#obtaining-a-cluster)
-    - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
-  - [Deploying from Source](#deploying-from-source)
-    - [Full Container Build](#full-container-build)
-    - [Running Code Locally](#running-code-locally)
-      - [hive-operator](#hive-operator)
-    - [hive-controllers](#hive-controllers)
-  - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
-  - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
-  - [Using Serving Certificates](#using-serving-certificates)
-    - [Generating a Certificate](#generating-a-certificate)
-    - [Using Generated Certificate](#using-generated-certificate)
-  - [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
-  - [Updating Hive APIs](#updating-hive-apis)
-  - [Importing Hive APIs](#importing-hive-apis)
-  - [Dependency management](#dependency-management)
-    - [Updating Dependencies](#updating-dependencies)
-    - [Re-creating vendor Directory](#re-creating-vendor-directory)
-    - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
-    - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
-  - [Running the e2e test locally](#running-the-e2e-test-locally)
-  - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
-  - [Hive Controllers Profiling](#hive-controllers-profiling)
+- [Prerequisites](#prerequisites)
+  - [External tools](#external-tools)
+- [Build and run tests](#build-and-run-tests)
+- [Setting up the development environment](#setting-up-the-development-environment)
+  - [Cloning the repository](#cloning-the-repository)
+- [Obtaining a Cluster](#obtaining-a-cluster)
+  - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
+- [Deploying from Source](#deploying-from-source)
+  - [Full Container Build](#full-container-build)
+  - [Running Code Locally](#running-code-locally)
+    - [hive-operator](#hive-operator)
+  - [hive-controllers](#hive-controllers)
+- [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
+- [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
+- [Using Serving Certificates](#using-serving-certificates)
+  - [Generating a Certificate](#generating-a-certificate)
+  - [Using Generated Certificate](#using-generated-certificate)
+- [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
+- [Updating Hive APIs](#updating-hive-apis)
+- [Importing Hive APIs](#importing-hive-apis)
+- [Dependency management](#dependency-management)
+  - [Updating Dependencies](#updating-dependencies)
+  - [Re-creating vendor Directory](#re-creating-vendor-directory)
+  - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
+    - [When to update Kubernetes dependencies](#when-to-update-kubernetes-dependencies)
+  - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
+- [Running the e2e test locally](#running-the-e2e-test-locally)
+- [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
+- [Hive Controllers Profiling](#hive-controllers-profiling)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -354,12 +354,17 @@ For convenience, `make modfix` will attempt to make these updates for you.
 
 Don't forget to `make vendor` when you're done to sync the vendor directories with your go.mod changes.
 
+#### When to update Kubernetes dependencies
+
+Hive's kubernetes dependencies must usually remain in lockstep with those of the openshift/installer repository, which we vendor (see below).
+It is therefore usually convenient, or even necessary, to update k8s dependencies alongside revendoring the installer.
+
 ### Vendoring the OpenShift Installer
 
 For various reasons, Hive vendors the OpenShift Installer. The OpenShift installer brings in quite a few dependencies, so it is important to know the general flow of how to vendor the latest version of the OpenShift Installer.
 
 Things to note:
-* Hive vendors the installer from `@master`, NOT from `@latest`. For go modules, `@latest` means the latest git tag, which for the installer is not up to date.
+* Hive vendors the installer from tags, such as `v1.4.22-ec5`, not from `@master` or `@latest`. (For go modules, `@latest` means the latest git tag, which for the installer is not up to date.)
 * The `go.mod` file contains a section called `replace`. The purpose of this section is to force go modules to use a specific version of that dependency.
 * `replace` directives may need to be copied from the OpenShift Installer or possibly other Hive dependencies. In other words, any dependency may need to be pinned to a specific version.
 * `go mod tidy` is used to add (download) missing dependencies and to remove unused modules.
@@ -370,18 +375,10 @@ The following is a basic flow for vendoring the latest OpenShift Installer. Upda
 
 Basic flow for vendoring the latest OpenShift Installer:
 
+* If not already available, request a new tag from the installer team.
+* Edit `go.mod` and change the OpenShift Installer `require` to reference the new tag.
 * Compare the `replace` section of the OpenShift Installer `go.mod` with the `replace` section of the Hive `go.mod`. If the Hive `replace` section has the same module listed as the OpenShift Installer `replace` section, ensure that the Hive version matches the installer version. If it doesn't, change the Hive version to match.
-
-* Edit `go.mod` and change the OpenShift Installer `require` to reference `master` (or a specific commit hash) instead of the last version. Go will change it to the version that master points to, so this is a temporary change.
-```
-github.com/openshift/installer master
-```
-
 * Run `make vendor`. This make target runs both `go mod tidy` and `go mod vendor` which get the latest modules, cleanup unused modules and copy the moduels into the Hive git tree.
-```
-make vendor
-```
-
 * If `go mod tidy` errors with a message like the following, then check Hive's usage of that package. In this case, the Hive import is importing an old version of the API. It needs to instead import v1beta1. Fix the hive code and re-run `go mod tidy`. This may need to be done multiple times.
 ```
 github.com/openshift/hive/pkg/controller/machinepool imports

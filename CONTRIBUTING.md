@@ -47,12 +47,15 @@ make verify
 make test
 ```
 
- ### Dependency Management
+### Dependency Management
+For trivial dependency version bumps, the following should suffice:
 ```bash
 make vendor   # Update vendor directory
-make modcheck # Check module dependencies
-make modfix   # Fix module dependencies
+make modcheck # Validate root vs apis/ module versions
+make modfix   # Sync apis/ module versions with the root
 ```
+
+For more complex dependencies, such as openshift/installer or k8s, see [developing.md](docs/developing.md#dependency-management).
 
 ### Test Types
 

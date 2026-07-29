@@ -11,6 +11,7 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
+	utils "github.com/openshift/installer/pkg/utils"
 )
 
 // MachineSets returns a list of machinesets for a machinepool.
@@ -79,6 +80,7 @@ func MachineSets(clusterID string, config *types.InstallConfig, subnets map[stri
 				},
 			},
 		}
+		utils.SetMachineSetOSStreamLabels(mset, config)
 		machinesets = append(machinesets, mset)
 	}
 	return machinesets, nil

@@ -13,6 +13,7 @@ import (
 	icaws "github.com/openshift/installer/pkg/asset/installconfig/aws"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/aws"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 // MachineSetInput holds the input arguments required to MachineSets for a machinepool.
@@ -26,6 +27,7 @@ type MachineSetInput struct {
 	Role                     string
 	UserDataSecret           string
 	Hosts                    map[string]icaws.Host
+	Config                   *types.InstallConfig
 }
 
 // MachineSets returns a list of machinesets for a machinepool.
@@ -157,7 +159,7 @@ func MachineSets(in *MachineSetInput) ([]*machineapi.MachineSet, error) {
 				},
 			},
 		}
-
+		utils.SetMachineSetOSStreamLabels(mset, in.Config)
 		machinesets = append(machinesets, mset)
 	}
 

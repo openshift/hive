@@ -3,6 +3,7 @@ package defaults
 import (
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
+	"github.com/openshift/installer/pkg/rhcos"
 	"github.com/openshift/installer/pkg/types"
 	awsdefaults "github.com/openshift/installer/pkg/types/aws/defaults"
 	"github.com/openshift/installer/pkg/types/azure"
@@ -67,11 +68,11 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 		c.ControlPlane = &types.MachinePool{}
 	}
 	c.ControlPlane.Name = "master"
-	SetMachinePoolDefaults(c.ControlPlane, &c.Platform)
+	SetMachinePoolDefaults(c.ControlPlane, &c.Platform, c.EnabledFeatureGates())
 
 	if c.Arbiter != nil {
 		c.Arbiter.Name = "arbiter"
-		SetMachinePoolDefaults(c.Arbiter, &c.Platform)
+		SetMachinePoolDefaults(c.Arbiter, &c.Platform, c.EnabledFeatureGates())
 	}
 
 	defaultComputePoolUndefined := true
@@ -85,7 +86,7 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 		c.Compute = append(c.Compute, types.MachinePool{Name: types.MachinePoolComputeRoleName})
 	}
 	for i := range c.Compute {
-		SetMachinePoolDefaults(&c.Compute[i], &c.Platform)
+		SetMachinePoolDefaults(&c.Compute[i], &c.Platform, c.EnabledFeatureGates())
 	}
 
 	if c.CredentialsMode == "" {
@@ -132,6 +133,10 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 		nonedefaults.SetPlatformDefaults(c.Platform.None)
 	case c.Platform.Nutanix != nil:
 		nutanixdefaults.SetPlatformDefaults(c.Platform.Nutanix)
+	}
+
+	if c.OSImageStream == "" {
+		c.OSImageStream = rhcos.GetDefaultOSImageStream(c)
 	}
 
 	if c.AdditionalTrustBundlePolicy == "" {

@@ -15,6 +15,7 @@ import (
 	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/azure"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 // MachineSets returns a list of machinesets for a machinepool.
@@ -122,6 +123,7 @@ func MachineSets(clusterID string, ic *installconfig.InstallConfig, pool *types.
 				},
 			},
 		}
+		utils.SetMachineSetOSStreamLabels(mset, ic.Config)
 		machinesets = append(machinesets, mset)
 	}
 	return machinesets, nil
@@ -244,6 +246,7 @@ func getMultiZoneMachineSets(in multiZoneMachineSetInput) ([]*clusterapi.Machine
 					},
 				},
 			}
+			utils.SetMachineSetOSStreamLabels(mset, in.ic.Config)
 			machineSets = append(machineSets, mset)
 			replicasToCreate -= currentReplica
 		}

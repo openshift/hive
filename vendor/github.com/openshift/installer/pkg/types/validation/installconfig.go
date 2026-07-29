@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	dockerref "github.com/containers/image/v5/docker/reference"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	dockerref "go.podman.io/image/v5/docker/reference"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -47,6 +47,7 @@ import (
 	openstackvalidation "github.com/openshift/installer/pkg/types/openstack/validation"
 	"github.com/openshift/installer/pkg/types/ovirt"
 	ovirtvalidation "github.com/openshift/installer/pkg/types/ovirt/validation"
+	pkivalidation "github.com/openshift/installer/pkg/types/pki"
 	"github.com/openshift/installer/pkg/types/powervc"
 	powervcvalidation "github.com/openshift/installer/pkg/types/powervc/validation"
 	"github.com/openshift/installer/pkg/types/powervs"
@@ -133,7 +134,7 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 	}
 	if c.Networking != nil {
 		allErrs = append(allErrs, validateNetworking(c.Networking, field.NewPath("networking"))...)
-		allErrs = append(allErrs, validateNetworkingIPVersion(c.Networking, &c.Platform)...)
+		allErrs = append(allErrs, validateNetworkingIPVersion(c)...)
 		allErrs = append(allErrs, validateNetworkingClusterNetworkMTU(c, field.NewPath("networking", "clusterNetworkMTU"))...)
 		allErrs = append(allErrs, validateVIPsForPlatform(c.Networking, &c.Platform, usingAgentMethod, field.NewPath("platform"))...)
 		allErrs = append(allErrs, validateOVNKubernetesConfig(c.Networking, field.NewPath("networking"))...)
@@ -145,6 +146,15 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 		allErrs = append(allErrs, validateControlPlane(c, field.NewPath("controlPlane"))...)
 	} else {
 		allErrs = append(allErrs, field.Required(field.NewPath("controlPlane"), "controlPlane is required"))
+	}
+
+	if c.BootstrapInPlace != nil && c.ControlPlane.Replicas != nil &&
+		*c.ControlPlane.Replicas == 1 && c.Platform.Name() == baremetal.Name {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("bootstrapInPlace"),
+			"",
+			"Single Node OpenShift is not supported on the baremetal platform",
+		))
 	}
 
 	if c.Arbiter != nil {
@@ -274,6 +284,10 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 		}
 	}
 
+	if c.PKI != nil {
+		allErrs = append(allErrs, pkivalidation.ValidatePKIConfig(c.PKI, field.NewPath("pki"))...)
+	}
+
 	allErrs = append(allErrs, ValidateFeatureSet(c)...)
 	allErrs = append(allErrs, validateOSImageStream(c)...)
 
@@ -356,8 +370,11 @@ func ipnetworksToStrings(networks []ipnet.IPNet) []string {
 
 // validateNetworkingIPVersion checks parameters for consistency when the user
 // requests single-stack IPv6 or dual-stack modes.
-func validateNetworkingIPVersion(n *types.Networking, p *types.Platform) field.ErrorList {
+func validateNetworkingIPVersion(c *types.InstallConfig) field.ErrorList {
 	var allErrs field.ErrorList
+
+	n := c.Networking
+	p := &c.Platform
 
 	hasIPv4, hasIPv6, presence, addresses := inferIPVersionFromInstallConfig(n)
 
@@ -368,10 +385,17 @@ func validateNetworkingIPVersion(n *types.Networking, p *types.Platform) field.E
 		}
 
 		allowV6Primary := false
-		experimentalDualStackEnabled, _ := strconv.ParseBool(os.Getenv("OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK"))
 		switch {
-		case p.Azure != nil && experimentalDualStackEnabled:
-			logrus.Warnf("Using experimental Azure dual-stack support")
+		case p.Azure != nil:
+			logrus.Info("Dual Stack support on Azure is still in Dev Preview")
+			// Dualstack is only allowed if platform.azure.ipFamily is set to dual-stack variants
+			if ipFamily := p.Azure.IPFamily; ipFamily.DualStackEnabled() {
+				if ipFamily == network.DualStackIPv6Primary {
+					allowV6Primary = true
+				}
+				break
+			}
+			allErrs = append(allErrs, field.Invalid(field.NewPath("networking"), "DualStack", fmt.Sprintf("dual-stack IPv4/IPv6 can only be specified when platform.azure.ipFamily is %s or %s", network.DualStackIPv4Primary, network.DualStackIPv6Primary)))
 		case p.BareMetal != nil:
 			// We now support ipv6-primary dual stack on baremetal
 			allowV6Primary = true
@@ -1564,9 +1588,9 @@ func validateAdditionalCABundlePolicy(c *types.InstallConfig) error {
 func ValidateFeatureSet(c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	featureSets, ok := types.FeatureSetsForProfile()
-	if !ok {
-		logrus.Warnf("no feature sets for cluster profile %q", types.GetClusterProfileName())
+	featureSets, err := types.FeatureSetsForProfile()
+	if err != nil {
+		logrus.Warnf("no feature sets for cluster profile %q. %s", types.GetClusterProfileName(), err)
 	}
 	if _, ok := featureSets[c.FeatureSet]; c.FeatureSet != configv1.CustomNoUpgrade && !ok {
 		sortedFeatureSets := func() []string {
@@ -1669,7 +1693,7 @@ func validateGatedFeatures(c *types.InstallConfig) field.ErrorList {
 func validateReleaseArchitecture(controlPlanePool *types.MachinePool, computePool []types.MachinePool, releaseArch types.Architecture) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	clusterArch := version.DefaultArch()
+	clusterArch := types.DefaultArch()
 	if controlPlanePool != nil && controlPlanePool.Architecture != "" {
 		clusterArch = controlPlanePool.Architecture
 	}
@@ -1757,10 +1781,20 @@ func validateFencingCredentialsAndPlatform(installConfig *types.InstallConfig) (
 	fencingCredentials := installConfig.ControlPlane.Fencing
 	allErrs := field.ErrorList{}
 	if fencingCredentials != nil {
+
 		allErrs = append(allErrs, common.ValidateUniqueAndRequiredFields(fencingCredentials.Credentials, fldPath.Child("credentials"), func([]byte) bool { return false })...)
 		allErrs = append(allErrs, validateFencingForPlatform(installConfig, fldPath)...)
 
 		for i, credential := range fencingCredentials.Credentials {
+			credPath := fldPath.Child("credentials").Index(i)
+			if credential.HostName == "" && credential.MACAddress == "" {
+				allErrs = append(allErrs, field.Required(credPath, "at least one of hostname or macaddress must be provided"))
+			}
+			if credential.MACAddress != "" {
+				if err := validate.MAC(credential.MACAddress); err != nil {
+					allErrs = append(allErrs, field.Invalid(credPath.Child("macAddress"), credential.MACAddress, err.Error()))
+				}
+			}
 			if len(credential.CertificateVerification) > 0 && credential.CertificateVerification != types.CertificateVerificationDisabled && credential.CertificateVerification != types.CertificateVerificationEnabled {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("credentials").Index(i).Key("CertificateVerification"), installConfig.ControlPlane.Fencing.Credentials[i].CertificateVerification, fmt.Sprintf("invalid certificate verification; %q should set to one of the following: ['Enabled' (default), 'Disabled']", credential.CertificateVerification)))
 			}
@@ -1785,17 +1819,14 @@ func validateFencingForPlatform(config *types.InstallConfig, fldPath *field.Path
 
 func validateOSImageStream(config *types.InstallConfig) field.ErrorList {
 	errs := field.ErrorList{}
-	if len(config.OSImageStream) != 0 && config.IsSCOS() {
-		errs = append(errs, field.Forbidden(field.NewPath("osImageStream"), "OS Image Streams are only supported on OCP clusters using RHCOS"))
-	}
+	validStreams := types.OSImageStreamValues()
 
-	supportedValues := []string{string(types.OSImageStreamRHCOS9), string(types.OSImageStreamRHCOS10)}
-	if config.OSImageStream != "" && !slices.Contains(supportedValues, string(config.OSImageStream)) {
+	if !slices.Contains(validStreams, config.OSImageStream) {
 		errs = append(errs,
-			field.Forbidden(
+			field.NotSupported(
 				field.NewPath("osImageStream"),
-				fmt.Sprintf("Unsupported OS Image Stream. Supported values are: %s", strings.Join(supportedValues, ", ")),
-			))
+				config.OSImageStream,
+				validStreams))
 	}
 	return errs
 }

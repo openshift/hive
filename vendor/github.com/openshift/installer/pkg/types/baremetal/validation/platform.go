@@ -102,6 +102,32 @@ func validateNoOverlapMachineCIDR(target *net.IPNet, n *types.Networking) error 
 	return nil
 }
 
+// isNetworkOrBroadcastAddress checks if the IP is a network or broadcast address.
+// For IPv4 with masks narrower than /31, network and broadcast addresses are not usable.
+func isNetworkOrBroadcastAddress(ip net.IP, cidr *net.IPNet) bool {
+	ones, bits := cidr.Mask.Size()
+	// Only apply network/broadcast checks to IPv4.
+	if bits != 32 {
+		return false
+	}
+	// For IPv4 /31 and /32, all addresses are usable.
+	if ones >= 31 {
+		return false
+	}
+	// Regular IPv4 → check network/broadcast
+	networkAddr := cidr.IP.Mask(cidr.Mask)
+	if ip.Equal(networkAddr) {
+		return true
+	}
+	// IPv4 broadcast address check (all host bits are 1).
+	broadcast := make(net.IP, len(networkAddr))
+	copy(broadcast, networkAddr)
+	for i := range broadcast {
+		broadcast[i] |= ^cidr.Mask[i]
+	}
+	return ip.Equal(broadcast)
+}
+
 func validateOSImageURI(uri string) error {
 	// Check for valid URI and sha256 checksum part of the URL
 	parsedURL, err := url.ParseRequestURI(uri)
@@ -173,6 +199,11 @@ func validateDHCPRange(p *baremetal.Platform, fldPath *field.Path) (allErrs fiel
 		// Validate BootstrapProvisioningIP is not in DHCP range
 		if bootstrapProvisioningIP := net.ParseIP(p.BootstrapProvisioningIP); bootstrapProvisioningIP != nil && bytes.Compare(bootstrapProvisioningIP, start) >= 0 && bytes.Compare(bootstrapProvisioningIP, end) <= 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("bootstrapProvisioningIP"), p.BootstrapProvisioningIP, fmt.Sprintf("%q overlaps with the allocated DHCP range", p.BootstrapProvisioningIP)))
+		}
+
+		// Validate ProvisioningNetworkGateway is not in DHCP range
+		if provisioningNetworkGateway := net.ParseIP(p.ProvisioningNetworkGateway); provisioningNetworkGateway != nil && bytes.Compare(provisioningNetworkGateway, start) >= 0 && bytes.Compare(provisioningNetworkGateway, end) <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q overlaps with the allocated DHCP range", p.ProvisioningNetworkGateway)))
 		}
 	}
 
@@ -461,6 +492,12 @@ func ValidatePlatform(p *baremetal.Platform, agentBasedInstallation bool, n *typ
 		}
 	}
 
+	if p.ProvisioningNetworkGateway != "" {
+		if err := validate.IP(p.ProvisioningNetworkGateway); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, err.Error()))
+		}
+	}
+
 	enabledCaps := c.GetEnabledCapabilities()
 	if !agentBasedInstallation && enabledCaps.Has(configv1.ClusterVersionCapabilityMachineAPI) && p.Hosts == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hosts"), p.Hosts, "bare metal hosts are missing"))
@@ -602,8 +639,43 @@ func ValidateProvisioningNetworking(p *baremetal.Platform, n *types.Networking, 
 		}
 
 		// Ensure clusterProvisioningIP is in the provisioningNetworkCIDR
-		if !p.ProvisioningNetworkCIDR.Contains(net.ParseIP(p.ClusterProvisioningIP)) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterProvisioningIP"), p.ClusterProvisioningIP, fmt.Sprintf("%q is not in the provisioning network", p.ClusterProvisioningIP)))
+		if p.ClusterProvisioningIP != "" {
+			if !p.ProvisioningNetworkCIDR.Contains(net.ParseIP(p.ClusterProvisioningIP)) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterProvisioningIP"), p.ClusterProvisioningIP, fmt.Sprintf("%q is not in the provisioning network", p.ClusterProvisioningIP)))
+			}
+		}
+
+		// Ensure provisioningNetworkGateway is in the provisioningNetworkCIDR
+		if p.ProvisioningNetworkGateway != "" {
+			gatewayIP := net.ParseIP(p.ProvisioningNetworkGateway)
+			if gatewayIP == nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q is not a valid IP", p.ProvisioningNetworkGateway)))
+			} else {
+				if !p.ProvisioningNetworkCIDR.Contains(gatewayIP) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q is not in the provisioning network", p.ProvisioningNetworkGateway)))
+				}
+				// Ensure gateway is not the same as clusterProvisioningIP
+				if p.ProvisioningNetworkGateway == p.ClusterProvisioningIP {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q overlaps with the IP address of the node that runs the bootstrap VM or provision server", p.ProvisioningNetworkGateway)))
+				}
+				// Ensure gateway is not network or broadcast address
+				if isNetworkOrBroadcastAddress(gatewayIP, &p.ProvisioningNetworkCIDR.IPNet) {
+					networkAddr := p.ProvisioningNetworkCIDR.IP.Mask(p.ProvisioningNetworkCIDR.Mask)
+					if gatewayIP.Equal(networkAddr) {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q is the network address of the provisioning network", p.ProvisioningNetworkGateway)))
+					} else {
+						// It's the broadcast address
+						broadcast := make(net.IP, len(networkAddr))
+						copy(broadcast, networkAddr)
+						for i := range broadcast {
+							broadcast[i] |= ^p.ProvisioningNetworkCIDR.Mask[i]
+						}
+						if gatewayIP.Equal(broadcast) {
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("provisioningNetworkGateway"), p.ProvisioningNetworkGateway, fmt.Sprintf("%q is the broadcast address of the provisioning network", p.ProvisioningNetworkGateway)))
+						}
+					}
+				}
+			}
 		}
 
 		// Ensure provisioningNetworkCIDR does not have any host bits set

@@ -11,6 +11,7 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/nutanix"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 // MachineSets returns a list of machine sets for a given machine pool.
@@ -137,6 +138,7 @@ func MachineSets(clusterID string, config *types.InstallConfig, pool *types.Mach
 				},
 			},
 		}
+		utils.SetMachineSetOSStreamLabels(mset, config)
 		machinesets = append(machinesets, mset)
 		idx++
 	}

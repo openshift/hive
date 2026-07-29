@@ -706,6 +706,23 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 			// We've stealthily allowed replacement of secret refs. This will at least make sure they're not empty.
 			allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
 		}
+
+		// Allow setting Topology.Template on failure domains where it was previously blank.
+		// Clusters installed before the template naming convention change have empty Template
+		// fields; customers or automation may need to set them explicitly.
+		if oldObject.Spec.Platform.VSphere.Infrastructure != nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+			oldFDs := oldObject.Spec.Platform.VSphere.Infrastructure.FailureDomains
+			newFDs := cd.Spec.Platform.VSphere.Infrastructure.FailureDomains
+			for i := range oldFDs {
+				if i >= len(newFDs) {
+					break
+				}
+				if oldFDs[i].Topology.Template == "" && newFDs[i].Topology.Template != "" {
+					// copy over the value to spoof the immutability checker
+					oldFDs[i].Topology.Template = newFDs[i].Topology.Template
+				}
+			}
+		}
 	}
 
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)

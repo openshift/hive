@@ -85,21 +85,22 @@ type clusterImageSet struct {
 }
 
 type clusterPool struct {
-	name           string
-	namespace      string
-	fake           string
-	baseDomain     string
-	imageSetRef    string
-	platformType   string
-	credRef        string
-	region         string
-	pullSecretRef  string
-	size           int
-	maxSize        int
-	runningCount   int
-	maxConcurrent  int
-	hibernateAfter string
-	template       string
+	name                           string
+	namespace                      string
+	fake                           string
+	baseDomain                     string
+	installConfigSecretTemplateRef string
+	imageSetRef                    string
+	platformType                   string
+	credRef                        string
+	region                         string
+	pullSecretRef                  string
+	size                           int
+	maxSize                        int
+	runningCount                   int
+	maxConcurrent                  int
+	hibernateAfter                 string
+	template                       string
 }
 
 type clusterPoolCDC struct {
@@ -143,6 +144,7 @@ type installConfig struct {
 	credentialsMode    string
 	internalJoinSubnet string
 	clusterNetworkMtu  int
+	userProvisionedDNS string
 }
 
 type installConfigPrivateLink struct {
@@ -753,6 +755,9 @@ func (imageset *clusterImageSet) create(oc *exutil.CLI) {
 
 func (pool *clusterPool) create(oc *exutil.CLI) {
 	parameters := []string{"--ignore-unknown-parameters=true", "-f", pool.template, "-p", "NAME=" + pool.name, "NAMESPACE=" + pool.namespace, "FAKE=" + pool.fake, "BASEDOMAIN=" + pool.baseDomain, "IMAGESETREF=" + pool.imageSetRef, "PLATFORMTYPE=" + pool.platformType, "CREDREF=" + pool.credRef, "PULLSECRETREF=" + pool.pullSecretRef, "SIZE=" + strconv.Itoa(pool.size), "MAXSIZE=" + strconv.Itoa(pool.maxSize), "RUNNINGCOUNT=" + strconv.Itoa(pool.runningCount), "MAXCONCURRENT=" + strconv.Itoa(pool.maxConcurrent), "HIBERNATEAFTER=" + pool.hibernateAfter, "REGION=" + pool.region}
+	if pool.installConfigSecretTemplateRef != "" {
+		parameters = append(parameters, "INSTALLCONFIGSECRETTEMPLATEREF="+pool.installConfigSecretTemplateRef)
+	}
 	err := applyResourceFromTemplate(oc, parameters...)
 	o.Expect(err).NotTo(o.HaveOccurred())
 }
@@ -791,8 +796,12 @@ func (config *installConfig) create(oc *exutil.CLI) {
 	if config.arch == "" {
 		config.arch = archAMD64
 	}
+	if config.userProvisionedDNS == "" {
+		config.userProvisionedDNS = "Disabled"
+	}
 
 	parameters := []string{"--ignore-unknown-parameters=true", "-f", config.template, "-p", "NAME1=" + config.name1, "NAMESPACE=" + config.namespace, "BASEDOMAIN=" + config.baseDomain, "NAME2=" + config.name2, "REGION=" + config.region, "PUBLISH=" + config.publish, "VMTYPE=" + config.vmType, "ARCH=" + config.arch}
+	parameters = append(parameters, "USERPROVISIONEDDNS="+config.userProvisionedDNS)
 	if len(config.credentialsMode) > 0 {
 		parameters = append(parameters, "CREDENTIALSMODE="+config.credentialsMode)
 	}

@@ -462,7 +462,7 @@ func waitForSyncSetApplied(namespace, cdName, syncsetname, syncsettype string) e
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func waitForSyncSetDeleted(namespace, syncsetname string) error {
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}
@@ -556,7 +556,7 @@ func waitForSyncSetDisassociated(namespace, cdName, syncsetname, syncsettype str
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}

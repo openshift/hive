@@ -3050,7 +3050,11 @@ func TestReconcileRBAC(t *testing.T) {
 					rbs.Items[idx].ResourceVersion = ""
 				}
 
-				assert.Equal(t, test.expectedBindings, rbs.Items)
+				expectedBindings := test.expectedBindings
+				if expectedBindings == nil {
+					expectedBindings = []rbacv1.RoleBinding{}
+				}
+				assert.Equal(t, expectedBindings, rbs.Items)
 			} else {
 				require.Regexp(t, err, test.expectedErr)
 			}

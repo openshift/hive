@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -483,6 +485,8 @@ type fakeManager struct {
 	watchedDomains sets.Set[string]
 }
 
+var _ manager.Manager = &fakeManager{}
+
 func (fm *fakeManager) Add(mgr manager.Runnable) error {
 	// not implemented
 
@@ -557,6 +561,14 @@ func (*fakeManager) GetControllerOptions() config.Controller {
 
 func (*fakeManager) GetHTTPClient() *http.Client {
 	panic("not implemented")
+}
+
+func (fm *fakeManager) GetConverterRegistry() conversion.Registry {
+	panic("unimplemented")
+}
+
+func (fm *fakeManager) GetEventRecorder(name string) events.EventRecorder {
+	panic("unimplemented")
 }
 
 func TestMultiCloudDNSSetup(t *testing.T) {

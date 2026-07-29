@@ -1785,7 +1785,7 @@ func waitForProvisioningStage(m *InstallManager) error {
 	if err != nil {
 		return errors.Wrap(err, "could not generate http client for config")
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, codecs, hc)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, false, config, codecs, hc)
 	if err != nil {
 		return errors.Wrap(err, "could not create REST client")
 	}

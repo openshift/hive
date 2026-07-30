@@ -59,6 +59,7 @@ objects:
           - "${PRIVATESUBNETID3}"
       publish: "${PUBLISH}"
       credentialsMode: "${CREDENTIALSMODE}"
+      userProvisionedDNS: "${USERPROVISIONEDDNS}"
   type: Opaque
 parameters:
 - name: NAME1
@@ -75,3 +76,4 @@ parameters:
 - name: PRIVATESUBNETID2
 - name: PRIVATESUBNETID3
 - name: MACHINENETWORKCIDR
+- name: USERPROVISIONEDDNS

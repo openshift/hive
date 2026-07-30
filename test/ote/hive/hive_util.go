@@ -163,6 +163,7 @@ type installConfigPrivateLink struct {
 	privateSubnetId2   string
 	privateSubnetId3   string
 	machineNetworkCidr string
+	userProvisionedDNS string
 }
 
 type clusterDeployment struct {
@@ -831,8 +832,12 @@ func (config *installConfigPrivateLink) create(oc *exutil.CLI) {
 	if config.arch == "" {
 		config.arch = archAMD64
 	}
+	if config.userProvisionedDNS == "" {
+		config.userProvisionedDNS = "Disabled"
+	}
 
 	parameters := []string{"--ignore-unknown-parameters=true", "-f", config.template, "-p", "NAME1=" + config.name1, "NAMESPACE=" + config.namespace, "BASEDOMAIN=" + config.baseDomain, "NAME2=" + config.name2, "REGION=" + config.region, "PUBLISH=" + config.publish, "VMTYPE=" + config.vmType, "ARCH=" + config.arch}
+	parameters = append(parameters, "USERPROVISIONEDDNS="+config.userProvisionedDNS)
 	if len(config.credentialsMode) > 0 {
 		parameters = append(parameters, "CREDENTIALSMODE="+config.credentialsMode)
 	}

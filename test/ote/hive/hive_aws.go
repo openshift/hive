@@ -3487,7 +3487,7 @@ spec:
 
 	// Author: fxie@redhat.com mihuang@redhat.com
 	// ./bin/extended-platform-tests run all --dry-run|grep "41212"|./bin/extended-platform-tests run --timeout 80m -f -
-	g.XIt("[Level0] Author:fxie-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-41212-High-43751-Medium-57403-[HiveSDRosa] [AWSGov] Hive supports to install private cluster [Disruptive]", func() {
+	g.It("[Level0] Author:fxie-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-83733-High-41212-High-43751-Medium-57403-[HiveSDRosa] [AWSGov] Hive supports to install private cluster with user-provisioned DNS [Disruptive]", func() {
 		// Settings
 		var (
 			testCaseID = "41212"
@@ -3851,6 +3851,7 @@ spec:
 			privateSubnetId2:   strings.Split(privateSubnetIds, ",")[1],
 			privateSubnetId3:   strings.Split(privateSubnetIds, ",")[2],
 			template:           filepath.Join(testDataDir, "aws-install-config-privatelink.yaml"),
+			userProvisionedDNS: userProvisionedDNSEnabled,
 		}
 		defer cleanupObjects(oc, objectTableRef{"Secret", oc.Namespace(), installConfigSecretName})
 		installConfigSecret.create(oc)

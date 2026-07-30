@@ -89,6 +89,11 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 			(*out)[key] = val
 		}
 	}
+	if in.AMIID != nil {
+		in, out := &in.AMIID, &out.AMIID
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

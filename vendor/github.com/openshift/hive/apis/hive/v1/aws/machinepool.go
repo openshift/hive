@@ -43,6 +43,11 @@ type MachinePoolPlatform struct {
 	// this field taking precedence when keys collide.
 	// +optional
 	UserTags map[string]string `json:"userTags,omitempty"`
+
+	// AMIID is the AMI to use for machines in this pool. When omitted, Hive falls back to its
+	// existing behavior of determining an appropriate boot image for the platform.
+	// +optional
+	AMIID *string `json:"amiID,omitempty"`
 }
 
 // SpotMarketOptions defines the options available to a user when configuring

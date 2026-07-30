@@ -120,6 +120,11 @@ spec:
                           items:
                             type: string
                           type: array
+                        amiID:
+                          description: |-
+                            AMIID is the AMI to use for machines in this pool. When omitted, Hive falls back to its
+                            existing behavior of determining an appropriate boot image for the platform.
+                          type: string
                         metadataService:
                           description: EC2MetadataOptions defines metadata service interaction options for EC2 instances in the machine pool.
                           properties:

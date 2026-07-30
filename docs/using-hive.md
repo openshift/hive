@@ -954,6 +954,26 @@ The `spec.replicas` and `spec.autoscaling` configurations cannot be configured s
 
 The `spec.autoscaling.maxReplicas` is an optional field. If it is not configured, then nodes will be auto-scaled without restriction based on resource utilization needs.
 
+#### Customizing VM boot image
+
+By default, we try to determine an appropriate boot image for VMs defined through MachinePools.
+For some platforms, a specific image can be supplied in the MachinePool spec.
+For example, for AWS, the AMI ID can be specified using `spec.platform.aws.amiID` field.
+
+```yaml
+apiVersion: hive.openshift.io/v1
+kind: MachinePool
+metadata:
+  name: mycluster-worker
+  namespace: mynamespace
+spec:
+  clusterDeploymentRef:
+    name: mycluster
+  name: worker
+  platform:
+    aws:
+      amiID: ami-01234567890123456
+```
 ##### Integration with Horizontal Pod Autoscalers
 
 A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on the deployed cluster. `ClusterAutoscalers` can co-exist and work with Horiztonal Pod Autoscalers to ensure that there are enough available nodes to meet the auto-scaled pod replica count requirements. See excerpt from OpenShift [documentation](https://docs.openshift.com/container-platform/4.8/machine_management/applying-autoscaling.html):

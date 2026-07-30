@@ -18,6 +18,7 @@ import (
 	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/azure"
+	utils "github.com/openshift/installer/pkg/utils"
 )
 
 const (
@@ -88,6 +89,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			},
 		}
 		*machineSetProvider = *provider
+		utils.SetMachineOSStreamLabels(&machine, config)
 		machines = append(machines, machine)
 	}
 
@@ -148,6 +150,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			},
 		},
 	}
+	utils.SetCPMSOSStreamLabels(controlPlaneMachineSet, config)
 
 	if len(failureDomains) > 0 {
 		controlPlaneMachineSet.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{

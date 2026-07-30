@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/installconfig/aws"
 	"github.com/openshift/installer/pkg/types"
 	awstypes "github.com/openshift/installer/pkg/types/aws"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 type machineProviderInput struct {
@@ -41,7 +42,7 @@ type machineProviderInput struct {
 }
 
 // Machines returns a list of machines for a machinepool.
-func Machines(clusterID string, region string, subnets aws.SubnetsByZone, pool *types.MachinePool, role, userDataSecret string, userTags map[string]string, publicSubnet bool) ([]machineapi.Machine, *machinev1.ControlPlaneMachineSet, error) {
+func Machines(clusterID string, region string, subnets aws.SubnetsByZone, pool *types.MachinePool, role, userDataSecret string, userTags map[string]string, publicSubnet bool, config *types.InstallConfig) ([]machineapi.Machine, *machinev1.ControlPlaneMachineSet, error) {
 	if poolPlatform := pool.Platform.Name(); poolPlatform != awstypes.Name {
 		return nil, nil, fmt.Errorf("non-AWS machine-pool: %q", poolPlatform)
 	}
@@ -107,7 +108,7 @@ func Machines(clusterID string, region string, subnets aws.SubnetsByZone, pool *
 				// we don't need to set Versions, because we control those via operators.
 			},
 		}
-
+		utils.SetMachineOSStreamLabels(&machine, config)
 		machines = append(machines, machine)
 	}
 
@@ -188,6 +189,7 @@ func Machines(clusterID string, region string, subnets aws.SubnetsByZone, pool *
 			},
 		},
 	}
+	utils.SetCPMSOSStreamLabels(controlPlaneMachineSet, config)
 	return machines, controlPlaneMachineSet, nil
 }
 

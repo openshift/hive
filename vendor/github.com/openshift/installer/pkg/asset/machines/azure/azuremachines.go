@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/manifests/capiutils"
 	"github.com/openshift/installer/pkg/types"
 	aztypes "github.com/openshift/installer/pkg/types/azure"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 const (
@@ -37,6 +38,7 @@ type MachineInput struct {
 	Platform       *aztypes.Platform
 	Pool           *types.MachinePool
 	RHCOS          string
+	Config         *types.InstallConfig
 }
 
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
@@ -197,6 +199,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 				DataDisks:              mpool.DataDisks,
 			},
 		}
+		utils.SetMachineOSStreamLabels(azureMachine, in.Config)
 
 		if len(zone) == 0 {
 			// FailureDomain must be nil (not empty) to trigger availability set.
@@ -243,6 +246,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 			},
 		}
 		controlPlaneMachine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
+		utils.SetMachineOSStreamLabels(controlPlaneMachine, in.Config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", azureMachine.Name)},
@@ -274,6 +278,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 			UserAssignedIdentities:     userAssignedIdentities,
 		},
 	}
+	utils.SetMachineOSStreamLabels(bootstrapAzureMachine, in.Config)
 
 	if len(mpool.Zones[0]) == 0 {
 		// FailureDomain must be nil (not empty) to trigger availability set.
@@ -321,6 +326,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 		},
 	}
 	bootstrapMachine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
+	utils.SetMachineOSStreamLabels(bootstrapMachine, in.Config)
 
 	result = append(result, &asset.RuntimeFile{
 		File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", bootstrapMachine.Name)},

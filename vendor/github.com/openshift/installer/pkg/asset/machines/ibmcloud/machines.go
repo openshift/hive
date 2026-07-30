@@ -12,6 +12,7 @@ import (
 	ibmcloudic "github.com/openshift/installer/pkg/asset/installconfig/ibmcloud"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
+	"github.com/openshift/installer/pkg/utils"
 	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 )
 
@@ -59,7 +60,7 @@ func Machines(clusterID string, config *types.InstallConfig, subnets map[string]
 				},
 			},
 		}
-
+		utils.SetMachineOSStreamLabels(&machine, config)
 		machines = append(machines, machine)
 	}
 

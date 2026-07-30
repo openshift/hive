@@ -143,7 +143,7 @@ func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 			}
 		}
 		if len(vCenter.Username) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("username"), "must specify the username"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("user"), "must specify the user"))
 		}
 		if len(vCenter.Password) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("password"), "must specify the password"))
@@ -160,11 +160,10 @@ func validateFailureDomains(p *vsphere.Platform, platformFldPath *field.Path, fl
 	tagUrnPattern := regexp.MustCompile(`^(urn):(vmomi):(InventoryServiceTag):([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}):([^:]+)$`)
 	allErrs := field.ErrorList{}
 	topologyFld := fldPath.Child("topology")
-	var associatedVCenter *vsphere.VCenter
-
 	zoneNames := make(map[string]string)
 
 	for index, failureDomain := range p.FailureDomains {
+		var associatedVCenter *vsphere.VCenter
 		if regionName, ok := zoneNames[failureDomain.Zone]; !ok {
 			zoneNames[failureDomain.Zone] = failureDomain.Region
 		} else if regionName == failureDomain.Region {
@@ -187,7 +186,7 @@ func validateFailureDomains(p *vsphere.Platform, platformFldPath *field.Path, fl
 		}
 
 		if failureDomain.ZoneType == vsphere.HostGroupFailureDomain && failureDomain.Topology.HostGroup == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("hostGroup"), "must not be empty if zoneType is HostGroup"))
+			allErrs = append(allErrs, field.Required(topologyFld.Child("hostGroup"), "must not be empty if zoneType is HostGroup"))
 		}
 
 		if failureDomain.RegionType == vsphere.ComputeClusterFailureDomain {

@@ -85,7 +85,7 @@ func innerTLSSecurityProfileObservations(genericListers configobserver.Listers, 
 func getSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []string) {
 	var profileType configv1.TLSProfileType
 	if profile == nil {
-		profileType = configv1.TLSProfileIntermediateType
+		profileType = crypto.DefaultTLSProfileType
 	} else {
 		profileType = profile.Type
 	}
@@ -101,7 +101,7 @@ func getSecurityProfileCiphers(profile *configv1.TLSSecurityProfile) (string, []
 
 	// nothing found / custom type set but no actual custom spec
 	if profileSpec == nil {
-		profileSpec = configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
+		profileSpec = configv1.TLSProfiles[crypto.DefaultTLSProfileType]
 	}
 
 	// need to remap all Ciphers to their respective IANA names used by Go

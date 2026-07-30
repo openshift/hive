@@ -18,6 +18,7 @@ import (
 	gcpconsts "github.com/openshift/installer/pkg/constants/gcp"
 	"github.com/openshift/installer/pkg/types"
 	gcptypes "github.com/openshift/installer/pkg/types/gcp"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 const (
@@ -61,7 +62,7 @@ func GenerateMachines(installConfig *installconfig.InstallConfig, infraID string
 		})
 
 		dataSecret := fmt.Sprintf("%s-%s", infraID, masterRole)
-		capiMachine := createCAPIMachine(gcpMachine.Name, dataSecret, infraID)
+		capiMachine := createCAPIMachine(gcpMachine.Name, dataSecret, infraID, installConfig.Config)
 
 		if len(mpool.Zones) > 0 {
 			// When there are fewer zones than the number of control plane instances,
@@ -104,7 +105,7 @@ func GenerateBootstrapMachines(name string, installConfig *installconfig.Install
 	})
 
 	dataSecret := fmt.Sprintf("%s-%s", infraID, "bootstrap")
-	bootstrapCapiMachine := createCAPIMachine(bootstrapGCPMachine.Name, dataSecret, infraID)
+	bootstrapCapiMachine := createCAPIMachine(bootstrapGCPMachine.Name, dataSecret, infraID, installConfig.Config)
 
 	result = append(result, &asset.RuntimeFile{
 		File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", bootstrapCapiMachine.Name)},
@@ -147,6 +148,7 @@ func createGCPMachine(name string, installConfig *installconfig.InstallConfig, i
 		},
 	}
 	gcpMachine.SetGroupVersionKind(capg.GroupVersion.WithKind("GCPMachine"))
+	utils.SetMachineOSStreamLabels(gcpMachine, installConfig.Config)
 	// Set optional values from machinepool
 	if mpool.OnHostMaintenance != "" {
 		gcpMachine.Spec.OnHostMaintenance = ptr.To(capg.HostMaintenancePolicy(mpool.OnHostMaintenance))
@@ -190,7 +192,7 @@ func createGCPMachine(name string, installConfig *installconfig.InstallConfig, i
 }
 
 // Create a CAPI machine based on the CAPG machine.
-func createCAPIMachine(name string, dataSecret string, infraID string) *capi.Machine {
+func createCAPIMachine(name, dataSecret, infraID string, config *types.InstallConfig) *capi.Machine {
 	machine := &capi.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -211,6 +213,7 @@ func createCAPIMachine(name string, dataSecret string, infraID string) *capi.Mac
 		},
 	}
 	machine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
+	utils.SetMachineOSStreamLabels(machine, config)
 
 	return machine
 }

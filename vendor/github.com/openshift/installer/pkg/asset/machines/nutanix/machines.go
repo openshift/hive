@@ -15,6 +15,7 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/nutanix"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 // Machines returns a list of machines for a machinepool.
@@ -74,6 +75,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 				// we don't need to set Versions, because we control those via operators.
 			},
 		}
+		utils.SetMachineOSStreamLabels(&machine, config)
 		machineSetProvider = provider.DeepCopy()
 		machines = append(machines, machine)
 	}
@@ -115,6 +117,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			},
 		},
 	}
+	utils.SetCPMSOSStreamLabels(controlPlaneMachineSet, config)
 
 	if len(failureDomains) > 0 {
 		fdRefs := make([]machinev1.NutanixFailureDomainReference, 0, len(failureDomains))

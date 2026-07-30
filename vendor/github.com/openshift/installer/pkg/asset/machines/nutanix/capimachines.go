@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/manifests/capiutils"
 	"github.com/openshift/installer/pkg/types"
 	nutanixtypes "github.com/openshift/installer/pkg/types/nutanix"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 )
 
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
-func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage string, role string) ([]*asset.RuntimeFile, error) {
+func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage, role string) ([]*asset.RuntimeFile, error) {
 	machines, _, err := Machines(clusterID, config, pool, osImage, role, "")
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve machines: %w", err)
@@ -42,7 +43,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 		}
 
 		// create the NutanixMachine object.
-		ntxMachine := generateNutanixMachine(machine.Name, providerSpec, categoryIdentifiers)
+		ntxMachine := generateNutanixMachine(machine.Name, providerSpec, categoryIdentifiers, config)
 		ntxMachines = append(ntxMachines, ntxMachine)
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", ntxMachine.Name)},
@@ -71,6 +72,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 			},
 		}
 		capiMachine.SetGroupVersionKind(capv1.GroupVersion.WithKind("Machine"))
+		utils.SetMachineOSStreamLabels(capiMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", capiMachine.Name)},
@@ -101,6 +103,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 			Spec: *bootstrapSpec,
 		}
 		bootstrapNtxMachine.SetGroupVersionKind(capnv1.GroupVersion.WithKind("NutanixMachine"))
+		utils.SetMachineOSStreamLabels(bootstrapNtxMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", bootstrapNtxMachine.Name)},
@@ -128,6 +131,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 			},
 		}
 		bootstrapCapiMachine.SetGroupVersionKind(capv1.GroupVersion.WithKind("Machine"))
+		utils.SetMachineOSStreamLabels(bootstrapCapiMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", bootstrapCapiMachine.Name)},
@@ -138,7 +142,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 	return result, nil
 }
 
-func generateNutanixMachine(machineName string, providerSpec *machinev1.NutanixMachineProviderConfig, categoryIdentifiers []capnv1.NutanixCategoryIdentifier) *capnv1.NutanixMachine {
+func generateNutanixMachine(machineName string, providerSpec *machinev1.NutanixMachineProviderConfig, categoryIdentifiers []capnv1.NutanixCategoryIdentifier, config *types.InstallConfig) *capnv1.NutanixMachine {
 	ntxMachine := &capnv1.NutanixMachine{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: capiutils.Namespace,
@@ -167,6 +171,7 @@ func generateNutanixMachine(machineName string, providerSpec *machinev1.NutanixM
 		},
 	}
 	ntxMachine.SetGroupVersionKind(capnv1.GroupVersion.WithKind("NutanixMachine"))
+	utils.SetMachineOSStreamLabels(ntxMachine, config)
 
 	for _, subnet := range providerSpec.Subnets {
 		ntxMachine.Spec.Subnets = append(ntxMachine.Spec.Subnets, capnv1.NutanixResourceIdentifier{

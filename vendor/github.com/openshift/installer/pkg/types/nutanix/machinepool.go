@@ -61,12 +61,12 @@ type MachinePool struct {
 	// GPUs is a list of GPU devices to attach to the machine's VM.
 	// +listType=set
 	// +optional
-	GPUs []machinev1.NutanixGPU `json:"gpus"`
+	GPUs []machinev1.NutanixGPU `json:"gpus,omitempty"`
 
 	// DataDisks holds information of the data disks to attach to the Machine's VM
 	// +listType=set
 	// +optional
-	DataDisks []DataDisk `json:"dataDisks"`
+	DataDisks []DataDisk `json:"dataDisks,omitempty"`
 
 	// FailureDomains optionally configures a list of failure domain names
 	// that will be applied to the MachinePool
@@ -262,7 +262,7 @@ func (p *MachinePool) validateProjectConfig(ctx context.Context, nc *nutanixclie
 		switch p.Project.Type {
 		case machinev1.NutanixIdentifierName:
 			if p.Project.Name == nil || *p.Project.Name == "" {
-				return field.Required(fldPath.Child("project", "name"), "missing projct name")
+				return field.Required(fldPath.Child("project", "name"), "missing project name")
 			}
 
 			projectName := *p.Project.Name
@@ -286,7 +286,7 @@ func (p *MachinePool) validateProjectConfig(ctx context.Context, nc *nutanixclie
 			}
 		case machinev1.NutanixIdentifierUUID:
 			if p.Project.UUID == nil || *p.Project.UUID == "" {
-				return field.Required(fldPath.Child("project", "uuid"), "missing projct uuid")
+				return field.Required(fldPath.Child("project", "uuid"), "missing project uuid")
 			} else {
 				if _, err := nc.V3.GetProject(ctx, *p.Project.UUID); err != nil {
 					return field.Invalid(fldPath.Child("project", "uuid"), *p.Project.UUID,

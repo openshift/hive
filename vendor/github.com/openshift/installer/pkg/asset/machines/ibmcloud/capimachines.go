@@ -15,6 +15,7 @@ import (
 	ibmcloudic "github.com/openshift/installer/pkg/asset/installconfig/ibmcloud"
 	"github.com/openshift/installer/pkg/asset/manifests/capiutils"
 	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/utils"
 	ibmcloudprovider "github.com/openshift/machine-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1"
 )
 
@@ -25,7 +26,7 @@ const (
 
 // GenerateMachines generates IBM Cloud CAPI VPC Machine manifests.
 // NOTE(cjschaef): This is currently dependent on the MAPI based Machine defintions and building, which should be replaced with pure CAPI based logic, once all Machine reconciliation is migrated to CAPI (including worker nodes).
-func GenerateMachines(ctx context.Context, infraID string, config *types.InstallConfig, subnets map[string]string, pool *types.MachinePool, imageName string, role string) ([]*asset.RuntimeFile, error) {
+func GenerateMachines(ctx context.Context, infraID string, config *types.InstallConfig, subnets map[string]string, pool *types.MachinePool, imageName, role string) ([]*asset.RuntimeFile, error) {
 	machines, err := Machines(infraID, config, subnets, pool, role, fmt.Sprintf("%s-user-data", role))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s machines %w", role, err)
@@ -166,6 +167,7 @@ func GenerateMachines(ctx context.Context, infraID string, config *types.Install
 			},
 		}
 		capibmcloudMachine.SetGroupVersionKind(capibmcloud.GroupVersion.WithKind("IBMVPCMachine"))
+		utils.SetMachineOSStreamLabels(capibmcloudMachine, config)
 		capibmcloudMachines = append(capibmcloudMachines, capibmcloudMachine)
 
 		result = append(result, &asset.RuntimeFile{
@@ -194,6 +196,7 @@ func GenerateMachines(ctx context.Context, infraID string, config *types.Install
 			},
 		}
 		capiMachine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
+		utils.SetMachineOSStreamLabels(capiMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", capiMachine.Name)},
@@ -220,6 +223,7 @@ func GenerateMachines(ctx context.Context, infraID string, config *types.Install
 			Spec: bootstrapSpec,
 		}
 		bootstrapMachine.SetGroupVersionKind(capibmcloud.GroupVersion.WithKind("IBMVPCMachine"))
+		utils.SetMachineOSStreamLabels(bootstrapMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", bootstrapMachine.Name)},
@@ -246,6 +250,7 @@ func GenerateMachines(ctx context.Context, infraID string, config *types.Install
 			},
 		}
 		bootstrapCAPIMachine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
+		utils.SetMachineOSStreamLabels(bootstrapCAPIMachine, config)
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", bootstrapMachine.Name)},

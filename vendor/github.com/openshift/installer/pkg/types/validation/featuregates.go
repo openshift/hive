@@ -4,6 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/api/features"
+	"github.com/openshift/installer/pkg/rhcos"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/featuregates"
 )
@@ -37,7 +38,7 @@ func validateMachinePoolFeatureGates(c *types.InstallConfig) []featuregates.Gate
 		},
 		{
 			FeatureGateName: features.FeatureGateOSStreams,
-			Condition:       len(c.OSImageStream) != 0,
+			Condition:       c.OSImageStream != rhcos.GetDefaultOSImageStream(c),
 			Field:           field.NewPath("osImageStream"),
 		},
 		{
@@ -47,8 +48,20 @@ func validateMachinePoolFeatureGates(c *types.InstallConfig) []featuregates.Gate
 		},
 		{
 			FeatureGateName: features.FeatureGateClusterAPIComputeInstall,
-			Condition:       len(c.Compute) > 0 && c.Compute[0].Management == types.ClusterAPI,
-			Field:           field.NewPath("compute", "management"),
+			Condition: func() bool {
+				for _, compute := range c.Compute {
+					if compute.Management == types.ClusterAPI {
+						return true
+					}
+				}
+				return false
+			}(),
+			Field: field.NewPath("compute", "management"),
+		},
+		{
+			FeatureGateName: features.FeatureGateConfigurablePKI,
+			Condition:       c.PKI != nil,
+			Field:           field.NewPath("pki"),
 		},
 	}
 }

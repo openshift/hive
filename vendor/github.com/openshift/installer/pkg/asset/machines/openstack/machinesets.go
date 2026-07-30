@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/openstack"
 	"github.com/openshift/installer/pkg/types/powervc"
+	"github.com/openshift/installer/pkg/utils"
 )
 
 const maxInt32 int64 = int64(^uint32(0)) >> 1
@@ -121,6 +122,7 @@ func MachineSets(ctx context.Context, clusterID string, config *types.InstallCon
 				},
 			},
 		}
+		utils.SetMachineSetOSStreamLabels(machinesets[idx], config)
 	}
 
 	return machinesets, nil

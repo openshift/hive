@@ -484,6 +484,37 @@ spec:
                               If unset, the default timeout is 30s
                             format: duration
                             type: string
+                          configurationManagement:
+                            description: |-
+                              configurationManagement specifies how OpenShift router should update
+                              the HAProxy configuration.  The following values are valid for this
+                              field:
+
+                              * "ForkAndReload".
+                              * "Dynamic".
+
+                              Omitting this field means that the user has no opinion and the
+                              platform may choose a reasonable default. This default is subject to
+                              change over time.  The current default is "ForkAndReload".
+
+                              "ForkAndReload" means that OpenShift router should rewrite the
+                              HAProxy configuration file and instruct HAProxy to fork and reload.
+                              This is OpenShift router's traditional approach.
+
+                              "Dynamic" means that OpenShift router may use HAProxy's control
+                              socket for some configuration updates and fall back to fork and
+                              reload for other configuration updates.  This is a newer approach,
+                              which may be less mature than ForkAndReload.  This setting can
+                              improve load-balancing fairness and metrics accuracy and reduce CPU
+                              and memory usage if HAProxy has frequent configuration updates for
+                              route and endpoints updates.
+
+                              Note: The "Dynamic" option is currently experimental and should not
+                              be enabled on production clusters.
+                            enum:
+                              - Dynamic
+                              - ForkAndReload
+                            type: string
                           connectTimeout:
                             description: |-
                               connectTimeout defines the maximum time to wait for
@@ -633,6 +664,9 @@ spec:
                               'container_memory_working_set_bytes{container="router",namespace="openshift-ingress"}/container_processes{container="router",namespace="openshift-ingress"}'.
                             format: int32
                             type: integer
+                            x-kubernetes-validations:
+                              - message: maxConnections must be 0, -1, or between 2000 and 2000000
+                                rule: self == 0 || self == -1 || (self >= 2000 && self <= 2000000)
                           reloadInterval:
                             description: |-
                               reloadInterval defines the minimum interval at which the router is allowed to reload
@@ -2269,24 +2303,6 @@ spec:
                           description: enabledCapabilities lists all the capabilities that are currently managed.
                           items:
                             description: ClusterVersionCapability enumerates optional, core cluster components.
-                            enum:
-                              - openshift-samples
-                              - baremetal
-                              - marketplace
-                              - Console
-                              - Insights
-                              - Storage
-                              - CSISnapshot
-                              - NodeTuning
-                              - MachineAPI
-                              - Build
-                              - DeploymentConfig
-                              - ImageRegistry
-                              - OperatorLifecycleManager
-                              - CloudCredential
-                              - Ingress
-                              - CloudControllerManager
-                              - OperatorLifecycleManagerV1
                             type: string
                           type: array
                           x-kubernetes-list-type: atomic
@@ -2294,24 +2310,6 @@ spec:
                           description: knownCapabilities lists all the capabilities known to the current cluster.
                           items:
                             description: ClusterVersionCapability enumerates optional, core cluster components.
-                            enum:
-                              - openshift-samples
-                              - baremetal
-                              - marketplace
-                              - Console
-                              - Insights
-                              - Storage
-                              - CSISnapshot
-                              - NodeTuning
-                              - MachineAPI
-                              - Build
-                              - DeploymentConfig
-                              - ImageRegistry
-                              - OperatorLifecycleManager
-                              - CloudCredential
-                              - Ingress
-                              - CloudControllerManager
-                              - OperatorLifecycleManagerV1
                             type: string
                           type: array
                           x-kubernetes-list-type: atomic

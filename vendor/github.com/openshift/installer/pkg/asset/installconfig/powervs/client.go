@@ -1122,12 +1122,15 @@ func (c *Client) GetDatacenterSupportedSystems(ctx context.Context, region strin
 			return nil, fmt.Errorf("failed to initialize PISession in GetDatacenterSupportedSystems: %w", err)
 		}
 	}
-	params := datacenters.NewV1DatacentersGetParamsWithContext(ctx).WithDatacenterRegion(region)
-	getOk, err := c.BXCli.PISession.Power.Datacenters.V1DatacentersGet(params)
+
+	// Use the global datacenter endpoint for accurate, non-cached data (other code uses a bulk endpoint)
+	datacenterClient := instance.NewIBMPIDatacenterClient(ctx, c.BXCli.PISession, "")
+	datacenter, err := datacenterClient.Get(region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get datacenter supported systems: %w", err)
 	}
-	return getOk.Payload.CapabilitiesDetails.SupportedSystems.General, nil
+
+	return datacenter.CapabilitiesDetails.SupportedSystems.General, nil
 }
 
 // TransitGatewayNameToID checks to see if the name is an existing transit gateway name.
@@ -1471,12 +1474,6 @@ func (c *Client) AddIPToLoadBalancerPool(ctx context.Context, lbID string, poolN
 
 		switch pmt := poolMember.Target.(type) {
 		case *vpcv1.LoadBalancerPoolMemberTarget:
-			logrus.Debugf("AddIPToLoadBalancerPool: pmt.Address = %+v", *pmt.Address)
-			if ip == *pmt.Address {
-				logrus.Debugf("AddIPToLoadBalancerPool: found %s", ip)
-				return nil
-			}
-		case *vpcv1.LoadBalancerPoolMemberTargetIP:
 			logrus.Debugf("AddIPToLoadBalancerPool: pmt.Address = %+v", *pmt.Address)
 			if ip == *pmt.Address {
 				logrus.Debugf("AddIPToLoadBalancerPool: found %s", ip)

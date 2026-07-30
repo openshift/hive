@@ -3,6 +3,7 @@ package hive
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
@@ -19,6 +20,7 @@ import (
 const (
 	userProvisionedDNSEnabled = "Enabled"
 	customDNSRecordTTL        = 60
+	customDNSChangeTimeout    = 2 * time.Minute
 )
 
 type awsCustomDNSRecord struct {
@@ -127,7 +129,7 @@ func hasAWSTag(tags []elbtypes.Tag, key, value string) bool {
 func (m *awsCustomDNSManager) upsertCNAME(name, target string) bool {
 	name = strings.TrimSuffix(name, ".") + "."
 	target = strings.TrimSuffix(target, ".") + "."
-	_, err := m.route53Client.ChangeResourceRecordSets(context.Background(), &route53.ChangeResourceRecordSetsInput{
+	output, err := m.route53Client.ChangeResourceRecordSets(context.Background(), &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(m.hostedZoneID),
 		ChangeBatch: &route53types.ChangeBatch{
 			Changes: []route53types.Change{{
@@ -145,6 +147,19 @@ func (m *awsCustomDNSManager) upsertCNAME(name, target string) bool {
 		e2e.Logf("Unable to publish custom DNS record %s -> %s yet: %v", name, target, err)
 		return false
 	}
+	if output.ChangeInfo == nil || output.ChangeInfo.Id == nil {
+		e2e.Logf("Route 53 did not return a change ID for custom DNS record %s -> %s", name, target)
+		return false
+	}
+	err = route53.NewResourceRecordSetsChangedWaiter(m.route53Client).Wait(
+		context.Background(),
+		&route53.GetChangeInput{Id: output.ChangeInfo.Id},
+		customDNSChangeTimeout,
+	)
+	if err != nil {
+		e2e.Logf("Waiting for custom DNS record %s -> %s to propagate: %v", name, target, err)
+		return false
+	}
 	m.createdRecords[name] = awsCustomDNSRecord{name: name, target: target}
 	e2e.Logf("Published test-owned custom DNS record %s -> %s", name, target)
 	return true
@@ -152,7 +167,7 @@ func (m *awsCustomDNSManager) upsertCNAME(name, target string) bool {
 
 func (m *awsCustomDNSManager) cleanup() {
 	for _, record := range m.createdRecords {
-		_, err := m.route53Client.ChangeResourceRecordSets(context.Background(), &route53.ChangeResourceRecordSetsInput{
+		output, err := m.route53Client.ChangeResourceRecordSets(context.Background(), &route53.ChangeResourceRecordSetsInput{
 			HostedZoneId: aws.String(m.hostedZoneID),
 			ChangeBatch: &route53types.ChangeBatch{
 				Changes: []route53types.Change{{
@@ -166,6 +181,14 @@ func (m *awsCustomDNSManager) cleanup() {
 				}},
 			},
 		})
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(output.ChangeInfo).NotTo(o.BeNil())
+		o.Expect(output.ChangeInfo.Id).NotTo(o.BeNil())
+		err = route53.NewResourceRecordSetsChangedWaiter(m.route53Client).Wait(
+			context.Background(),
+			&route53.GetChangeInput{Id: output.ChangeInfo.Id},
+			customDNSChangeTimeout,
+		)
 		o.Expect(err).NotTo(o.HaveOccurred())
 	}
 }

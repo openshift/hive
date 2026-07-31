@@ -3855,6 +3855,13 @@ spec:
 		}
 		defer cleanupObjects(oc, objectTableRef{"Secret", oc.Namespace(), installConfigSecretName})
 		installConfigSecret.create(oc)
+		renderedInstallConfig, _, err := oc.AsAdmin().Run("extract").Args(
+			"secret/"+installConfigSecretName, "--keys=install-config.yaml", "--to=-",
+		).Outputs()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\n    userProvisionedDNS: \"Enabled\"\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureSet: CustomNoUpgrade\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureGates:\n- AWSClusterHostedDNSInstall=true\n"))
 
 		compat_otp.By("Copying AWS credentials")
 		createAWSCreds(oc, oc.Namespace())
@@ -7689,7 +7696,9 @@ spec:
 			"secret/"+installConfigSecretName, "--keys=install-config.yaml", "--to=-",
 		).Outputs()
 		o.Expect(err).NotTo(o.HaveOccurred())
-		o.Expect(renderedInstallConfig).To(o.ContainSubstring("userProvisionedDNS: \"Enabled\""))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\n    userProvisionedDNS: \"Enabled\"\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureSet: CustomNoUpgrade\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureGates:\n- AWSClusterHostedDNSInstall=true\n"))
 		newCheck("expect", "get", asAdmin, requireNS, contain, cdName, nok, DefaultTimeout,
 			[]string{"dnszone"}).check(oc)
 
@@ -7771,29 +7780,49 @@ spec:
 		defer cleanupObjects(oc, objectTableRef{"ClusterPool", oc.Namespace(), poolName})
 		pool.create(oc)
 
-		compat_otp.By("Wait for the ClusterPool to create its ClusterDeployment")
-		var cdName string
+		compat_otp.By("Wait for the ClusterPool to create its ClusterDeployment and install-config Secret")
+		var cdName, cdNamespace, generatedInstallConfigSecret string
 		o.Eventually(func() bool {
-			cdName = strings.TrimSpace(getCDlistfromPool(oc, poolName))
-			return cdName != "" && !strings.Contains(cdName, "\n")
+			cdRef, _, err := oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"ClusterDeployment", "-A",
+				"-l", "hive.openshift.io/clusterpool-namespace="+oc.Namespace()+",hive.openshift.io/clusterpool-name="+poolName,
+				"-o=jsonpath={range .items[*]}{.metadata.namespace}{\" \"}{.metadata.name}{\"\\n\"}{end}",
+			).Outputs()
+			if err != nil {
+				return false
+			}
+			fields := strings.Fields(cdRef)
+			if len(fields) != 2 {
+				return false
+			}
+			cdNamespace, cdName = fields[0], fields[1]
+			generatedInstallConfigSecret, _, err = oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"ClusterDeployment", cdName, "-n", cdNamespace, "-o=jsonpath={.spec.provisioning.installConfigSecretRef.name}",
+			).Outputs()
+			generatedInstallConfigSecret = strings.TrimSpace(generatedInstallConfigSecret)
+			if err != nil || generatedInstallConfigSecret == "" {
+				return false
+			}
+			_, _, err = oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"Secret", generatedInstallConfigSecret, "-n", cdNamespace,
+			).Outputs()
+			return err == nil
 		}).WithTimeout(DefaultTimeout * time.Second).WithPolling(5 * time.Second).Should(o.BeTrue())
 
 		compat_otp.By("Verify the generated install-config retains user-provisioned DNS")
-		generatedInstallConfigSecret, _, err := oc.AsAdmin().WithoutNamespace().Run("get").Args(
-			"ClusterDeployment", cdName, "-n", oc.Namespace(), "-o=jsonpath={.spec.provisioning.installConfigSecretRef.name}",
-		).Outputs()
-		o.Expect(err).NotTo(o.HaveOccurred())
 		renderedInstallConfig, _, err := oc.AsAdmin().WithoutNamespace().Run("extract").Args(
-			"secret/"+generatedInstallConfigSecret, "-n", oc.Namespace(), "--keys=install-config.yaml", "--to=-",
+			"secret/"+generatedInstallConfigSecret, "-n", cdNamespace, "--keys=install-config.yaml", "--to=-",
 		).Outputs()
 		o.Expect(err).NotTo(o.HaveOccurred())
-		o.Expect(renderedInstallConfig).To(o.ContainSubstring("userProvisionedDNS: \"Enabled\""))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\n    userProvisionedDNS: \"Enabled\"\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureSet: CustomNoUpgrade\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureGates:\n- AWSClusterHostedDNSInstall=true\n"))
 		newCheck("expect", "get", asAdmin, withoutNamespace, contain, cdName, nok, DefaultTimeout,
-			[]string{"dnszone", "-n", oc.Namespace()}).check(oc)
+			[]string{"dnszone", "-n", cdNamespace}).check(oc)
 
 		dnsManager := newAWSCustomDNSManager(getAWSConfig(oc, region), basedomain)
 		defer dnsManager.cleanup()
-		infraID := getInfraIDFromCDName(oc, cdName)
+		infraID := getInfraIDFromCDNameInNamespace(oc, cdName, cdNamespace)
 
 		compat_otp.By("Publish the pool cluster's external API record")
 		o.Eventually(dnsManager.publishAPIRecord).
@@ -7815,7 +7844,7 @@ spec:
 		tmpDir := "/tmp/" + cdName
 		defer os.RemoveAll(tmpDir)
 		o.Expect(os.MkdirAll(tmpDir, 0700)).To(o.Succeed())
-		getClusterKubeconfig(oc, cdName, oc.Namespace(), tmpDir)
+		getClusterKubeconfig(oc, cdName, cdNamespace, tmpDir)
 		o.Expect(oc.AsAdmin().WithoutNamespace().Run("get").Args("co", "--kubeconfig", filepath.Join(tmpDir, "kubeconfig")).Execute()).To(o.Succeed())
 	})
 })

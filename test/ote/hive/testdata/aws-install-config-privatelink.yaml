@@ -13,6 +13,9 @@ objects:
     install-config.yaml: |
       apiVersion: v1
       baseDomain: "${BASEDOMAIN}"
+      ${FEATURECONFIGPREFIX}featureSet: CustomNoUpgrade
+      ${FEATURECONFIGPREFIX}featureGates:
+      ${FEATURECONFIGPREFIX}- AWSClusterHostedDNSInstall=true
       compute:
       - name: worker
         architecture: "${ARCH}"
@@ -53,13 +56,13 @@ objects:
       platform:
         aws:
           region: "${REGION}"
+          userProvisionedDNS: "${USERPROVISIONEDDNS}"
           subnets:
           - "${PRIVATESUBNETID1}"
           - "${PRIVATESUBNETID2}"
           - "${PRIVATESUBNETID3}"
       publish: "${PUBLISH}"
       credentialsMode: "${CREDENTIALSMODE}"
-      userProvisionedDNS: "${USERPROVISIONEDDNS}"
   type: Opaque
 parameters:
 - name: NAME1
@@ -77,3 +80,6 @@ parameters:
 - name: PRIVATESUBNETID3
 - name: MACHINENETWORKCIDR
 - name: USERPROVISIONEDDNS
+  value: "Disabled"
+- name: FEATURECONFIGPREFIX
+  value: "# "

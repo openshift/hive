@@ -62,9 +62,13 @@ func NewAWSActuator(
 		logger.WithError(err).Warn("failed to create AWS client")
 		return nil, err
 	}
-	amiID := pool.Annotations[hivev1.MachinePoolImageIDOverrideAnnotation]
-	if amiID != "" {
-		log.Infof("using AMI override from %s annotation: %s", hivev1.MachinePoolImageIDOverrideAnnotation, amiID)
+	var amiID string
+	if pool.Spec.Platform.AWS != nil && pool.Spec.Platform.AWS.AMIID != nil && *pool.Spec.Platform.AWS.AMIID != "" {
+		amiID = *pool.Spec.Platform.AWS.AMIID
+		logger.WithField("AMIID", amiID).Info("using AMI from spec.platform.aws.amiID")
+	} else if override := pool.Annotations[hivev1.MachinePoolImageIDOverrideAnnotation]; override != "" {
+		amiID = override
+		logger.WithField("AMIID", amiID).Infof("using AMI override from %s annotation", hivev1.MachinePoolImageIDOverrideAnnotation)
 	} else {
 		refByTag, err := masterAMIRefByTag(masterMachine)
 		if err != nil {

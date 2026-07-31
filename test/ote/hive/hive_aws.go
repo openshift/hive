@@ -7648,4 +7648,195 @@ spec:
 		newCheck("expect", "get", asAdmin, withoutNamespace, contain, "true", ok, ClusterInstallTimeout, []string{"ClusterDeployment", cdName, "-n", oc.Namespace(), "-o=jsonpath={.spec.installed}"}).check(oc)
 		newCheck("expect", "get", asAdmin, withoutNamespace, contain, "True", ok, DefaultTimeout, []string{"clusterdeployment", cdName, "-n", oc.Namespace(), "-o=jsonpath={.status.conditions[?(@.type==\"PrivateLinkReady\")].status}"}).check(oc)
 	})
+
+	// Polarion: OCP-83733
+	g.It("[Level0] Author:jshu-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-83733-[HiveSDRosa] Hive supports an AWS ClusterDeployment with user-provisioned DNS [Serial]", func() {
+		testCaseID := "83733"
+		cdName := "cluster-" + testCaseID + "-cd-" + getRandomString()[:ClusterSuffixLen]
+		installConfigSecretName := cdName + "-install-config"
+
+		installConfigSecret := installConfig{
+			name1:              installConfigSecretName,
+			namespace:          oc.Namespace(),
+			baseDomain:         basedomain,
+			name2:              cdName,
+			region:             region,
+			template:           filepath.Join(testDataDir, "aws-install-config.yaml"),
+			userProvisionedDNS: userProvisionedDNSEnabled,
+		}
+		cluster := clusterDeployment{
+			fake:                 "false",
+			name:                 cdName,
+			namespace:            oc.Namespace(),
+			baseDomain:           basedomain,
+			clusterName:          cdName,
+			manageDNS:            false,
+			platformType:         "aws",
+			credRef:              AWSCreds,
+			region:               region,
+			imageSetRef:          cdName + "-imageset",
+			installConfigSecret:  installConfigSecretName,
+			pullSecretRef:        PullSecret,
+			template:             filepath.Join(testDataDir, "clusterdeployment.yaml"),
+			installAttemptsLimit: 1,
+		}
+		defer cleanCD(oc, cluster.name+"-imageset", oc.Namespace(), installConfigSecret.name1, cluster.name)
+		createCD(testDataDir, testOCPImage, oc, oc.Namespace(), installConfigSecret, cluster)
+
+		compat_otp.By("Verify Hive accepted user-provisioned DNS without creating a managed DNSZone")
+		renderedInstallConfig, _, err := oc.AsAdmin().Run("extract").Args(
+			"secret/"+installConfigSecretName, "--keys=install-config.yaml", "--to=-",
+		).Outputs()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\n    userProvisionedDNS: \"Enabled\"\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureSet: CustomNoUpgrade\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureGates:\n- AWSClusterHostedDNSInstall=true\n"))
+		newCheck("expect", "get", asAdmin, requireNS, contain, cdName, nok, DefaultTimeout,
+			[]string{"dnszone"}).check(oc)
+
+		dnsManager := newAWSCustomDNSManager(getAWSConfig(oc, region), basedomain)
+		defer dnsManager.cleanup()
+		infraID := getInfraIDFromCDName(oc, cdName)
+
+		compat_otp.By("Publish the external API record through the test-owned DNS workflow")
+		o.Eventually(dnsManager.publishAPIRecord).
+			WithTimeout(30*time.Minute).
+			WithPolling(15*time.Second).
+			WithArguments(infraID, cdName, basedomain).
+			Should(o.BeTrue())
+
+		compat_otp.By("Wait for the ClusterDeployment to finish installation")
+		newCheck("expect", "get", asAdmin, requireNS, compare, "true", ok, ClusterInstallTimeout,
+			[]string{"ClusterDeployment", cdName, "-o=jsonpath={.spec.installed}"}).check(oc)
+
+		compat_otp.By("Publish ingress DNS and verify the installed cluster is reachable")
+		o.Eventually(dnsManager.publishIngressRecord).
+			WithTimeout(10*time.Minute).
+			WithPolling(15*time.Second).
+			WithArguments(infraID, cdName, basedomain).
+			Should(o.BeTrue())
+		tmpDir := "/tmp/" + cdName
+		defer os.RemoveAll(tmpDir)
+		o.Expect(os.MkdirAll(tmpDir, 0700)).To(o.Succeed())
+		getClusterKubeconfig(oc, cdName, oc.Namespace(), tmpDir)
+		o.Expect(oc.AsAdmin().WithoutNamespace().Run("get").Args("co", "--kubeconfig", filepath.Join(tmpDir, "kubeconfig")).Execute()).To(o.Succeed())
+	})
+
+	// Polarion: OCP-83733
+	g.It("[Level0] Author:jshu-NonHyperShiftHOST-Longduration-NonPreRelease-ConnectedOnly-High-83733-[HiveSDRosa] Hive supports an AWS ClusterPool with user-provisioned DNS [Serial]", func() {
+		testCaseID := "83733"
+		poolName := "pool-" + testCaseID + "-" + getRandomString()[:ClusterSuffixLen]
+		imageSetName := poolName + "-imageset"
+		installConfigTemplateName := poolName + "-install-config-template"
+
+		imageSet := clusterImageSet{
+			name:         imageSetName,
+			releaseImage: testOCPImage,
+			template:     filepath.Join(testDataDir, "clusterimageset.yaml"),
+		}
+		defer cleanupObjects(oc, objectTableRef{"ClusterImageSet", "", imageSetName})
+		imageSet.create(oc)
+		createAWSCreds(oc, oc.Namespace())
+		createPullSecret(oc, oc.Namespace())
+
+		installConfigTemplate := installConfig{
+			name1:              installConfigTemplateName,
+			namespace:          oc.Namespace(),
+			baseDomain:         basedomain,
+			name2:              "pool-template",
+			region:             region,
+			template:           filepath.Join(testDataDir, "aws-install-config.yaml"),
+			userProvisionedDNS: userProvisionedDNSEnabled,
+		}
+		defer cleanupObjects(oc, objectTableRef{"Secret", oc.Namespace(), installConfigTemplateName})
+		installConfigTemplate.create(oc)
+
+		pool := clusterPool{
+			name:                           poolName,
+			namespace:                      oc.Namespace(),
+			fake:                           "false",
+			baseDomain:                     basedomain,
+			installConfigSecretTemplateRef: installConfigTemplateName,
+			imageSetRef:                    imageSetName,
+			platformType:                   "aws",
+			credRef:                        AWSCreds,
+			region:                         region,
+			pullSecretRef:                  PullSecret,
+			size:                           1,
+			maxSize:                        1,
+			runningCount:                   0,
+			maxConcurrent:                  1,
+			hibernateAfter:                 "360m",
+			template:                       filepath.Join(testDataDir, "clusterpool-custom-dns.yaml"),
+		}
+		defer cleanupObjects(oc, objectTableRef{"ClusterPool", oc.Namespace(), poolName})
+		pool.create(oc)
+
+		compat_otp.By("Wait for the ClusterPool to create its ClusterDeployment and install-config Secret")
+		var cdName, cdNamespace, generatedInstallConfigSecret string
+		o.Eventually(func() bool {
+			cdRef, _, err := oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"ClusterDeployment", "-A",
+				"-l", "hive.openshift.io/clusterpool-namespace="+oc.Namespace()+",hive.openshift.io/clusterpool-name="+poolName,
+				"-o=jsonpath={range .items[*]}{.metadata.namespace}{\" \"}{.metadata.name}{\"\\n\"}{end}",
+			).Outputs()
+			if err != nil {
+				return false
+			}
+			fields := strings.Fields(cdRef)
+			if len(fields) != 2 {
+				return false
+			}
+			cdNamespace, cdName = fields[0], fields[1]
+			generatedInstallConfigSecret, _, err = oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"ClusterDeployment", cdName, "-n", cdNamespace, "-o=jsonpath={.spec.provisioning.installConfigSecretRef.name}",
+			).Outputs()
+			generatedInstallConfigSecret = strings.TrimSpace(generatedInstallConfigSecret)
+			if err != nil || generatedInstallConfigSecret == "" {
+				return false
+			}
+			_, _, err = oc.AsAdmin().WithoutNamespace().Run("get").Args(
+				"Secret", generatedInstallConfigSecret, "-n", cdNamespace,
+			).Outputs()
+			return err == nil
+		}).WithTimeout(DefaultTimeout * time.Second).WithPolling(5 * time.Second).Should(o.BeTrue())
+
+		compat_otp.By("Verify the generated install-config retains user-provisioned DNS")
+		renderedInstallConfig, _, err := oc.AsAdmin().WithoutNamespace().Run("extract").Args(
+			"secret/"+generatedInstallConfigSecret, "-n", cdNamespace, "--keys=install-config.yaml", "--to=-",
+		).Outputs()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\n    userProvisionedDNS: \"Enabled\"\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureSet: CustomNoUpgrade\n"))
+		o.Expect(renderedInstallConfig).To(o.ContainSubstring("\nfeatureGates:\n- AWSClusterHostedDNSInstall=true\n"))
+		newCheck("expect", "get", asAdmin, withoutNamespace, contain, cdName, nok, DefaultTimeout,
+			[]string{"dnszone", "-n", cdNamespace}).check(oc)
+
+		dnsManager := newAWSCustomDNSManager(getAWSConfig(oc, region), basedomain)
+		defer dnsManager.cleanup()
+		infraID := getInfraIDFromCDNameInNamespace(oc, cdName, cdNamespace)
+
+		compat_otp.By("Publish the pool cluster's external API record")
+		o.Eventually(dnsManager.publishAPIRecord).
+			WithTimeout(30*time.Minute).
+			WithPolling(15*time.Second).
+			WithArguments(infraID, cdName, basedomain).
+			Should(o.BeTrue())
+
+		compat_otp.By("Wait for the ClusterPool to have one ready cluster")
+		newCheck("expect", "get", asAdmin, withoutNamespace, compare, "1", ok, ClusterInstallTimeout,
+			[]string{"ClusterPool", poolName, "-n", oc.Namespace(), "-o=jsonpath={.status.ready}"}).check(oc)
+
+		compat_otp.By("Publish ingress DNS and verify the pool cluster is reachable")
+		o.Eventually(dnsManager.publishIngressRecord).
+			WithTimeout(10*time.Minute).
+			WithPolling(15*time.Second).
+			WithArguments(infraID, cdName, basedomain).
+			Should(o.BeTrue())
+		tmpDir := "/tmp/" + cdName
+		defer os.RemoveAll(tmpDir)
+		o.Expect(os.MkdirAll(tmpDir, 0700)).To(o.Succeed())
+		getClusterKubeconfig(oc, cdName, cdNamespace, tmpDir)
+		o.Expect(oc.AsAdmin().WithoutNamespace().Run("get").Args("co", "--kubeconfig", filepath.Join(tmpDir, "kubeconfig")).Execute()).To(o.Succeed())
+	})
 })

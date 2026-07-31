@@ -85,21 +85,22 @@ type clusterImageSet struct {
 }
 
 type clusterPool struct {
-	name           string
-	namespace      string
-	fake           string
-	baseDomain     string
-	imageSetRef    string
-	platformType   string
-	credRef        string
-	region         string
-	pullSecretRef  string
-	size           int
-	maxSize        int
-	runningCount   int
-	maxConcurrent  int
-	hibernateAfter string
-	template       string
+	name                           string
+	namespace                      string
+	fake                           string
+	baseDomain                     string
+	installConfigSecretTemplateRef string
+	imageSetRef                    string
+	platformType                   string
+	credRef                        string
+	region                         string
+	pullSecretRef                  string
+	size                           int
+	maxSize                        int
+	runningCount                   int
+	maxConcurrent                  int
+	hibernateAfter                 string
+	template                       string
 }
 
 type clusterPoolCDC struct {
@@ -143,6 +144,7 @@ type installConfig struct {
 	credentialsMode    string
 	internalJoinSubnet string
 	clusterNetworkMtu  int
+	userProvisionedDNS string
 }
 
 type installConfigPrivateLink struct {
@@ -753,6 +755,9 @@ func (imageset *clusterImageSet) create(oc *exutil.CLI) {
 
 func (pool *clusterPool) create(oc *exutil.CLI) {
 	parameters := []string{"--ignore-unknown-parameters=true", "-f", pool.template, "-p", "NAME=" + pool.name, "NAMESPACE=" + pool.namespace, "FAKE=" + pool.fake, "BASEDOMAIN=" + pool.baseDomain, "IMAGESETREF=" + pool.imageSetRef, "PLATFORMTYPE=" + pool.platformType, "CREDREF=" + pool.credRef, "PULLSECRETREF=" + pool.pullSecretRef, "SIZE=" + strconv.Itoa(pool.size), "MAXSIZE=" + strconv.Itoa(pool.maxSize), "RUNNINGCOUNT=" + strconv.Itoa(pool.runningCount), "MAXCONCURRENT=" + strconv.Itoa(pool.maxConcurrent), "HIBERNATEAFTER=" + pool.hibernateAfter, "REGION=" + pool.region}
+	if pool.installConfigSecretTemplateRef != "" {
+		parameters = append(parameters, "INSTALLCONFIGSECRETTEMPLATEREF="+pool.installConfigSecretTemplateRef)
+	}
 	err := applyResourceFromTemplate(oc, parameters...)
 	o.Expect(err).NotTo(o.HaveOccurred())
 }
@@ -791,8 +796,16 @@ func (config *installConfig) create(oc *exutil.CLI) {
 	if config.arch == "" {
 		config.arch = archAMD64
 	}
+	if config.userProvisionedDNS == "" {
+		config.userProvisionedDNS = "Disabled"
+	}
+	featureConfigPrefix := "# "
+	if config.userProvisionedDNS == userProvisionedDNSEnabled {
+		featureConfigPrefix = ""
+	}
 
 	parameters := []string{"--ignore-unknown-parameters=true", "-f", config.template, "-p", "NAME1=" + config.name1, "NAMESPACE=" + config.namespace, "BASEDOMAIN=" + config.baseDomain, "NAME2=" + config.name2, "REGION=" + config.region, "PUBLISH=" + config.publish, "VMTYPE=" + config.vmType, "ARCH=" + config.arch}
+	parameters = append(parameters, "USERPROVISIONEDDNS="+config.userProvisionedDNS, "FEATURECONFIGPREFIX="+featureConfigPrefix)
 	if len(config.credentialsMode) > 0 {
 		parameters = append(parameters, "CREDENTIALSMODE="+config.credentialsMode)
 	}
@@ -1167,8 +1180,7 @@ func cleanupObjects(oc *exutil.CLI, objs ...objectTableRef) {
 		if v.kind == "ClusterPool" {
 			if v.namespace != "" {
 				cdListStr := getCDlistfromPool(oc, v.name)
-				var cdArray []string
-				cdArray = strings.Split(strings.TrimSpace(cdListStr), "\n")
+				cdArray := strings.Fields(cdListStr)
 				for i := range cdArray {
 					installedFlag, _ = oc.AsAdmin().WithoutNamespace().Run("get").Args("ClusterDeployment", "-n", cdArray[i], cdArray[i], "-o=jsonpath={.spec.installed}").Output()
 					if installedFlag == "false" {
@@ -1187,11 +1199,15 @@ func cleanupObjects(oc *exutil.CLI, objs ...objectTableRef) {
 				printProvisionPodLogs(oc, provisionPodOutput, v.namespace)
 			}
 		}
+		deleteArgs := []string{v.kind}
 		if v.namespace != "" {
-			oc.AsAdmin().WithoutNamespace().Run("delete").Args(v.kind, "-n", v.namespace, v.name, "--ignore-not-found").Output()
-		} else {
-			oc.AsAdmin().WithoutNamespace().Run("delete").Args(v.kind, v.name, "--ignore-not-found").Output()
+			deleteArgs = append(deleteArgs, "-n", v.namespace)
 		}
+		deleteArgs = append(deleteArgs, v.name, "--ignore-not-found")
+		if v.kind == "ClusterPool" || v.kind == "ClusterDeployment" {
+			deleteArgs = append(deleteArgs, "--wait=false", "--request-timeout=2m")
+		}
+		oc.AsAdmin().WithoutNamespace().Run("delete").Args(deleteArgs...).Output()
 		//For ClusterPool or ClusterDeployment, need to wait ClusterDeployment delete done
 		if v.kind == "ClusterPool" || v.kind == "ClusterDeployment" {
 			e2e.Logf("Wait ClusterDeployment delete done for %s", v.name)
@@ -1245,13 +1261,17 @@ func ContainsInStringSlice(items []string, item string) bool {
 }
 
 func getInfraIDFromCDName(oc *exutil.CLI, cdName string) string {
+	return getInfraIDFromCDNameInNamespace(oc, cdName, oc.Namespace())
+}
+
+func getInfraIDFromCDNameInNamespace(oc *exutil.CLI, cdName, namespace string) string {
 	var (
 		infraID string
 		err     error
 	)
 
 	getInfraIDFromCD := func() bool {
-		infraID, _, err = oc.AsAdmin().Run("get").Args("cd", cdName, "-o=jsonpath={.spec.clusterMetadata.infraID}").Outputs()
+		infraID, _, err = oc.AsAdmin().WithoutNamespace().Run("get").Args("cd", cdName, "-n", namespace, "-o=jsonpath={.spec.clusterMetadata.infraID}").Outputs()
 		return err == nil && strings.HasPrefix(infraID, cdName)
 	}
 	o.Eventually(getInfraIDFromCD).WithTimeout(10 * time.Minute).WithPolling(5 * time.Second).Should(o.BeTrue())

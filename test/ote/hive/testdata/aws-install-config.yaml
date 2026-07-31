@@ -13,6 +13,9 @@ objects:
     install-config.yaml: |
       apiVersion: v1
       baseDomain: "${BASEDOMAIN}"
+      ${FEATURECONFIGPREFIX}featureSet: CustomNoUpgrade
+      ${FEATURECONFIGPREFIX}featureGates:
+      ${FEATURECONFIGPREFIX}- AWSClusterHostedDNSInstall=true
       compute:
       - name: worker
         architecture: "${ARCH}"
@@ -54,6 +57,7 @@ objects:
       platform:
         aws:
           region: "${REGION}"
+          userProvisionedDNS: "${USERPROVISIONEDDNS}"
       publish: "${PUBLISH}"
       credentialsMode: "${CREDENTIALSMODE}"
   type: Opaque
@@ -69,3 +73,7 @@ parameters:
 - name: CREDENTIALSMODE
 - name: INTERNALJOINSUBNET
 - name: CLUSTERNETWORKMTU
+- name: USERPROVISIONEDDNS
+  value: "Disabled"
+- name: FEATURECONFIGPREFIX
+  value: "# "

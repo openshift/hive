@@ -375,7 +375,7 @@ func (vd *validator) arrValidate(arr []any) {
 				}
 			case *Schema:
 				for i, item := range arr[evaluated:] {
-					vd.addErr(vd.validateVal(additional, item, strconv.Itoa(i)))
+					vd.addErr(vd.validateVal(additional, item, strconv.Itoa(evaluated+i)))
 				}
 			}
 		}
@@ -390,7 +390,7 @@ func (vd *validator) arrValidate(arr []any) {
 		// items2020 --
 		if s.Items2020 != nil {
 			for i, item := range arr[evaluated:] {
-				vd.addErr(vd.validateVal(s.Items2020, item, strconv.Itoa(i)))
+				vd.addErr(vd.validateVal(s.Items2020, item, strconv.Itoa(evaluated+i)))
 			}
 		}
 	}

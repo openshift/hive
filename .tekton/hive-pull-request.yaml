@@ -35,6 +35,7 @@ spec:
     - name: build-platforms
       value:
         - linux/x86_64
+        - linux-mxlarge/arm64
     - name: dockerfile
       value: Dockerfile
     - name: path-context

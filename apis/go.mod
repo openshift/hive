@@ -5,7 +5,6 @@ go 1.26.0
 toolchain go1.26.5
 
 require (
-	github.com/openshift/installer v1.5.0-alpha.1
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
 )
@@ -17,6 +16,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/openshift/api v0.0.0-20260728120005-8ba0b25b0f29
+	github.com/openshift/installer v1.5.0-alpha.2
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/net v0.55.1-0.20260602153038-42abb857022c // indirect

@@ -19,8 +19,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/openshift/api v0.0.0-20260728120005-8ba0b25b0f29 h1:WrS2vkQtwJyo5xHJnJfjmHPDasdyKLKwojhMDV3tPto=
 github.com/openshift/api v0.0.0-20260728120005-8ba0b25b0f29/go.mod h1:k6qH5QOVa5GDln2VVm8Jz4NV3Z7R2SATHFLwGS6Wh3M=
-github.com/openshift/installer v1.5.0-alpha.1 h1:Vd+ZAiD6cV5h8fBTPvYnbq42KwScdzhHVF3RFhzHu0w=
-github.com/openshift/installer v1.5.0-alpha.1/go.mod h1:K6syzgcjEQO7QymXOD/CnJTqNNrJVoBX3I1YecYmfck=
+github.com/openshift/installer v1.5.0-alpha.2 h1:5u6TSe3MON6MYvzIWgTyrzWzT21XMT+yJm9DEtxpcmM=
+github.com/openshift/installer v1.5.0-alpha.2/go.mod h1:K6syzgcjEQO7QymXOD/CnJTqNNrJVoBX3I1YecYmfck=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

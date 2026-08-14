@@ -10,6 +10,15 @@ metadata:
     control-plane: {{.ControllerName}}
     controller-tools.k8s.io: "1.0"
 spec:
+  podManagementPolicy: OrderedReady
+  revisionHistoryLimit: 10
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
   selector:
     matchLabels:
       control-plane: {{.ControllerName}}

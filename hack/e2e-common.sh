@@ -129,6 +129,27 @@ function wait_for_namespace {
   exit 1
 }
 
+# apply_deny_all_netpol pre-creates namespace $1 (idempotently) and applies a
+# deny-all NetworkPolicy to it. This exercises Hive's non-OLM network policy
+# coverage: if any required netpol is absent or misconfigured, pods in that
+# namespace cannot communicate and the subsequent e2e tests will fail.
+function apply_deny_all_netpol {
+  local ns=$1
+  oc create namespace "${ns}" --dry-run=client -o yaml | oc apply -f -
+  oc apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: ${ns}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+EOF
+}
+
 function get_osp_resources() {
   local resource_path=$1
 
@@ -214,6 +235,16 @@ function save_hive_logs() {
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
 trap 'set +e; kill %1; save_hive_logs' EXIT
+
+# Pre-apply deny-all network policies to both hive namespaces and the cluster
+# namespace. make deploy then lays down the operator netpol (egress for
+# hive-operator pods) and the operator lays down controller/admission netpols
+# in HIVE_NS. For CLUSTER_NAMESPACE, hive controllers lay down per-job allow
+# netpols (imageset/provision/deprovision) before each job starts. If any
+# netpol is missing or misconfigured, the e2e tests that follow will fail.
+apply_deny_all_netpol "${HIVE_OPERATOR_NS}"
+apply_deny_all_netpol "${HIVE_NS}"
+apply_deny_all_netpol "${CLUSTER_NAMESPACE}"
 
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy

@@ -78,9 +78,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		)
 	}
 	// Delete the (non-NetworkPolicy) assets from previous target namespaces. The
-	// allow-all NetworkPolicy is intentionally left in place here and removed later,
-	// once the workload pods have terminated, by scrubOldNamespaceNetworkPolicies --
-	// see that function for why the ordering matters.
+	// NetworkPolicy is intentionally left in place here and removed later, once the
+	// workload pods have terminated, by scrubOldNamespaceNetworkPolicies -- see that
+	// function for why the ordering matters.
 	if err := deleteAssetsFromOldNamespaces(h, instance, namespacesToClean, hLog, append(namespacedAssets, deploymentAsset)...); err != nil {
 		return err
 	}

@@ -61,9 +61,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	// NOTE: This policy applies to sharded controllers as well.
 	netpolAsset := hiveControllersNetworkPolicyAsset
 	// Delete the (non-NetworkPolicy) assets from previous target namespaces. The
-	// allow-all NetworkPolicy is intentionally left in place here and removed later,
-	// once the workload pods have terminated, by scrubOldNamespaceNetworkPolicies --
-	// see that function for why the ordering matters.
+	// NetworkPolicy is intentionally left in place here and removed later, once the
+	// workload pods have terminated, by scrubOldNamespaceNetworkPolicies -- see that
+	// function for why the ordering matters.
 	if err := deleteAssetsFromOldNamespaces(h, instance, namespacesToClean, hLog, append(namespacedAssets, deploymentAsset)...); err != nil {
 		return err
 	}
@@ -384,9 +384,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 // matches the podSelectors in the NetworkPolicy assets below.
 const hiveComponentLabelKey = "hive.openshift.io/component"
 
-// The allow-all NetworkPolicy asset paths. These are the single source of truth:
-// each is applied to the (new) target namespace by its deploy* func and removed
-// from former target namespaces via oldNamespaceNetworkPolicyAssets below.
+// The NetworkPolicy asset paths Hive manages. These are the single source of
+// truth: each is applied to the (new) target namespace by its deploy* func and
+// removed from former target namespaces via oldNamespaceNetworkPolicyAssets below.
 const (
 	// hiveControllersNetworkPolicyAsset applies to hive-controllers, hive-clustersync,
 	// and hive-machinepool pods.
@@ -395,17 +395,15 @@ const (
 	hiveAdmissionNetworkPolicyAsset = "config/netpol/hiveadmission.yaml"
 )
 
-// oldNamespaceNetworkPolicyAssets are the allow-all NetworkPolicies Hive lays
-// down in its target namespace. They must be removed from former target
-// namespaces only after the workload pods they protect have terminated.
+// oldNamespaceNetworkPolicyAssets are the NetworkPolicies Hive lays down in its
+// target namespace. They must be removed from former target namespaces only after
+// the workload pods they protect have terminated.
 var oldNamespaceNetworkPolicyAssets = []string{
 	hiveControllersNetworkPolicyAsset,
 	hiveAdmissionNetworkPolicyAsset,
 }
 
-// hivePodsGone reports whether any Hive workload pods remain in the given
-// namespace. It uses the typed kube client rather than r.List because the
-// operator's dynamic clientFor has no case for Pods and would panic.
+// hivePodsGone reports whether any Hive workload pods remain in the given namespace.
 func (r *ReconcileHiveConfig) hivePodsGone(namespace string, hLog log.FieldLogger) (bool, error) {
 	pods, err := r.kubeClient.CoreV1().Pods(namespace).List(
 		context.TODO(), metav1.ListOptions{LabelSelector: hiveComponentLabelKey})
@@ -422,15 +420,15 @@ func (r *ReconcileHiveConfig) hivePodsGone(namespace string, hLog log.FieldLogge
 
 // scrubOldNamespaceNetworkPolicies is "phase 2" of old-target-namespace teardown.
 // For each former target namespace whose workload pods have fully terminated, it
-// deletes Hive's allow-all NetworkPolicies. It returns the subset of namespaces
+// deletes the NetworkPolicies Hive manages. It returns the subset of namespaces
 // that were fully scrubbed (pods gone AND NetworkPolicies deleted); any namespace
 // still hosting terminating pods is omitted so the caller can requeue and retry.
 //
 // The ordering -- delete workloads first (phase 1, in the deploy* funcs), wait for
 // their pods, then delete these NetworkPolicies -- matters in environments where
-// the admin applies a baseline deny-all NetworkPolicy. Removing Hive's allow-all
-// policy while a controller/admission pod is still shutting down would strand that
-// pod without the egress it needs to release its leader lease and exit cleanly,
+// the admin applies a baseline deny-all NetworkPolicy. Removing Hive's own
+// NetworkPolicy while a controller/admission pod is still shutting down would strand
+// that pod without the egress it needs to release its leader lease and exit cleanly,
 // leaving it in Error and leaking into the old namespace.
 func (r *ReconcileHiveConfig) scrubOldNamespaceNetworkPolicies(h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, hLog log.FieldLogger) ([]string, error) {
 	var scrubbed []string

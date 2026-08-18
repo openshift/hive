@@ -23,102 +23,71 @@ func testLogger() log.FieldLogger {
 	return l
 }
 
-// componentPod builds a Pod carrying the hive.openshift.io/component label that
-// Hive's workload pods (controllers/clustersync/machinepool/hiveadmission) all bear.
-func componentPod(namespace, name string) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-			Labels:    map[string]string{hiveComponentLabelKey: "hive-controllers"},
-		},
+// pod builds a Pod in the given namespace. If hiveComponent is true it carries the
+// hive.openshift.io/component label that Hive's workload pods
+// (controllers/clustersync/machinepool/hiveadmission) all bear; otherwise it is an
+// unrelated pod that happens to live in the namespace.
+func pod(namespace, name string, hiveComponent bool) *corev1.Pod {
+	p := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}
+	if hiveComponent {
+		p.Labels = map[string]string{hiveComponentLabelKey: "hive-controllers"}
 	}
+	return p
 }
 
-// unlabeledPod builds a Pod with no hive.openshift.io/component label (e.g. some
-// unrelated pod that happens to live in the namespace).
-func unlabeledPod(namespace, name string) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
-	}
-}
-
-func TestHivePodsGone(t *testing.T) {
+// TestScrubOldNamespaceNetworkPolicies covers the gating contract that the fix
+// depends on: a former target namespace's NetworkPolicies are deleted only once its
+// Hive workload pods are gone. This also transitively exercises hivePodsGone,
+// including its label selectivity (unrelated pods must not block scrubbing).
+func TestScrubOldNamespaceNetworkPolicies(t *testing.T) {
+	const ns = "old"
 	cases := []struct {
-		name      string
-		existing  []runtime.Object
-		namespace string
-		wantGone  bool
+		name string
+		// existing pods seeded into the (former target) namespace.
+		existing []runtime.Object
+		// expectScrubbed is whether the namespace should be fully scrubbed -- i.e. its
+		// NetworkPolicies deleted and the namespace reported back to the caller.
+		expectScrubbed bool
 	}{
 		{
-			name:      "no pods at all",
-			existing:  nil,
-			namespace: "old",
-			wantGone:  true,
+			name:           "workload pods present -> netpols retained, ns not scrubbed",
+			existing:       []runtime.Object{pod(ns, "hive-controllers-abc", true)},
+			expectScrubbed: false,
 		},
 		{
-			name:      "hive workload pod present",
-			existing:  []runtime.Object{componentPod("old", "hive-controllers-abc")},
-			namespace: "old",
-			wantGone:  false,
+			name:           "no pods -> both netpols deleted, ns scrubbed",
+			existing:       nil,
+			expectScrubbed: true,
 		},
 		{
-			name:      "only unlabeled pods present",
-			existing:  []runtime.Object{unlabeledPod("old", "something-else")},
-			namespace: "old",
-			wantGone:  true,
-		},
-		{
-			name:      "hive workload pod only in a different namespace",
-			existing:  []runtime.Object{componentPod("other", "hive-controllers-abc")},
-			namespace: "old",
-			wantGone:  true,
+			name:           "only unrelated pods -> both netpols deleted, ns scrubbed",
+			existing:       []runtime.Object{pod(ns, "something-else", false)},
+			expectScrubbed: true,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			h := mock.NewMockHelper(ctrl)
+			if tc.expectScrubbed {
+				// apiVersion/kind come from the decoded asset; match on namespace + name.
+				h.EXPECT().Delete(gomock.Any(), gomock.Any(), ns, "hive-controllers").Return(nil)
+				h.EXPECT().Delete(gomock.Any(), gomock.Any(), ns, "hiveadmission").Return(nil)
+			}
+			// When not expectScrubbed, the strict mock has no Delete expectations, so any
+			// NetworkPolicy deletion fails the test -- this is the assertion that guards
+			// against deleting a NetworkPolicy while workload pods still exist.
+
 			r := &ReconcileHiveConfig{kubeClient: fakekubeclient.NewSimpleClientset(tc.existing...)}
-			gone, err := r.hivePodsGone(tc.namespace, testLogger())
+			scrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, &hivev1.HiveConfig{}, []string{ns}, testLogger())
 			require.NoError(t, err)
-			assert.Equal(t, tc.wantGone, gone)
+			if tc.expectScrubbed {
+				assert.Equal(t, []string{ns}, scrubbed)
+			} else {
+				assert.Empty(t, scrubbed, "namespace with live pods must not be reported as scrubbed")
+			}
 		})
 	}
-}
-
-// TestScrubOldNamespaceNetworkPolicies_PodsPresent is the assertion that guards the
-// fix: while a former target namespace still has Hive workload pods, its allow-all
-// NetworkPolicies must NOT be deleted (deleting them would strand the terminating
-// pods behind an admin's baseline deny-all). The strict mock has no Delete
-// expectations, so any NetworkPolicy deletion fails the test.
-func TestScrubOldNamespaceNetworkPolicies_PodsPresent(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	h := mock.NewMockHelper(ctrl)
-
-	r := &ReconcileHiveConfig{
-		kubeClient: fakekubeclient.NewSimpleClientset(componentPod("old", "hive-controllers-abc")),
-	}
-
-	scrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, &hivev1.HiveConfig{}, []string{"old"}, testLogger())
-	require.NoError(t, err)
-	assert.Empty(t, scrubbed, "namespace with live pods must not be reported as scrubbed")
-}
-
-// TestScrubOldNamespaceNetworkPolicies_PodsGone verifies that once the workload pods
-// are gone, both allow-all NetworkPolicies are deleted from the namespace and the
-// namespace is reported as fully scrubbed.
-func TestScrubOldNamespaceNetworkPolicies_PodsGone(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	h := mock.NewMockHelper(ctrl)
-	// apiVersion/kind come from the decoded asset; match on namespace + name, which
-	// are the values that actually matter here.
-	h.EXPECT().Delete(gomock.Any(), gomock.Any(), "old", "hive-controllers").Return(nil)
-	h.EXPECT().Delete(gomock.Any(), gomock.Any(), "old", "hiveadmission").Return(nil)
-
-	r := &ReconcileHiveConfig{kubeClient: fakekubeclient.NewSimpleClientset()}
-
-	scrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, &hivev1.HiveConfig{}, []string{"old"}, testLogger())
-	require.NoError(t, err)
-	assert.Equal(t, []string{"old"}, scrubbed)
 }
 
 // TestScrubOldNamespaceNetworkPolicies_Mixed verifies per-namespace gating: a drained
@@ -132,7 +101,7 @@ func TestScrubOldNamespaceNetworkPolicies_Mixed(t *testing.T) {
 	h.EXPECT().Delete(gomock.Any(), gomock.Any(), "gone", "hiveadmission").Return(nil)
 
 	r := &ReconcileHiveConfig{
-		kubeClient: fakekubeclient.NewSimpleClientset(componentPod("busy", "hive-controllers-abc")),
+		kubeClient: fakekubeclient.NewSimpleClientset(pod("busy", "hive-controllers-abc", true)),
 	}
 
 	scrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, &hivev1.HiveConfig{}, []string{"gone", "busy"}, testLogger())

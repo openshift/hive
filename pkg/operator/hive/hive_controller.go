@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubeinformers "k8s.io/client-go/informers"
@@ -611,10 +612,10 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	// Phase 2 of old-target-namespace teardown: now that the workloads have been
-	// deleted (phase 1, in the deploy* funcs above), remove Hive's allow-all
-	// NetworkPolicies from each former target namespace -- but only once that
-	// namespace's workload pods have actually terminated. Namespaces still hosting
-	// terminating pods are retried on a subsequent reconcile.
+	// deleted (phase 1, in the deploy* funcs above), remove the NetworkPolicies Hive
+	// manages from each former target namespace -- but only once that namespace's
+	// workload pods have actually terminated. Namespaces still hosting terminating
+	// pods are retried on a subsequent reconcile.
 	fullyScrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, instance, namespacesToClean, hLog)
 	if err != nil {
 		hLog.WithError(err).Error("error removing NetworkPolicies from old target namespaces")
@@ -642,7 +643,9 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if len(fullyScrubbed) < len(namespacesToClean) {
-		hLog.Info("waiting for workload pods to terminate in former target namespaces before removing their NetworkPolicies; will retry")
+		remaining := sets.New(namespacesToClean...).Difference(sets.New(fullyScrubbed...))
+		hLog.WithField("namespaces", sets.List(remaining)).Info(
+			"waiting for workload pods to terminate before removing NetworkPolicies from former target namespaces; will retry")
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 

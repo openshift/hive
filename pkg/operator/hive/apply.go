@@ -142,12 +142,12 @@ func applyRuntimeObject(h resource.Helper, rtoFactory toRuntimeObject, hLog log.
 	return h.ApplyRuntimeObject(requiredObj, scheme.GetScheme())
 }
 
-// deleteAssetsFromOldNamespaces deletes each of the named assets (by path) from
-// every namespace in namespacesToClean. It is a no-op for assets that are already
-// absent. This is the shared "phase 1" of old-target-namespace teardown: it
+// deleteAssetsFromOldNamespaces idempotently deletes each of the named assets (by
+// path) from every namespace in namespacesToClean, no-opping for assets that are
+// already absent. This is the shared "phase 1" of old-target-namespace teardown: it
 // removes workloads and their satellite objects but intentionally NOT the
-// allow-all NetworkPolicies, which are removed later (once the workload pods have
-// terminated) by (*ReconcileHiveConfig).scrubOldNamespaceNetworkPolicies.
+// NetworkPolicies, which are removed later (once the workload pods have terminated)
+// by (*ReconcileHiveConfig).scrubOldNamespaceNetworkPolicies.
 func deleteAssetsFromOldNamespaces(h resource.Helper, hiveconfig *hivev1.HiveConfig, namespacesToClean []string, hLog log.FieldLogger, assetPaths ...string) error {
 	for _, ns := range namespacesToClean {
 		for _, assetPath := range assetPaths {

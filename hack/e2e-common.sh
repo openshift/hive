@@ -150,6 +150,26 @@ spec:
 EOF
 }
 
+# watch_clusterpool_namespaces runs as a background process, polling every 2s
+# for namespaces labeled hive.openshift.io/cluster-pool-name (created at
+# runtime by the clusterpool controller) and applying a deny-all NetworkPolicy
+# to each one it hasn't processed yet. Start it with & and capture the PID;
+# kill the PID in the EXIT trap.
+function watch_clusterpool_namespaces {
+  local seen=""
+  while true; do
+    while read -r ns; do
+      [[ -z "$ns" ]] && continue
+      if [[ " $seen " != *" $ns "* ]]; then
+        apply_deny_all_netpol "$ns"
+        seen="$seen $ns"
+      fi
+    done < <(oc get namespace -l 'hive.openshift.io/cluster-pool-name' \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)
+    sleep 2
+  done
+}
+
 function get_osp_resources() {
   local resource_path=$1
 

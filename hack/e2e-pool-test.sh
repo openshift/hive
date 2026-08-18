@@ -14,6 +14,11 @@ for deployment in hive-controllers hiveadmission; do
   oc wait --for=condition=Available --timeout=2m deploy/$deployment -n $HIVE_NS
 done
 
+# Start background watcher to apply deny-all netpols to clusterpool namespaces
+# as they are created at runtime by the controller.
+watch_clusterpool_namespaces &
+NETPOL_WATCHER_PID=$!
+
 function create_imageset() {
   local is_name=$1
   echo "Creating imageset $is_name"
@@ -98,6 +103,7 @@ REAL_POOL_NAME=$CLUSTER_NAME
 
 function cleanup() {
   echo "!EXIT TRAP!"
+  kill "$NETPOL_WATCHER_PID" 2>/dev/null || true
   capture_manifests CLEANUP_000
   # Let's save the logs now in case any of the following fail
   echo "Saving hive logs before cleanup"

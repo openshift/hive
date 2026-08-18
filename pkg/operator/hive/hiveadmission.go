@@ -65,8 +65,8 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
-		"config/netpol/hiveadmission.yaml",
 	}
+	netpolAsset := hiveAdmissionNetworkPolicyAsset
 	// In OpenShift, we get the service and kube root CA certs from automatically-generated ConfigMaps
 	if !r.isOpenShift {
 		namespacedAssets = append(namespacedAssets,
@@ -77,22 +77,20 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 			"config/hiveadmission/sa-token-secret.yaml",
 		)
 	}
-	// Delete the assets from previous target namespaces
-	assetsToClean := append(namespacedAssets, deploymentAsset)
-	for _, ns := range namespacesToClean {
-		for _, asset := range assetsToClean {
-			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
-			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := deleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
-				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
-			}
-		}
+	// Delete the (non-NetworkPolicy) assets from previous target namespaces. The
+	// allow-all NetworkPolicy is intentionally left in place here and removed later,
+	// once the workload pods have terminated, by scrubOldNamespaceNetworkPolicies --
+	// see that function for why the ordering matters.
+	if err := deleteAssetsFromOldNamespaces(h, instance, namespacesToClean, hLog, append(namespacedAssets, deploymentAsset)...); err != nil {
+		return err
 	}
 
 	hiveNSName := GetHiveNamespace(instance)
 
-	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	for _, assetPath := range namespacedAssets {
+	// Load namespaced assets, decode them, set to our target namespace, and apply.
+	// The NetworkPolicy is applied to the (new) target namespace alongside the rest;
+	// only its removal from *old* namespaces is deferred (see above).
+	for _, assetPath := range append(namespacedAssets, netpolAsset) {
 		if _, err := applyRuntimeObject(h, fromAssetPath(assetPath), hLog, withNamespaceOverride(hiveNSName), withGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err

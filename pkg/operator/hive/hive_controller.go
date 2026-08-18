@@ -610,11 +610,27 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// If we get here, we've successfully scrubbed all *our* resources out of previous target
+	// Phase 2 of old-target-namespace teardown: now that the workloads have been
+	// deleted (phase 1, in the deploy* funcs above), remove Hive's allow-all
+	// NetworkPolicies from each former target namespace -- but only once that
+	// namespace's workload pods have actually terminated. Namespaces still hosting
+	// terminating pods are retried on a subsequent reconcile.
+	fullyScrubbed, err := r.scrubOldNamespaceNetworkPolicies(h, instance, namespacesToClean, hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error removing NetworkPolicies from old target namespaces")
+		instance.Status.Conditions = SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorScrubbingOldNamespaces", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	// We've successfully scrubbed all *our* resources out of these previous target
 	// namespaces. Ideally, we would delete the namespace. Unfortunately, there's no good way to
 	// tell whether a) we were the one to create it, or b) it's empty. So settle for unlabeling it,
 	// accepting the fact that we might be leaking namespaces.
-	for _, ns := range namespacesToClean {
+	// NOTE: We unlabel only fully-scrubbed namespaces. Unlabeling before the NetworkPolicies are
+	// deleted would drop the namespace from namespacesToClean on the next reconcile, leaking the
+	// NetworkPolicy.
+	for _, ns := range fullyScrubbed {
 		hLog.Infof("Unlabeling former target namespace %s", ns)
 		if err := h.Patch(
 			types.NamespacedName{Name: ns}, "Namespace", "v1",
@@ -623,6 +639,11 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 			hLog.WithError(err).Errorf("error unlabeling former target namespace %s", ns)
 			return reconcile.Result{}, err
 		}
+	}
+
+	if len(fullyScrubbed) < len(namespacesToClean) {
+		hLog.Info("waiting for workload pods to terminate in former target namespaces before removing their NetworkPolicies; will retry")
+		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	instance.Status.Conditions = SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionTrue, "DeploymentSuccess", "Hive is deployed successfully")

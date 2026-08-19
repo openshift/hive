@@ -129,6 +129,54 @@ function wait_for_namespace {
   exit 1
 }
 
+# apply_deny_all_netpol applies a deny-all NetworkPolicy to namespace $1. By
+# default it also (idempotently) pre-creates the namespace; pass "false" as $2 to
+# skip that step -- e.g. from watch_clusterpool_namespaces, where the namespace
+# already exists and re-creating a just-reaped one would be wrong.
+# This exercises Hive's non-OLM network policy coverage: if any required netpol is
+# absent or misconfigured, pods in that namespace cannot communicate and the
+# subsequent e2e tests will fail.
+function apply_deny_all_netpol {
+  local ns=$1
+  local create_ns=${2:-true}
+  if [[ "$create_ns" == "true" ]]; then
+    oc create namespace "${ns}" --dry-run=client -o yaml | oc apply -f -
+  fi
+  oc apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: ${ns}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+EOF
+}
+
+# watch_clusterpool_namespaces runs as a background process, watching for
+# namespaces labeled hive.openshift.io/cluster-pool-name (created at runtime by
+# the clusterpool controller) and applying a deny-all NetworkPolicy to each one.
+# Start it with & and capture the PID; kill the PID in the EXIT trap.
+#
+# `-w` streams namespaces as they appear, which narrows (though can't fully close)
+# the race between namespace creation and NetworkPolicy application.
+function watch_clusterpool_namespaces {
+  local -A seen
+  oc get namespace -l 'hive.openshift.io/cluster-pool-name' -o name --no-headers -w 2>/dev/null \
+    | while IFS=/ read -r _ ns; do
+        [[ -z "$ns" ]] && continue
+        [[ -n "${seen[$ns]}" ]] && continue
+        # The namespace already exists (we're reacting to it), so don't re-create it.
+        # Under set -e a failed apply aborts the whole test, which is what we want:
+        # a clusterpool CD must never provision without the deny-all policy.
+        apply_deny_all_netpol "$ns" false
+        seen[$ns]=1
+      done
+}
+
 function get_osp_resources() {
   local resource_path=$1
 
@@ -214,6 +262,16 @@ function save_hive_logs() {
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
 trap 'set +e; kill %1; save_hive_logs' EXIT
+
+# Pre-apply deny-all network policies to both hive namespaces and the cluster
+# namespace. make deploy then lays down the operator netpol (egress for
+# hive-operator pods) and the operator lays down controller/admission netpols
+# in HIVE_NS. For CLUSTER_NAMESPACE, hive controllers lay down per-job allow
+# netpols (imageset/provision/deprovision) before each job starts. If any
+# netpol is missing or misconfigured, the e2e tests that follow will fail.
+apply_deny_all_netpol "${HIVE_OPERATOR_NS}"
+apply_deny_all_netpol "${HIVE_NS}"
+apply_deny_all_netpol "${CLUSTER_NAMESPACE}"
 
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy

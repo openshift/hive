@@ -57,19 +57,17 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/configmaps/install-log-regexes-configmap.yaml",
 		"config/rbac/hive_frontend_serviceaccount.yaml",
 		"config/controllers/hive_controllers_serviceaccount.yaml",
-		// NOTE: This policy applies to sharded controllers as well.
-		"config/netpol/hive-controllers.yaml",
 	}
-	// Delete the assets from previous target namespaces
-	assetsToClean := append(namespacedAssets, deploymentAsset)
+	// NOTE: This policy applies to sharded controllers as well.
+	netpolAsset := hiveControllersNetworkPolicyAsset
+	// Delete the (non-NetworkPolicy) assets from previous target namespaces. The
+	// NetworkPolicy is intentionally left in place here and removed later, once the
+	// workload pods have terminated, by scrubOldNamespaceNetworkPolicies -- see that
+	// function for why the ordering matters.
+	if err := deleteAssetsFromOldNamespaces(h, instance, namespacesToClean, hLog, append(namespacedAssets, deploymentAsset)...); err != nil {
+		return err
+	}
 	for _, ns := range namespacesToClean {
-		for _, asset := range assetsToClean {
-			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
-			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := deleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
-				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
-			}
-		}
 		// The hive-controller binary creates a configmap and lease to handle leader election. Delete them.
 		// TODO: Dedup this with const cmd/manager/main.go:leaderElectionLockName
 		lockName := "hive-controllers-leader"
@@ -298,8 +296,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
 		httpProxy+httpsProxy+noProxy, configHashes...)
 
-	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	for _, assetPath := range namespacedAssets {
+	// Load namespaced assets, decode them, set to our target namespace, and apply.
+	// The NetworkPolicy is applied to the (new) target namespace alongside the rest;
+	// only its removal from *old* namespaces is deferred (see above).
+	for _, assetPath := range append(namespacedAssets, netpolAsset) {
 		if _, err := applyRuntimeObject(h, fromAssetPath(assetPath), hLog, withNamespaceOverride(hiveNSName), withGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
@@ -377,6 +377,75 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	hLog.Info("all hive components successfully reconciled")
 	return nil
+}
+
+// hiveComponentLabelKey is the label key present on every Hive workload pod
+// (hive-controllers, hive-clustersync, hive-machinepool, hiveadmission). It
+// matches the podSelectors in the NetworkPolicy assets below.
+const hiveComponentLabelKey = "hive.openshift.io/component"
+
+// The NetworkPolicy asset paths Hive manages. These are the single source of
+// truth: each is applied to the (new) target namespace by its deploy* func and
+// removed from former target namespaces via oldNamespaceNetworkPolicyAssets below.
+const (
+	// hiveControllersNetworkPolicyAsset applies to hive-controllers, hive-clustersync,
+	// and hive-machinepool pods.
+	hiveControllersNetworkPolicyAsset = "config/netpol/hive-controllers.yaml"
+	// hiveAdmissionNetworkPolicyAsset applies to hiveadmission pods.
+	hiveAdmissionNetworkPolicyAsset = "config/netpol/hiveadmission.yaml"
+)
+
+// oldNamespaceNetworkPolicyAssets are the NetworkPolicies Hive lays down in its
+// target namespace. They must be removed from former target namespaces only after
+// the workload pods they protect have terminated.
+var oldNamespaceNetworkPolicyAssets = []string{
+	hiveControllersNetworkPolicyAsset,
+	hiveAdmissionNetworkPolicyAsset,
+}
+
+// hivePodsGone reports whether any Hive workload pods remain in the given namespace.
+func (r *ReconcileHiveConfig) hivePodsGone(namespace string, hLog log.FieldLogger) (bool, error) {
+	pods, err := r.kubeClient.CoreV1().Pods(namespace).List(
+		context.TODO(), metav1.ListOptions{LabelSelector: hiveComponentLabelKey})
+	if err != nil {
+		return false, errors.Wrapf(err, "error listing hive pods in namespace %s", namespace)
+	}
+	if remaining := len(pods.Items); remaining > 0 {
+		hLog.WithField("namespace", namespace).WithField("pods", remaining).
+			Info("hive workload pods still terminating; deferring NetworkPolicy removal")
+		return false, nil
+	}
+	return true, nil
+}
+
+// scrubOldNamespaceNetworkPolicies is "phase 2" of old-target-namespace teardown.
+// For each former target namespace whose workload pods have fully terminated, it
+// deletes the NetworkPolicies Hive manages. It returns the subset of namespaces
+// that were fully scrubbed (pods gone AND NetworkPolicies deleted); any namespace
+// still hosting terminating pods is omitted so the caller can requeue and retry.
+//
+// The ordering -- delete workloads first (phase 1, in the deploy* funcs), wait for
+// their pods, then delete these NetworkPolicies -- matters in environments where
+// the admin applies a baseline deny-all NetworkPolicy. Removing Hive's own
+// NetworkPolicy while a controller/admission pod is still shutting down would strand
+// that pod without the egress it needs to release its leader lease and exit cleanly,
+// leaving it in Error and leaking into the old namespace.
+func (r *ReconcileHiveConfig) scrubOldNamespaceNetworkPolicies(h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, hLog log.FieldLogger) ([]string, error) {
+	var scrubbed []string
+	for _, ns := range namespacesToClean {
+		gone, err := r.hivePodsGone(ns, hLog)
+		if err != nil {
+			return scrubbed, err
+		}
+		if !gone {
+			continue
+		}
+		if err := deleteAssetsFromOldNamespaces(h, instance, []string{ns}, hLog, oldNamespaceNetworkPolicyAssets...); err != nil {
+			return scrubbed, err
+		}
+		scrubbed = append(scrubbed, ns)
+	}
+	return scrubbed, nil
 }
 
 func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, hiveContainer *corev1.Container, namespacesToClean []string) error {

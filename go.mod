@@ -36,7 +36,7 @@ require (
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v1.5.0-alpha.2
 	github.com/openshift/library-go v0.0.0-20260728221828-f675e9a73816
-	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f
+	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f // indirect
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20260113091719-80740861bb2a
 	github.com/openshift/machine-api-provider-ibmcloud v0.0.0-20231207164151-6b0b8ea7b16d
 	github.com/pkg/errors v0.9.1
@@ -423,15 +423,12 @@ require (
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/grpc v1.83.0 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
-	gopkg.in/gcfg.v1 v1.2.3 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.6.1 // indirect
 	k8s.io/apiserver v0.36.2 // indirect
-	k8s.io/cloud-provider-vsphere v1.33.3 // indirect
 	k8s.io/component-base v0.36.2 // indirect
 	k8s.io/component-helpers v0.36.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect

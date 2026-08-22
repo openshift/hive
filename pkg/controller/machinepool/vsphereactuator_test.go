@@ -1,6 +1,7 @@
 package machinepool
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -11,13 +12,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
-	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestVSphereActuator(t *testing.T) {
@@ -25,7 +25,6 @@ func TestVSphereActuator(t *testing.T) {
 		name                       string
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
-		masterMachine              *machineapi.Machine
 		expectedMachineSetReplicas map[string]int64
 		expectedErr                bool
 	}{
@@ -33,14 +32,12 @@ func TestVSphereActuator(t *testing.T) {
 			name:              "deprecated vsphere fields",
 			clusterDeployment: testDeprecatedVSphereClusterDeployment(),
 			pool:              testVSpherePool(),
-			masterMachine:     testVSphereMachine("master0", "master"),
 			expectedErr:       true,
 		},
 		{
 			name:              "generate machineset",
 			clusterDeployment: testVSphereClusterDeployment(),
 			pool:              testVSpherePool(),
-			masterMachine:     testVSphereMachine("master0", "master"),
 			expectedMachineSetReplicas: map[string]int64{
 				fmt.Sprintf("%s-worker-0", testInfraID): 3,
 			},
@@ -49,9 +46,17 @@ func TestVSphereActuator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			scheme := scheme.GetScheme()
-
-			actuator, err := NewVSphereActuator(test.masterMachine, scheme, log.WithField("actuator", "vsphereactuator_test"))
+			var fds []vsphere.FailureDomain
+			var infraID string
+			if test.clusterDeployment.Spec.Platform.VSphere != nil &&
+				test.clusterDeployment.Spec.Platform.VSphere.Infrastructure != nil {
+				fds = test.clusterDeployment.Spec.Platform.VSphere.Infrastructure.FailureDomains
+			}
+			if test.clusterDeployment.Spec.ClusterMetadata != nil {
+				infraID = test.clusterDeployment.Spec.ClusterMetadata.InfraID
+			}
+			logger := log.WithField("actuator", "vsphereactuator_test")
+			actuator, err := NewVSphereActuator(nil, infraID, fds, logger)
 			assert.NoError(t, err, "unexpected error creating VSphereActuator")
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
@@ -63,6 +68,254 @@ func TestVSphereActuator(t *testing.T) {
 				validateVSphereMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
 			}
 		})
+	}
+}
+
+func TestBackfillVSphereTemplates(t *testing.T) {
+	logger := log.WithField("test", "backfill")
+
+	tests := []struct {
+		name              string
+		failureDomains    []vsphere.FailureDomain
+		remoteMachineSets []machineapi.MachineSet
+		infraID           string
+		expectedTemplates map[string]string
+	}{
+		{
+			name: "non-zonal: backfill from matching MachineSet",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "generated-failure-domain",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "datastore1", "/dc1/host/cluster1/Resources", "", "/dc1/vm/test-infra-rhcos-generated-region-generated-zone"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"generated-failure-domain": "/dc1/vm/test-infra-rhcos-generated-region-generated-zone",
+			},
+		},
+		{
+			name: "non-zonal: template already set, not overwritten",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "fd1",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+						Template:     "/dc1/vm/explicit-template",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "datastore1", "/dc1/host/cluster1/Resources", "", "/dc1/vm/test-infra-rhcos-fd1"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"fd1": "",
+			},
+		},
+		{
+			name: "non-zonal: no matching remote MachineSet, template stays empty",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "fd1",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "other-vcenter.example.com", "dc2", "datastore2", "/dc2/host/cluster2/Resources", "", "/dc2/vm/test-infra-rhcos-fd2"),
+			},
+			infraID:           "test-infra",
+			expectedTemplates: map[string]string{"fd1": ""},
+		},
+		{
+			name: "compute-cluster zonal: ResourcePool disambiguates FDs",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:     "us-east-1",
+					Server:   "vcenter.example.com",
+					ZoneType: vsphere.ComputeClusterFailureDomain,
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "shared-ds",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+				{
+					Name:     "us-east-2",
+					Server:   "vcenter.example.com",
+					ZoneType: vsphere.ComputeClusterFailureDomain,
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "shared-ds",
+						ResourcePool: "/dc1/host/cluster2/Resources",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "shared-ds", "/dc1/host/cluster1/Resources", "", "/dc1/vm/test-infra-rhcos-us-east-1"),
+				testRemoteMachineSet("test-infra-worker-1", "vcenter.example.com", "dc1", "shared-ds", "/dc1/host/cluster2/Resources", "", "/dc1/vm/test-infra-rhcos-us-east-2"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"us-east-1": "/dc1/vm/test-infra-rhcos-us-east-1",
+				"us-east-2": "/dc1/vm/test-infra-rhcos-us-east-2",
+			},
+		},
+		{
+			name: "host-group zonal: VMGroup disambiguates FDs",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:     "zone-a",
+					Server:   "vcenter.example.com",
+					ZoneType: vsphere.HostGroupFailureDomain,
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "shared-ds",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+				{
+					Name:     "zone-b",
+					Server:   "vcenter.example.com",
+					ZoneType: vsphere.HostGroupFailureDomain,
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "shared-ds",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "shared-ds", "/dc1/host/cluster1/Resources", "test-infra-zone-a", "/dc1/vm/test-infra-rhcos-zone-a"),
+				testRemoteMachineSet("test-infra-worker-1", "vcenter.example.com", "dc1", "shared-ds", "/dc1/host/cluster1/Resources", "test-infra-zone-b", "/dc1/vm/test-infra-rhcos-zone-b"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"zone-a": "/dc1/vm/test-infra-rhcos-zone-a",
+				"zone-b": "/dc1/vm/test-infra-rhcos-zone-b",
+			},
+		},
+		{
+			name: "no remote MachineSets: template stays empty",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "fd1",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+			},
+			remoteMachineSets: nil,
+			infraID:           "test-infra",
+			expectedTemplates: map[string]string{"fd1": ""},
+		},
+		{
+			name: "ResourcePool normalization: trailing slash match",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "fd1",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources/",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "datastore1", "/dc1/host/cluster1/Resources", "", "/dc1/vm/test-infra-rhcos-fd1"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"fd1": "/dc1/vm/test-infra-rhcos-fd1",
+			},
+		},
+		{
+			name: "MachinePool ResourcePool override does not affect template discovery",
+			failureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "fd1",
+					Server: "vcenter.example.com",
+					Topology: vsphere.Topology{
+						Datacenter:   "dc1",
+						Datastore:    "datastore1",
+						ResourcePool: "/dc1/host/cluster1/Resources",
+					},
+				},
+			},
+			remoteMachineSets: []machineapi.MachineSet{
+				testRemoteMachineSet("test-infra-worker-0", "vcenter.example.com", "dc1", "datastore1", "/dc1/host/cluster1/Resources", "", "/dc1/vm/test-infra-rhcos-fd1"),
+			},
+			infraID: "test-infra",
+			expectedTemplates: map[string]string{
+				"fd1": "/dc1/vm/test-infra-rhcos-fd1",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			templates := buildTemplateMap(test.failureDomains, test.remoteMachineSets, test.infraID, logger)
+
+			for fdName, expected := range test.expectedTemplates {
+				if expected == "" {
+					assert.NotContains(t, templates, fdName, "expected no template for FD %s", fdName)
+				} else {
+					assert.Equal(t, expected, templates[fdName], "unexpected template for FD %s", fdName)
+				}
+			}
+		})
+	}
+}
+
+func testRemoteMachineSet(name, server, datacenter, datastore, resourcePool, vmGroup, template string) machineapi.MachineSet {
+	spec := &machineapi.VSphereMachineProviderSpec{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "VSphereMachineProviderSpec",
+			APIVersion: machineapi.SchemeGroupVersion.String(),
+		},
+		Template: template,
+		Workspace: &machineapi.Workspace{
+			Server:       server,
+			Datacenter:   datacenter,
+			Datastore:    datastore,
+			ResourcePool: resourcePool,
+			VMGroup:      vmGroup,
+		},
+	}
+	raw, _ := json.Marshal(spec)
+	return machineapi.MachineSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: machineapi.MachineSetSpec{
+			Template: machineapi.MachineTemplateSpec{
+				Spec: machineapi.MachineSpec{
+					ProviderSpec: machineapi.ProviderSpec{
+						Value: &runtime.RawExtension{Raw: raw},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -93,8 +346,6 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 func testVSpherePool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
-		// Observation: when constructing this way, we have to use hive.MachinePool{installer.MachinePool{}}
-		// whereas when accessing it, we can (optionally) skip the intermediate (e.g. ...Platform.VSphere.MemoryMiB)
 		VSphere: &hivev1vsphere.MachinePool{
 			MachinePool: vsphere.MachinePool{
 				MemoryMiB:         32 * 1024,
@@ -150,54 +401,4 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 	return cd
-}
-
-func testVSphereMachineSpec(machineType string) machineapi.MachineSpec {
-	rawVSphereProviderSpec, err := vsphereutil.RawExtensionFromProviderSpec(testVSphereProviderSpec())
-	if err != nil {
-		log.WithError(err).Fatal("error encoding VSphere machine provider spec")
-	}
-	return machineapi.MachineSpec{
-		ObjectMeta: machineapi.ObjectMeta{
-			Labels: map[string]string{
-				"machine.openshift.io/cluster-api-cluster":      testInfraID,
-				"machine.openshift.io/cluster-api-machine-role": machineType,
-				"machine.openshift.io/cluster-api-machine-type": machineType,
-			},
-		},
-		ProviderSpec: machineapi.ProviderSpec{
-			Value: rawVSphereProviderSpec,
-		},
-		Taints: []corev1.Taint{
-			{
-				Key:    "foo",
-				Value:  "bar",
-				Effect: corev1.TaintEffectNoSchedule,
-			},
-		},
-	}
-}
-
-func testVSphereMachine(name string, machineType string) *machineapi.Machine {
-	return &machineapi.Machine{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: machineAPINamespace,
-			Labels: map[string]string{
-				"machine.openshift.io/cluster-api-cluster": testInfraID,
-			},
-		},
-		Spec: testVSphereMachineSpec(machineType),
-	}
-}
-
-func testVSphereProviderSpec() *machineapi.VSphereMachineProviderSpec {
-	return &machineapi.VSphereMachineProviderSpec{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "VSphereMachineProviderSpec",
-			APIVersion: machineapi.SchemeGroupVersion.String(),
-		},
-		NumCPUs: 8,
-		DiskGiB: 120,
-	}
 }

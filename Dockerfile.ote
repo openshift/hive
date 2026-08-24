@@ -1,5 +1,5 @@
 ARG OTE_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
-ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+ARG BASE_IMAGE=registry.redhat.io/ubi9/ubi-minimal-pqc:latest
 
 FROM ${OTE_BUILD_IMAGE} as builder
 RUN mkdir -p /go/src/github.com/openshift/hive

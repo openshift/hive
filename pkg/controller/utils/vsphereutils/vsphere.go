@@ -30,5 +30,22 @@ func ConvertDeprecatedFields(platform *hivevsphere.Platform) error {
 	}
 
 	platform.Infrastructure = dummyInstallConfig.Platform.VSphere
+	// ConvertInstallConfig copies legacy names onto the installer Platform and
+	// leaves them there. infrastructure.folder is CRD-validated as a full
+	// inventory path (^/.*?/vm/.*?); a non-pathed leftover fails KAS
+	// (OCPBUGS-105520). Drop all deprecated fields — topology already holds
+	// the upconverted values.
+	infra := platform.Infrastructure
+	infra.DeprecatedVCenter = ""
+	infra.DeprecatedUsername = ""
+	infra.DeprecatedPassword = ""
+	infra.DeprecatedDatacenter = ""
+	infra.DeprecatedDefaultDatastore = ""
+	infra.DeprecatedFolder = ""
+	infra.DeprecatedCluster = ""
+	infra.DeprecatedResourcePool = ""
+	infra.DeprecatedAPIVIP = ""
+	infra.DeprecatedIngressVIP = ""
+	infra.DeprecatedNetwork = ""
 	return nil
 }

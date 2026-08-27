@@ -1,31 +1,72 @@
 package machinepool
 
 import (
+	"encoding/json"
+	"path"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installvspheremachines "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 // VSphereActuator encapsulates the pieces necessary to be able to generate
-// a list of MachineSets to sync to the remote cluster
+// a list of MachineSets to sync to the remote cluster.
 type VSphereActuator struct {
-	logger log.FieldLogger
+	logger            log.FieldLogger
+	remoteMachineSets []machineapi.MachineSet
+	infrastructure    *configv1.Infrastructure
+	vmGroupMap        map[string]string
+	templates         map[string]string // fd-name → template, populated lazily
 }
 
 var _ Actuator = &VSphereActuator{}
 
-// NewVSphereActuator is the constructor for building a VSphereActuator
-func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
+// NewVSphereActuator is the constructor for building a VSphereActuator.
+// Template backfill from remote MachineSets is deferred until GenerateMachineSets
+// encounters a failure domain with an empty Topology.Template.
+func NewVSphereActuator(
+	cd *hivev1.ClusterDeployment,
+	remoteMachineSets []machineapi.MachineSet,
+	infrastructure *configv1.Infrastructure,
+	logger log.FieldLogger,
+) (*VSphereActuator, error) {
 	return &VSphereActuator{
-		logger: logger,
+		logger:            logger,
+		remoteMachineSets: remoteMachineSets,
+		infrastructure:    infrastructure,
+		templates:         make(map[string]string),
 	}, nil
+}
+
+// buildVSphereVMGroupMap reads VMGroup names from the spoke cluster Infrastructure CR.
+// Installer failure domain types do not carry VMGroup; configv1 does via ZoneAffinity.
+func buildVSphereVMGroupMap(infrastructure *configv1.Infrastructure) map[string]string {
+	vmGroupMap := make(map[string]string)
+	if infrastructure == nil || infrastructure.Spec.PlatformSpec.VSphere == nil {
+		return vmGroupMap
+	}
+	for _, fd := range infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
+		if fd.ZoneAffinity != nil && fd.ZoneAffinity.HostGroup != nil {
+			vmGroupMap[fd.Name] = fd.ZoneAffinity.HostGroup.VMGroup
+		}
+	}
+	return vmGroupMap
+}
+
+func (a *VSphereActuator) vmGroupForFD(fdName string) string {
+	if a.vmGroupMap == nil {
+		a.vmGroupMap = buildVSphereVMGroupMap(a.infrastructure)
+	}
+	return a.vmGroupMap[fdName]
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
@@ -47,14 +88,24 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	computePool := baseMachinePool(pool)
 	computePool.Platform.VSphere = &pool.Spec.Platform.VSphere.MachinePool
 
-	// Fake an install config as we do with other actuators.
+	// DeepCopy into a local InstallConfig — mutations below never touch the ClusterDeployment.
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			VSphere: cd.Spec.Platform.VSphere.Infrastructure.DeepCopy(),
 		},
 	}
 	for i := range ic.VSphere.FailureDomains {
-		failureDomain := &ic.VSphere.FailureDomains[i] // because go ranges by copy, not by reference
+		failureDomain := &ic.VSphere.FailureDomains[i]
+		// Backfill before MachinePool overrides so matching uses the FD default ResourcePool.
+		if failureDomain.Topology.Template == "" {
+			if tmpl := a.templateForFailureDomain(failureDomain); tmpl != "" {
+				failureDomain.Topology.Template = tmpl
+				logger.WithFields(log.Fields{
+					"failureDomain": failureDomain.Name,
+					"template":      tmpl,
+				}).Info("applied backfilled Topology.Template from remote MachineSet")
+			}
+		}
 		if pool.Spec.Platform.VSphere.ResourcePool != "" {
 			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.ResourcePool
 		}
@@ -75,4 +126,67 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	return installerMachineSets, true, nil
+}
+
+func (a *VSphereActuator) templateForFailureDomain(fd *installervsphere.FailureDomain) string {
+	if fd.Topology.Template != "" {
+		return ""
+	}
+	if tmpl, ok := a.templates[fd.Name]; ok {
+		return tmpl
+	}
+	tmpl := a.findTemplateForFD(fd)
+	a.templates[fd.Name] = tmpl
+	return tmpl
+}
+
+// findTemplateForFD searches remote MachineSets for one whose workspace fields match the
+// given failure domain using a 5-field conjunction (MCO PR #5745 pattern):
+// Datacenter + Datastore + Server + VMGroup + ResourcePool.
+// Always matches against the FD's own ResourcePool since existing remote MachineSets
+// were created with the FD default, not a MachinePool-level override.
+func (a *VSphereActuator) findTemplateForFD(fd *installervsphere.FailureDomain) string {
+	vmGroup := ""
+	if fd.ZoneType == installervsphere.HostGroupFailureDomain {
+		vmGroup = a.vmGroupForFD(fd.Name)
+	}
+
+	for _, ms := range a.remoteMachineSets {
+		spec, err := vsphereProviderSpecFromRawExtension(ms.Spec.Template.Spec.ProviderSpec.Value)
+		if err != nil {
+			a.logger.WithError(err).WithField("machineSet", ms.Name).Warn("cannot decode VSphereMachineProviderSpec")
+			continue
+		}
+		if spec.Template == "" || spec.Workspace == nil {
+			continue
+		}
+
+		if spec.Workspace.Datacenter != fd.Topology.Datacenter ||
+			spec.Workspace.Datastore != fd.Topology.Datastore ||
+			spec.Workspace.Server != fd.Server ||
+			spec.Workspace.VMGroup != vmGroup ||
+			path.Clean(spec.Workspace.ResourcePool) != path.Clean(fd.Topology.ResourcePool) {
+			continue
+		}
+
+		a.logger.WithFields(log.Fields{
+			"failureDomain": fd.Name,
+			"machineSet":    ms.Name,
+			"template":      spec.Template,
+		}).Info("found template backfill from remote MachineSet")
+		return spec.Template
+	}
+	return ""
+}
+
+// vsphereProviderSpecFromRawExtension unmarshals a JSON-encoded VSphereMachineProviderSpec.
+func vsphereProviderSpecFromRawExtension(rawExtension *runtime.RawExtension) (*machineapi.VSphereMachineProviderSpec, error) {
+	if rawExtension == nil {
+		return &machineapi.VSphereMachineProviderSpec{}, nil
+	}
+	spec := new(machineapi.VSphereMachineProviderSpec)
+	if err := json.Unmarshal(rawExtension.Raw, spec); err != nil {
+		return nil, errors.Wrap(err, "error unmarshalling VSphereMachineProviderSpec")
+	}
+	return spec, nil
 }

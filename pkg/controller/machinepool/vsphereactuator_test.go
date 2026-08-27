@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -26,7 +28,7 @@ func TestVSphereActuator(t *testing.T) {
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
 		remoteMachineSets          []machineapi.MachineSet
-		vmGroupMap                 map[string]string
+		infrastructure             *configv1.Infrastructure
 		expectedMachineSetReplicas map[string]int64
 		expectedTemplate           string
 		expectedErr                bool
@@ -61,13 +63,8 @@ func TestVSphereActuator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var fds []vsphere.FailureDomain
-			if test.clusterDeployment.Spec.Platform.VSphere != nil &&
-				test.clusterDeployment.Spec.Platform.VSphere.Infrastructure != nil {
-				fds = test.clusterDeployment.Spec.Platform.VSphere.Infrastructure.FailureDomains
-			}
 			logger := log.WithField("actuator", "vsphereactuator_test")
-			actuator, err := NewVSphereActuator(test.remoteMachineSets, test.vmGroupMap, fds, logger)
+			actuator, err := NewVSphereActuator(test.clusterDeployment, test.remoteMachineSets, test.infrastructure, logger)
 			assert.NoError(t, err, "unexpected error creating VSphereActuator")
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
@@ -297,17 +294,48 @@ func TestBackfillVSphereTemplates(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			templates := buildTemplateMap(test.failureDomains, test.remoteMachineSets, test.vmGroupMap, logger)
+			actuator, err := NewVSphereActuator(&hivev1.ClusterDeployment{}, test.remoteMachineSets, testInfrastructureWithVMGroups(test.vmGroupMap), logger)
+			require.NoError(t, err)
 
 			for fdName, expected := range test.expectedTemplates {
+				var fd *vsphere.FailureDomain
+				for i := range test.failureDomains {
+					if test.failureDomains[i].Name == fdName {
+						fd = &test.failureDomains[i]
+						break
+					}
+				}
+				require.NotNil(t, fd, "missing failure domain %s in test data", fdName)
+
 				if expected == "" {
-					assert.NotContains(t, templates, fdName, "expected no template for FD %s", fdName)
+					assert.Equal(t, "", actuator.templateForFailureDomain(fd), "expected no template for FD %s", fdName)
 				} else {
-					assert.Equal(t, expected, templates[fdName], "unexpected template for FD %s", fdName)
+					assert.Equal(t, expected, actuator.templateForFailureDomain(fd), "unexpected template for FD %s", fdName)
 				}
 			}
 		})
 	}
+}
+
+func testInfrastructureWithVMGroups(vmGroupMap map[string]string) *configv1.Infrastructure {
+	infra := &configv1.Infrastructure{
+		Spec: configv1.InfrastructureSpec{
+			PlatformSpec: configv1.PlatformSpec{
+				VSphere: &configv1.VSpherePlatformSpec{},
+			},
+		},
+	}
+	for fdName, vmGroup := range vmGroupMap {
+		infra.Spec.PlatformSpec.VSphere.FailureDomains = append(infra.Spec.PlatformSpec.VSphere.FailureDomains, configv1.VSpherePlatformFailureDomainSpec{
+			Name: fdName,
+			ZoneAffinity: &configv1.VSphereFailureDomainZoneAffinity{
+				HostGroup: &configv1.VSphereFailureDomainHostGroup{
+					VMGroup: vmGroup,
+				},
+			},
+		})
+	}
+	return infra
 }
 
 func testRemoteMachineSet(name, server, datacenter, datastore, resourcePool, vmGroup, template string) machineapi.MachineSet {

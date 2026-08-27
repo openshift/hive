@@ -21,26 +21,29 @@ import (
 // VSphereActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type VSphereActuator struct {
-	logger    log.FieldLogger
-	templates map[string]string // fd-name → template extracted from remote MachineSets
+	logger            log.FieldLogger
+	remoteMachineSets []machineapi.MachineSet
+	infrastructure    *configv1.Infrastructure
+	vmGroupMap        map[string]string
+	templates         map[string]string // fd-name → template, populated lazily
 }
 
 var _ Actuator = &VSphereActuator{}
 
 // NewVSphereActuator is the constructor for building a VSphereActuator.
-// Following the GCP actuator pattern, it preprocesses remoteMachineSets into scalar
-// data (a per-failure-domain template map) at construction time so that GenerateMachineSets
-// can apply it after DeepCopy without mutating the ClusterDeployment.
+// Template backfill from remote MachineSets is deferred until GenerateMachineSets
+// encounters a failure domain with an empty Topology.Template.
 func NewVSphereActuator(
+	cd *hivev1.ClusterDeployment,
 	remoteMachineSets []machineapi.MachineSet,
-	vmGroupMap map[string]string,
-	failureDomains []installervsphere.FailureDomain,
+	infrastructure *configv1.Infrastructure,
 	logger log.FieldLogger,
 ) (*VSphereActuator, error) {
-	templates := buildTemplateMap(failureDomains, remoteMachineSets, vmGroupMap, logger)
 	return &VSphereActuator{
-		logger:    logger,
-		templates: templates,
+		logger:            logger,
+		remoteMachineSets: remoteMachineSets,
+		infrastructure:    infrastructure,
+		templates:         make(map[string]string),
 	}, nil
 }
 
@@ -57,6 +60,13 @@ func buildVSphereVMGroupMap(infrastructure *configv1.Infrastructure) map[string]
 		}
 	}
 	return vmGroupMap
+}
+
+func (a *VSphereActuator) vmGroupForFD(fdName string) string {
+	if a.vmGroupMap == nil {
+		a.vmGroupMap = buildVSphereVMGroupMap(a.infrastructure)
+	}
+	return a.vmGroupMap[fdName]
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
@@ -86,21 +96,21 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 	for i := range ic.VSphere.FailureDomains {
 		failureDomain := &ic.VSphere.FailureDomains[i]
-		if pool.Spec.Platform.VSphere.ResourcePool != "" {
-			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.ResourcePool
-		}
-		if len(pool.Spec.Platform.VSphere.TagIDs) > 0 {
-			failureDomain.Topology.TagIDs = pool.Spec.Platform.VSphere.TagIDs
-		}
-		// Apply backfilled template on the DeepCopy failure domain only (in-memory, not persisted to CD).
+		// Backfill before MachinePool overrides so matching uses the FD default ResourcePool.
 		if failureDomain.Topology.Template == "" {
-			if tmpl, ok := a.templates[failureDomain.Name]; ok {
+			if tmpl := a.templateForFailureDomain(failureDomain); tmpl != "" {
 				failureDomain.Topology.Template = tmpl
 				logger.WithFields(log.Fields{
 					"failureDomain": failureDomain.Name,
 					"template":      tmpl,
 				}).Info("applied backfilled Topology.Template from remote MachineSet")
 			}
+		}
+		if pool.Spec.Platform.VSphere.ResourcePool != "" {
+			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.ResourcePool
+		}
+		if len(pool.Spec.Platform.VSphere.TagIDs) > 0 {
+			failureDomain.Topology.TagIDs = pool.Spec.Platform.VSphere.TagIDs
 		}
 	}
 
@@ -118,25 +128,16 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	return installerMachineSets, true, nil
 }
 
-// buildTemplateMap creates a fd-name → template mapping by matching each failure domain
-// (where Template is empty) against remote MachineSets using workspace fields.
-func buildTemplateMap(failureDomains []installervsphere.FailureDomain, remoteMachineSets []machineapi.MachineSet, vmGroupMap map[string]string, logger log.FieldLogger) map[string]string {
-	templates := make(map[string]string)
-	for i := range failureDomains {
-		fd := &failureDomains[i]
-		if fd.Topology.Template != "" {
-			continue
-		}
-		template := findTemplateForFD(fd, remoteMachineSets, vmGroupMap, logger)
-		if template != "" {
-			templates[fd.Name] = template
-			logger.WithFields(log.Fields{
-				"failureDomain": fd.Name,
-				"template":      template,
-			}).Info("found template backfill from remote MachineSet")
-		}
+func (a *VSphereActuator) templateForFailureDomain(fd *installervsphere.FailureDomain) string {
+	if fd.Topology.Template != "" {
+		return ""
 	}
-	return templates
+	if tmpl, ok := a.templates[fd.Name]; ok {
+		return tmpl
+	}
+	tmpl := a.findTemplateForFD(fd)
+	a.templates[fd.Name] = tmpl
+	return tmpl
 }
 
 // findTemplateForFD searches remote MachineSets for one whose workspace fields match the
@@ -144,16 +145,16 @@ func buildTemplateMap(failureDomains []installervsphere.FailureDomain, remoteMac
 // Datacenter + Datastore + Server + VMGroup + ResourcePool.
 // Always matches against the FD's own ResourcePool since existing remote MachineSets
 // were created with the FD default, not a MachinePool-level override.
-func findTemplateForFD(fd *installervsphere.FailureDomain, remoteMachineSets []machineapi.MachineSet, vmGroupMap map[string]string, logger log.FieldLogger) string {
+func (a *VSphereActuator) findTemplateForFD(fd *installervsphere.FailureDomain) string {
 	vmGroup := ""
 	if fd.ZoneType == installervsphere.HostGroupFailureDomain {
-		vmGroup = vmGroupMap[fd.Name]
+		vmGroup = a.vmGroupForFD(fd.Name)
 	}
 
-	for _, ms := range remoteMachineSets {
+	for _, ms := range a.remoteMachineSets {
 		spec, err := vsphereProviderSpecFromRawExtension(ms.Spec.Template.Spec.ProviderSpec.Value)
 		if err != nil {
-			logger.WithError(err).WithField("machineSet", ms.Name).Warn("cannot decode VSphereMachineProviderSpec")
+			a.logger.WithError(err).WithField("machineSet", ms.Name).Warn("cannot decode VSphereMachineProviderSpec")
 			continue
 		}
 		if spec.Template == "" || spec.Workspace == nil {
@@ -168,6 +169,11 @@ func findTemplateForFD(fd *installervsphere.FailureDomain, remoteMachineSets []m
 			continue
 		}
 
+		a.logger.WithFields(log.Fields{
+			"failureDomain": fd.Name,
+			"machineSet":    ms.Name,
+			"template":      spec.Template,
+		}).Info("found template backfill from remote MachineSet")
 		return spec.Template
 	}
 	return ""

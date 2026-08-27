@@ -5,7 +5,7 @@ dnf install -y \
 	make
 
 # Since go 1.26.x is not available in ubi8, let's go upstream
-go install golang.org/dl/go1.26.5@latest
-/root/go/bin/go1.26.5 download
+go install golang.org/dl/go1.26.7@latest
+/root/go/bin/go1.26.7 download
 rm /usr/bin/go
-ln -s /root/go/bin/go1.26.5 /usr/bin/go
+ln -s /root/go/bin/go1.26.7 /usr/bin/go

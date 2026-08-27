@@ -2,7 +2,7 @@ module github.com/openshift/hive/apis
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.7
 
 require (
 	k8s.io/api v0.36.2

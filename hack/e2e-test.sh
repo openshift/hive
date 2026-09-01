@@ -2,6 +2,14 @@
 
 set -e
 
+# QA-only vSphere fixture: run the published MCE 5.1 Hive image against an
+# OpenShift release whose installer still creates region/zone RHCOS templates.
+# This branch is intentionally not mergeable.
+if [[ "${CLOUD:-}" == "vsphere" ]]; then
+  export HIVE_IMAGE="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hive-mce-51@sha256:a37a5752bf65226b4f3feabc917dcda0a96700f585d207227d7d7025b449ef71"
+  export RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release@sha256:fbad931c725b2e5b937b295b58345334322bdabb0b67da1c800a53686d7397da"
+fi
+
 TEST_NAME=e2e
 source ${0%/*}/e2e-common.sh
 

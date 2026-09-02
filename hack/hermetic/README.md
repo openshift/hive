@@ -1,5 +1,25 @@
 # Hermetic builds for hive
 
+- [Overview](#overview)
+- [Updating](#updating)
+- [Manual Process](#manual-process)
+
+## Overview
+"Hermetic" in this context means the pieces that went into the build must provably be exactly what we expect.
+This is in contrast to building in a container and accepting whatever operating system libraries happen to be there.
+The idea is to minimize ambiguities/variances, and thus the incidence of attack vectors, in (this part of) the supply chain.
+
+The mechanism is to maintain a list ("lock file") of all the RPMs we require/expect in the build container, pinned at specific versions, accompanied by metadata (e.g. checksums) to validate that the contents have not been altered. Our [konflux configs](../../.tekton/) are wired to use the contents of this directory to enforce these package versions during the build.
+
+## Updating
+MintMaker is [configured](../../renovate.json) to propose PRs to keep our lockfile up to date.
+
+If that fails or lags behind, we have a never-run [periodic](https://github.com/openshift/release/blob/c36cb7de5b6c2f66cc54e27802d128bbee678bb0/ci-operator/jobs/infra-periodics.yaml#L3479) that can be triggered on demand.
+
+And as a last resort, the process to do it manually is described [below](#manual-process) (though you may be better off using the script embedded in the periodic).
+
+## Manual Process
+
 https://konflux.pages.redhat.com/docs/users/building/activation-keys-subscription.html#configuring-an-rpm-lockfile-for-hermetic-builds
 
 * Basically just follow the instructions

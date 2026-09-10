@@ -1549,6 +1549,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - key
+    - name: universeDomain
+      type:
+        scalar: string
 - name: com.github.openshift.api.config.v1.GCPResourceLabel
   map:
     fields:
@@ -5004,6 +5007,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorCpufreqConfig
       default: {}
+    - name: deviceMapperMultipath
+      type:
+        namedType: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorDeviceMapperMultipathConfig
+      default: {}
     - name: ethtool
       type:
         namedType: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorEthtoolConfig
@@ -5040,7 +5047,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorTcpStatConfig
       default: {}
+    - name: zoneinfo
+      type:
+        namedType: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorZoneinfoConfig
+      default: {}
 - name: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorCpufreqConfig
+  map:
+    fields:
+    - name: collectionPolicy
+      type:
+        scalar: string
+- name: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorDeviceMapperMultipathConfig
   map:
     fields:
     - name: collectionPolicy
@@ -5128,6 +5145,12 @@ var schemaYAML = typed.YAMLObject(`types:
       - fieldName: collect
         discriminatorValue: Collect
 - name: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorTcpStatConfig
+  map:
+    fields:
+    - name: collectionPolicy
+      type:
+        scalar: string
+- name: com.github.openshift.api.config.v1alpha1.NodeExporterCollectorZoneinfoConfig
   map:
     fields:
     - name: collectionPolicy
@@ -5575,6 +5598,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - name
+    - name: messageVersion
+      type:
+        scalar: string
     - name: metadataConfig
       type:
         namedType: com.github.openshift.api.config.v1alpha1.MetadataConfig

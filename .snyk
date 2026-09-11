@@ -13,3 +13,8 @@ ignore:
     'SNYK-GOLANG-K8SIOCLIENTGOTRANSPORT-7538822':
      - '* > k8s.io/client-go/transport':
         reason: 'Snyk mistakenly identifies v1.17.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'
+    'SNYK-GOLANG-GITHUBCOMGRPCECOSYSTEMGRPCGATEWAYV2RUNTIME-19432132':
+     - '* > github.com/grpc-ecosystem/grpc-gateway/v2/runtime':
+        reason: 'False positive: CVE-2026-37236 affects grpc-gateway's HTTP server (runtime.ServeMux). grpc-gateway is a transitive dependency from OpenTelemetry. Hive uses OTLP as gRPC client only via otlptracegrpc.NewClient(), never instantiates vulnerable runtime.ServeMux server code path.'
+        expires: 2027-10-06T00:00:00.000Z
+        created: 2026-10-06T00:00:00.000Z

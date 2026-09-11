@@ -539,9 +539,9 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 	remoteClient, err := r.remoteClientBuilder(cd).Build()
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to connect to target cluster")
-		// Special case: it's possible to get here when we're in StartingMachines state. But MachinesRunning
+		// Special case: it's possible to get here when we're in StartingMachines or WaitingForMachines state. But MachinesRunning
 		// returned true, so really we're waiting for nodes. So make sure that state is set.
-		if cd.Status.PowerState == hivev1.ClusterPowerStateStartingMachines {
+		if cd.Status.PowerState == hivev1.ClusterPowerStateStartingMachines || cd.Status.PowerState == hivev1.ClusterPowerStateWaitingForMachines {
 			r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonWaitingForNodes,
 				"Waiting for Nodes to be ready (step 2/4)", corev1.ConditionFalse, logger)
 			cd.Status.PowerState = hivev1.ClusterPowerStateWaitingForNodes

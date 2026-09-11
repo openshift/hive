@@ -401,6 +401,32 @@ func TestReconcile(t *testing.T) {
 			expectRequeueAfter: time.Minute * 2,
 		},
 		{
+			name: "starting machines transitions to waiting for nodes when cluster unreachable",
+			cd: cdBuilder.Options(o.shouldRun).Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
+					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse,
+					hivev1.ReadyReasonStartingMachines, 1*time.Hour))),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				builder.EXPECT().Build().Times(1).Return(nil, fmt.Errorf("failed to connect to remote cluster"))
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForNodes, cd.Status.PowerState)
+			},
+			expectError: true,
+		},
+		{
 			name: "proceed to pausing for cluster operators from waiting for machines",
 			cd: cdBuilder.Options(o.shouldRun).Build(
 				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
@@ -421,6 +447,32 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Minute * 2,
+		},
+		{
+			name: "waiting for machines transitions to waiting for nodes when cluster unreachable",
+			cd: cdBuilder.Options(o.shouldRun).Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
+					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse,
+					hivev1.ReadyReasonWaitingForMachines, 1*time.Hour))),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				builder.EXPECT().Build().Times(1).Return(nil, fmt.Errorf("failed to connect to remote cluster"))
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForNodes, cd.Status.PowerState)
+			},
+			expectError: true,
 		},
 		{
 			name: "proceed to pausing for cluster operators from waiting for nodes",

@@ -1,4 +1,4 @@
-ARG OTE_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
+ARG OTE_BUILD_IMAGE=registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9
 ARG BASE_IMAGE=registry.redhat.io/ubi9/ubi-minimal-pqc:latest
 
 FROM ${OTE_BUILD_IMAGE} as builder

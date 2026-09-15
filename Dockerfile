@@ -1,6 +1,6 @@
 ARG CONTAINER_SUB_MANAGER_OFF=0
-ARG EL8_BUILD_IMAGE=${EL8_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.26-openshift-4.23}
-ARG EL9_BUILD_IMAGE=${EL9_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23}
+ARG EL8_BUILD_IMAGE=${EL8_BUILD_IMAGE:-registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel8}
+ARG EL9_BUILD_IMAGE=${EL9_BUILD_IMAGE:-registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9}
 ARG BASE_IMAGE=${BASE_IMAGE:-registry.redhat.io/ubi9/ubi-minimal-pqc:latest}
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8

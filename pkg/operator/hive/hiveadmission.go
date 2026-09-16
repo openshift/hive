@@ -17,6 +17,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
+	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/configobserver/apiserver"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/openshift/library-go/pkg/operator/resourcesynccontroller"
@@ -278,10 +279,16 @@ func (r *ReconcileHiveConfig) populateTLSConfig(hiveAdmContainer *corev1.Contain
 	if !r.isOpenShift {
 		return nil
 	}
-	observedConfig, errs := apiserver.ObserveTLSSecurityProfileToArguments(
+
+	asa, tlsmvk, tlscsk, tlscpk := "apiServerArguments", "tls-min-version", "tls-cipher-suites", "tls-curve-preferences"
+	observedConfig, errs := apiserver.ObserveTLSSecurityProfileWithGroupPaths(
 		&directAPIServerLister{reconciler: r},
 		logrusutil.NewLoggingEventRecorder(hLog, "hiveadmission-tls-config"),
-		map[string]interface{}{})
+		map[string]interface{}{},
+		[]string{asa, tlsmvk},
+		[]string{asa, tlscsk},
+		[]string{asa, tlscpk},
+	)
 
 	if len(errs) > 0 {
 		return errors.Wrap(utilerrors.NewAggregate(errs), "failed to discover global TLS config from APIServer cluster")
@@ -293,8 +300,6 @@ func (r *ReconcileHiveConfig) populateTLSConfig(hiveAdmContainer *corev1.Contain
 		return errors.New("observed TLS config was empty")
 	}
 
-	asa, tlsmvk, tlscsk := "apiServerArguments", "tls-min-version", "tls-cipher-suites"
-
 	tlsmv, found, err := unstructured.NestedString(observedConfig, asa, tlsmvk)
 	if !found || err != nil {
 		return errors.Wrapf(err, "could not find %s.%s in observed TLS config %v", asa, tlsmvk, observedConfig)
@@ -303,16 +308,48 @@ func (r *ReconcileHiveConfig) populateTLSConfig(hiveAdmContainer *corev1.Contain
 	if !found || err != nil {
 		return errors.Wrapf(err, "could not find %s.%s in observed TLS config %v", asa, tlscsk, observedConfig)
 	}
+	tlscp, found, err := unstructured.NestedStringSlice(observedConfig, asa, tlscpk)
+	if !found || err != nil {
+		return errors.Wrapf(err, "could not find %s.%s in observed TLS config %v", asa, tlscpk, observedConfig)
+	}
 
-	// NOTE: These arguments (--tls-min-version, --tls-cipher-suites) are expected to be *absent*
-	// from the container we're given.
+	// NOTE: These arguments (--tls-min-version, --tls-cipher-suites, --tls-curve-preferences)
+	// are expected to be *absent* from the container we're given.
 	hiveAdmContainer.Command = append(
 		hiveAdmContainer.Command,
 		fmt.Sprintf("--%s=%s", tlsmvk, tlsmv),
 		fmt.Sprintf("--%s=%s", tlscsk, strings.Join(tlscs, ",")),
 	)
+	if curveArg, ok := tlsCurvePreferencesArg(tlscp, hLog); ok {
+		hiveAdmContainer.Command = append(hiveAdmContainer.Command, curveArg)
+	}
 
 	return nil
+}
+
+// tlsCurvePreferencesArg maps observed TLS group names to hiveadmission's
+// --tls-curve-preferences flag, which takes numeric Go crypto/tls CurveIDs.
+// Empty or fully unrecognized lists omit the flag so Go's defaults apply.
+func tlsCurvePreferencesArg(groups []string, hLog log.FieldLogger) (string, bool) {
+	if len(groups) == 0 {
+		return "", false
+	}
+	typed := make([]configv1.TLSGroup, len(groups))
+	for i, g := range groups {
+		typed[i] = configv1.TLSGroup(g)
+	}
+	curveIDs, unrecognized := crypto.TLSGroupsToCurveIDs(typed)
+	if len(unrecognized) > 0 {
+		hLog.WithField("unrecognized", unrecognized).Warn("dropping unrecognized TLS groups from observed profile")
+	}
+	if len(curveIDs) == 0 {
+		return "", false
+	}
+	ids := make([]string, len(curveIDs))
+	for i, id := range curveIDs {
+		ids[i] = fmt.Sprintf("%d", id)
+	}
+	return fmt.Sprintf("--tls-curve-preferences=%s", strings.Join(ids, ",")), true
 }
 
 // Modern OpenShift injects two ConfigMaps into every namespace. One contains the service CA cert;

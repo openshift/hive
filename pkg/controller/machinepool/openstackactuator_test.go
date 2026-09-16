@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
@@ -285,4 +286,94 @@ func testOSPClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 	return cd
+}
+
+// TestOpenStackMatchMachineSets verifies the ACM-35041 snowflake: because Hive's OpenStack
+// MachinePool API has no AvailabilityZone field, the generated failure domain always has an
+// empty AZ. The match should succeed on the label alone so that replica-count changes are
+// propagated to existing MachineSets that were created by the installer with a real AZ.
+func TestOpenStackMatchMachineSets(t *testing.T) {
+	infra := &configv1.Infrastructure{
+		Spec: configv1.InfrastructureSpec{
+			PlatformSpec: configv1.PlatformSpec{
+				Type: configv1.OpenStackPlatformType,
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		generated   *machinev1beta1.MachineSet
+		remote      *machinev1beta1.MachineSet
+		expectMatch bool
+		expectErr   bool
+	}{
+		{
+			name:        "generated empty AZ matches remote with real AZ (no root volume)",
+			generated:   testOpenStackMachineSet("", nil),
+			remote:      testOpenStackMachineSet("nova-az1", nil),
+			expectMatch: true,
+		},
+		{
+			name:      "generated empty AZ matches remote with real AZ and root volume",
+			generated: testOpenStackMachineSet("", nil),
+			remote: testOpenStackMachineSet("nova-az1", &machinev1alpha1.RootVolume{
+				VolumeType: "san3000-gen3",
+				Zone:       "nova-az1",
+			}),
+			expectMatch: true,
+		},
+		{
+			name:        "both empty AZ match",
+			generated:   testOpenStackMachineSet("", nil),
+			remote:      testOpenStackMachineSet("", nil),
+			expectMatch: true,
+		},
+		{
+			name:      "labels do not match",
+			generated: testOpenStackMachineSet("", nil),
+			remote: func() *machinev1beta1.MachineSet {
+				ms := testOpenStackMachineSet("nova-az1", nil)
+				ms.Labels[machinePoolNameLabel] = "different-pool"
+				return ms
+			}(),
+			expectMatch: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			match, err := matchMachineSets(test.generated, *test.remote, infra, log.New())
+			if test.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectMatch, match)
+			}
+		})
+	}
+}
+
+func testOpenStackMachineSet(az string, rootVolume *machinev1alpha1.RootVolume) *machinev1beta1.MachineSet {
+	return &machinev1beta1.MachineSet{
+		ObjectMeta: v1.ObjectMeta{
+			Labels: map[string]string{
+				machinePoolNameLabel: "a-pool",
+			},
+		},
+		Spec: machinev1beta1.MachineSetSpec{
+			Template: machinev1beta1.MachineTemplateSpec{
+				Spec: machinev1beta1.MachineSpec{
+					ProviderSpec: machinev1beta1.ProviderSpec{
+						Value: &runtime.RawExtension{
+							Object: &machinev1alpha1.OpenstackProviderSpec{
+								AvailabilityZone: az,
+								RootVolume:       rootVolume,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

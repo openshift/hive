@@ -733,6 +733,16 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		return rfd.AWS().Placement.AvailabilityZone == gfd.AWS().Placement.AvailabilityZone, nil
 	}
 
+	// SNOWFLAKE! ACM-35041: Hive's OpenStack MachinePool API has no AvailabilityZone field, so
+	// the generated failure domain always has an empty compute AZ (and always an empty root volume
+	// AZ). Since Hive generates at most one MachineSet per OpenStack MachinePool, the label match
+	// (already confirmed by the caller) is sufficient to identify the same machines.
+	if rfdtype == configv1.OpenStackPlatformType {
+		if gfd.OpenStack().AvailabilityZone == "" {
+			return true, nil
+		}
+	}
+
 	// Otherwise the FailureDomain should be unambiguous and we can just compare them.
 	equal := rfd.Equal(gfd)
 	if !equal {

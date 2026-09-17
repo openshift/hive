@@ -9723,6 +9723,13 @@ objects:
                         empty string is interpolated if there are no labels, or if the indicated key does not exist.
                         Note that this only works in values (not e.g. map keys) that are of type string.
                       type: boolean
+                    enableSecretMappingTemplates:
+                      description: |-
+                        EnableSecretMappingTemplates enables Go text/templates in Secrets[].SourceRef.Name.
+                        The fromCDLabel function reads labels from the target ClusterDeployment.
+                        Rendered names must be valid, non-empty Kubernetes Secret names.
+                        Namespaces, target references, and Secret contents are not templated.
+                      type: boolean
                     patches:
                       description: Patches is the list of patches to apply.
                       items:
@@ -10504,6 +10511,13 @@ objects:
                         be substituted with the string value of ClusterDeployment.Labels["some.label/key"]. The
                         empty string is interpolated if there are no labels, or if the indicated key does not exist.
                         Note that this only works in values (not e.g. map keys) that are of type string.
+                      type: boolean
+                    enableSecretMappingTemplates:
+                      description: |-
+                        EnableSecretMappingTemplates enables Go text/templates in Secrets[].SourceRef.Name.
+                        The fromCDLabel function reads labels from the target ClusterDeployment.
+                        Rendered names must be valid, non-empty Kubernetes Secret names.
+                        Namespaces, target references, and Secret contents are not templated.
                       type: boolean
                     patches:
                       description: Patches is the list of patches to apply.

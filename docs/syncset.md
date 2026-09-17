@@ -173,22 +173,10 @@ the empty string is substituted.
 
 Set `spec.enableSecretMappingTemplates: true` to use Go templates in
 `secretMappings[].sourceRef.name` for SyncSets and SelectorSyncSets. Templates can use
-`fromCDLabel` to read a label from the target ClusterDeployment:
+[`fromCDLabel`](#fromcdlabel-custom-function) to read labels from the target ClusterDeployment.
+Hive evaluates the source name for each ClusterDeployment and copies the selected
+Secret to the configured target.
 
-```yaml
-spec:
-  enableSecretMappingTemplates: true
-  secretMappings:
-  - sourceRef:
-      name: '{{ fromCDLabel "api.openshift.com/name" }}'
-      namespace: cluster-secrets
-    targetRef:
-      name: cluster-secret
-      namespace: default
-```
-
-For a ClusterDeployment labeled `api.openshift.com/name: hs-mc-o2d6208f0`, Hive copies
-`cluster-secrets/hs-mc-o2d6208f0` to `default/cluster-secret` on the target cluster.
 Namespaces, target references, and Secret contents remain literal. Template errors
 and empty or invalid rendered names are reported in the ClusterSync status.
 

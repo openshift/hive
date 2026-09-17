@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -688,7 +689,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 
 	// Apply Secrets
 	for i, secretMapping := range syncSet.GetSpec().Secrets {
-		returnErr, requeue = r.applySecret(syncSet, i, secretMapping, referencesToSecrets[i], applyFn, applyFnMetricsLabel, logger)
+		returnErr, requeue = r.applySecret(syncSet, cd, i, secretMapping, referencesToSecrets[i], applyFn, applyFnMetricsLabel, logger)
 		if returnErr != nil {
 			resourcesApplied = append(resourcesApplied, referencesToSecrets[:i]...)
 			return
@@ -789,6 +790,7 @@ func (r *ReconcileClusterSync) applyResource(
 
 func (r *ReconcileClusterSync) applySecret(
 	syncSet CommonSyncSet,
+	cd *hivev1.ClusterDeployment,
 	secretIndex int,
 	secretMapping hivev1.SecretMapping,
 	reference hiveintv1alpha1.SyncResourceReference,
@@ -816,8 +818,19 @@ func (r *ReconcileClusterSync) applySecret(
 			return fmt.Errorf("source in wrong namespace for secret %d", secretIndex), false
 		}
 	}
+	sourceName := secretMapping.SourceRef.Name
+	if syncSet.GetSpec().EnableResourceTemplates {
+		value, err := applyTemplate(templateForCD(cd), sourceName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parameterize source name for secret %d", secretIndex), false
+		}
+		sourceName = value.(string)
+		if problems := apivalidation.NameIsDNSSubdomain(sourceName, false); len(problems) > 0 {
+			return fmt.Errorf("invalid source name for secret %d: %s", secretIndex, strings.Join(problems, "; ")), false
+		}
+	}
 	secret := &corev1.Secret{}
-	if err := r.Get(context.Background(), types.NamespacedName{Namespace: srcNamespace, Name: secretMapping.SourceRef.Name}, secret); err != nil {
+	if err := r.Get(context.Background(), types.NamespacedName{Namespace: srcNamespace, Name: sourceName}, secret); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "cannot read secret")
 		return errors.Wrapf(err, "failed to read secret %d", secretIndex), true
 	}

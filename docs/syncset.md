@@ -5,7 +5,7 @@
   - [How to use `applyBehavior`](#how-to-use-applybehavior)
   - [Patch and Resource Templates](#patch-and-resource-templates)
     - [`fromCDLabel` Custom Function](#fromcdlabel-custom-function)
-    - [Selecting a source Secret with `fromCDLabel`](#selecting-a-source-secret-with-fromcdlabel)
+  - [Secret Mapping Templates](#secret-mapping-templates)
   - [Example of SyncSet use](#example-of-syncset-use)
 - [SelectorSyncSet Object Definition](#selectorsyncset-object-definition)
 - [Ordering](#ordering)
@@ -42,6 +42,7 @@ spec:
 
   enablePatchTemplates: false
   enableResourceTemplates: false
+  enableSecretMappingTemplates: false
 
   resources:
   - apiVersion: user.openshift.io/v1
@@ -75,7 +76,8 @@ spec:
 | `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing `SyncSet` resources that are not listed in the `SyncSet` are not deleted. Specify `"Sync"` to allow deleting existing objects that were previously in the resources list. This includes deleting _all_ resources when the entire SyncSet is deleted. |
 | `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to `resources` and `secretMappings` (but not `patches`). More details [below](#how-to-use-applybehavior). |
 | `enablePatchTemplates  ` | If true, special use of golang's `text/templates` is allowed in `patches[].patch`. More details [below](#patch-and-resource-templates). |
-| `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources` and `secretMappings[].sourceRef.name`. More details [below](#patch-and-resource-templates). |
+| `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#patch-and-resource-templates). |
+| `enableSecretMappingTemplates` | Enables Go templates in `secretMappings[].sourceRef.name`. Defaults to false. See [Secret Mapping Templates](#secret-mapping-templates). |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
 | `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. |
 | `secretMappings` | A list of secret mappings. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
@@ -167,42 +169,28 @@ data:
 If the ClusterDeployment has no labels, or if there is no label with the specified key,
 the empty string is substituted.
 
-#### Selecting a source Secret with `fromCDLabel`
+### Secret Mapping Templates
 
-With `enableResourceTemplates: true`, `secretMappings[].sourceRef.name` supports the same
-templates. For example, this SelectorSyncSet copies a cell-specific client certificate into
-a fixed Secret on each matching cluster:
+Set `spec.enableSecretMappingTemplates: true` to use Go templates in
+`secretMappings[].sourceRef.name` for SyncSets and SelectorSyncSets. Templates can use
+`fromCDLabel` to read a label from the target ClusterDeployment:
 
 ```yaml
-apiVersion: hive.openshift.io/v1
-kind: SelectorSyncSet
-metadata:
-  name: writer-credentials
 spec:
-  enableResourceTemplates: true
-  clusterDeploymentSelector:
-    matchExpressions:
-    - key: example.com/cell
-      operator: Exists
+  enableSecretMappingTemplates: true
   secretMappings:
   - sourceRef:
-      name: 'writer-{{ fromCDLabel "example.com/cell" }}'
-      namespace: credentials
+      name: '{{ fromCDLabel "api.openshift.com/name" }}'
+      namespace: cluster-secrets
     targetRef:
-      name: writer
-      namespace: monitoring
+      name: cluster-secret
+      namespace: default
 ```
 
-For a ClusterDeployment labeled `example.com/cell: cell-a`, Hive reads
-`credentials/writer-cell-a` and copies it to `monitoring/writer` on the target cluster.
-The source name is evaluated separately for each ClusterDeployment when the SyncSet is applied.
-The stored SyncSet or SelectorSyncSet is not modified.
-
-Only the source Secret name is templated. Source namespaces, target references, and Secret
-contents remain literal, and the existing source namespace restrictions still apply.
-Parse or execution errors, or an empty or invalid rendered Secret name, fail the sync and
-are reported in the ClusterSync status. With `enableResourceTemplates` disabled, source
-names are used literally.
+For a ClusterDeployment labeled `api.openshift.com/name: hs-mc-o2d6208f0`, Hive copies
+`cluster-secrets/hs-mc-o2d6208f0` to `default/cluster-secret` on the target cluster.
+Namespaces, target references, and Secret contents remain literal. Template errors
+and empty or invalid rendered names are reported in the ClusterSync status.
 
 ### Example of SyncSet use
 

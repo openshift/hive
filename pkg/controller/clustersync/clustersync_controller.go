@@ -819,7 +819,7 @@ func (r *ReconcileClusterSync) applySecret(
 		}
 	}
 	sourceName := secretMapping.SourceRef.Name
-	if syncSet.GetSpec().EnableResourceTemplates {
+	if syncSet.GetSpec().EnableSecretMappingTemplates {
 		value, err := applyTemplate(templateForCD(cd), sourceName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parameterize source name for secret %d", secretIndex), false

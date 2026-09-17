@@ -230,15 +230,13 @@ type SyncSetCommonSpec struct {
 	// +optional
 	ApplyBehavior SyncSetApplyBehavior `json:"applyBehavior,omitempty"`
 
-	// EnableResourceTemplates, if True, causes hive to honor golang text/templates in Resources
-	// and Secrets[].SourceRef.Name. Secret namespaces, target references, and contents are not templated.
+	// EnableResourceTemplates, if True, causes hive to honor golang text/templates in Resources.
 	// While the standard syntax is supported, it won't do you a whole lot of good as the parser
 	// does not pass a data object (i.e. there is no "dot" for you to use). This currently exists
 	// to expose a single function: {{ fromCDLabel "some.label/key" }} will
 	// be substituted with the string value of ClusterDeployment.Labels["some.label/key"]. The
 	// empty string is interpolated if there are no labels, or if the indicated key does not exist.
 	// Note that this only works in values (not e.g. map keys) that are of type string.
-	// A templated source secret name must render to a valid, non-empty Kubernetes secret name.
 	EnableResourceTemplates bool `json:"enableResourceTemplates,omitempty"`
 
 	// EnablePatchTemplates, if True, causes hive to honor golang text/templates in Patches[].Patch
@@ -250,6 +248,13 @@ type SyncSetCommonSpec struct {
 	// patch string must be valid JSON after interpolation. This may make for odd-looking quoting
 	// in the uninterpolated string.
 	EnablePatchTemplates bool `json:"enablePatchTemplates,omitempty"`
+
+	// EnableSecretMappingTemplates enables Go text/templates in Secrets[].SourceRef.Name.
+	// The fromCDLabel function reads labels from the target ClusterDeployment.
+	// Rendered names must be valid, non-empty Kubernetes Secret names.
+	// Namespaces, target references, and Secret contents are not templated.
+	// +optional
+	EnableSecretMappingTemplates bool `json:"enableSecretMappingTemplates,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

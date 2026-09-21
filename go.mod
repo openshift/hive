@@ -276,7 +276,6 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gofrs/uuid/v5 v5.3.0 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golangci/dupl v0.0.0-20250308024227-f665c8d69b32 // indirect
 	github.com/golangci/go-printf-func-name v0.1.0 // indirect
@@ -392,9 +391,9 @@ require (
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	go-simpler.org/musttag v0.13.0 // indirect
 	go-simpler.org/sloglint v0.9.0 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.10 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.10 // indirect
-	go.etcd.io/etcd/client/v3 v3.6.10 // indirect
+	go.etcd.io/etcd/api/v3 v3.7.1 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.7.1 // indirect
+	go.etcd.io/etcd/client/v3 v3.7.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0 // indirect
@@ -508,17 +507,15 @@ replace (
 	k8s.io/cloud-provider-vsphere => github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb4928
 )
 
-// CVE-2022-1996 (only affects go.sum; zero actual code is vendored in from this lib)
-replace github.com/emicklei/go-restful v2.15.0+incompatible => github.com/emicklei/go-restful v2.16.0+incompatible
-
-// needed for fixing CVE-2018-1099
-exclude (
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
-)
+// Pinned for machine-api-operator compatibility
+replace github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
 
 // CVE-2025-30204: Some transitive deps are still using older v4. Safe to remove once go.sum shows only 4.5.2 or higher.
 replace github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
 
-// Pinned for machine-api-operator compatibility
-replace github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
+// CVE-2026-73500: Transitive deps
+// NB: I *think* the CVE is for etcd-the-product, not etcd-the-lib. But this (and the `require`s) ought to stop us getting flagged.
+replace (
+	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.1
+	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.1
+)

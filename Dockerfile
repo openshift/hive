@@ -37,8 +37,10 @@ ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 ARG DNF=${DNF:-microdnf}
 
-RUN if [ -e "/activation-key/org" ]; then ${DNF} install -y subscription-manager && ${DNF} clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+# Enforce PQC. Idempotent (harmless if already set)
+RUN if command -v update-crypto-policies; then update-crypto-policies --set DEFAULT:PQ; fi
 
+RUN if [ -e "/activation-key/org" ]; then ${DNF} install -y subscription-manager && ${DNF} clean all && rm -rf /var/cache/dnf/*; unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 ##
 # ssh-agent required for gathering logs in some situations:

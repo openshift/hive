@@ -519,3 +519,6 @@ replace (
 	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.1
 	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.1
 )
+
+// CVE-2026-88031 (Not used; only showed up in go.sum.)
+exclude go.mongodb.org/mongo-driver v1.4.3

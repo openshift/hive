@@ -53,7 +53,11 @@ controller to run its finalizer code for the ClusterDeployment but informs the c
 to run perform a deprovision.
 
 
-## Concerns
-1. How does the dnszone controller get informed that the DNS records should be preserved?
+## Concerns (Resolved)
+1. ~~How does the dnszone controller get informed that the DNS records should be preserved?~~
+   Resolved: PreserveOnDelete is synced from ClusterDeployment to DNSZone by the CD controller.
+   The dnszone controller honors PreserveOnDelete by skipping hosted zone cleanup. The
+   delegation record in Hive's parent zone is always cleaned up to avoid leaking dangling
+   references. See docs/managed-dns.md for the full cleanup flow.
 1. What should happen if there are SelectorSyncSets in the source Hive instance that are not present
 in the destination Hive instance?

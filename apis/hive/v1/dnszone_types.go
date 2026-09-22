@@ -32,6 +32,12 @@ type DNSZoneSpec struct {
 	// PreserveOnDelete allows the user to disconnect a DNSZone from Hive without deprovisioning it.
 	// This can also be used to abandon ongoing DNSZone deprovision.
 	// Typically set automatically due to PreserveOnDelete being set on a ClusterDeployment.
+	//
+	// Note: PreserveOnDelete only preserves the cloud-provider hosted zone (hive.openshift.io/dnszone
+	// finalizer). The NS delegation record in Hive's parent zone is still removed
+	// (hive.openshift.io/dnsendpoint finalizer) to avoid leaking a dangling reference that would
+	// never be cleaned up once the cluster is outside Hive's control. This means DNS for the
+	// orphaned cluster will be broken until its administrator sets up their own delegation.
 	// +optional
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
 

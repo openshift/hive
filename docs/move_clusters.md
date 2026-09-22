@@ -53,7 +53,7 @@ controller to run its finalizer code for the ClusterDeployment but informs the c
 to run perform a deprovision.
 
 
-## Concerns (Resolved)
+## Concerns
 1. ~~How does the dnszone controller get informed that the DNS records should be preserved?~~
    Resolved: PreserveOnDelete is synced from ClusterDeployment to DNSZone by the CD controller.
    The dnszone controller honors PreserveOnDelete by skipping hosted zone cleanup. The

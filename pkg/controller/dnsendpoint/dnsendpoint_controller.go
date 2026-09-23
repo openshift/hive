@@ -271,6 +271,11 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 
 	// NS needs to be deleted, either because the DNSZone has been deleted or because
 	// there are no targets for the NS.
+	// Note: We intentionally do NOT check PreserveOnDelete here. The delegation record
+	// lives in Hive's parent zone, not in the target cluster's cloud account. Preserving
+	// it would leak a dangling reference with no cleanup mechanism once the cluster leaves
+	// Hive's control. The dnszone controller (separate finalizer) handles PreserveOnDelete
+	// for the hosted zone itself.
 	default:
 		dnsLog.Info("deleting NS records")
 		if err := nsTool.queryClient.Delete(rootDomain, fullDomain, scrapedNameServers); err != nil {

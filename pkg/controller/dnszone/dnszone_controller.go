@@ -258,8 +258,12 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 // ReconcileDNSProvider attempts to make the current state reflect the desired state. It does this idempotently.
 func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone, logger log.FieldLogger) (reconcile.Result, error) {
 
-	// If deleted and set to PreserveOnDelete, we need to skip any
-	// attempts to use the cluster's cloud credentials as they may no longer be good.
+	// If deleted and set to PreserveOnDelete, skip cloud cleanup and just remove the finalizer.
+	// The hosted zone and its records are preserved in the cloud provider. This is important both
+	// because the cluster's cloud credentials may no longer be valid, and because the intent is to
+	// let the orphaned cluster continue operating under its own management.
+	// Note: the dnsendpoint finalizer (separate controller) still removes the NS delegation record
+	// from Hive's parent zone -- see dnsendpoint_controller.go for rationale.
 	if dnsZone.DeletionTimestamp != nil && dnsZone.Spec.PreserveOnDelete {
 		logger.Info("DNSZone set to PreserveOnDelete, skipping cleanup and removing finalizer")
 		err := r.removeDNSZoneFinalizer(dnsZone, logger)

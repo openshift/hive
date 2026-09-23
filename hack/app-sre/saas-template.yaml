@@ -2394,7 +2394,10 @@ objects:
                     preserveOnDelete:
                       description: |-
                         PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it. This can also be
-                        used to abandon ongoing cluster deprovision.
+                        used to abandon ongoing cluster deprovision. When ManageDNS is true, this preserves the cloud-provider hosted
+                        zone but still removes the NS delegation record from Hive's parent zone to avoid leaking a dangling reference.
+                        DNS for the orphaned cluster will be broken until its administrator sets up their own delegation. See
+                        docs/managed-dns.md for details.
                       type: boolean
                     provisioning:
                       description: |-
@@ -6496,6 +6499,12 @@ objects:
                         PreserveOnDelete allows the user to disconnect a DNSZone from Hive without deprovisioning it.
                         This can also be used to abandon ongoing DNSZone deprovision.
                         Typically set automatically due to PreserveOnDelete being set on a ClusterDeployment.
+
+                        Note: PreserveOnDelete only preserves the cloud-provider hosted zone (hive.openshift.io/dnszone
+                        finalizer). The NS delegation record in Hive's parent zone is still removed
+                        (hive.openshift.io/dnsendpoint finalizer) to avoid leaking a dangling reference that would
+                        never be cleaned up once the cluster is outside Hive's control. This means DNS for the
+                        orphaned cluster will be broken until its administrator sets up their own delegation.
                       type: boolean
                     zone:
                       description: Zone is the DNS zone to host

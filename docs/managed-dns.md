@@ -127,7 +127,36 @@ These things are only done if [cd.Spec.ManageDNS](https://github.com/openshift/h
     Parlay this into the CD's `DNSNotReady` condition, which we set to `False` (double negative :eyeroll:)
   - We'll keep waiting up to 10m, at which point we'll give up, setting the CD's `ProvisionStopped` condition with reason `DNSNotReadyTimedOut`.
 
-**TODO:** Document the cleanup flow.
+### Cleanup Flow (Deletion)
+
+When a ClusterDeployment with ManageDNS is deleted, two independent
+finalizers run on the associated DNSZone:
+
+1. **`hive.openshift.io/dnszone`** (dnszone controller): Deletes the
+   hosted zone (and its record sets) from the cloud provider using the
+   cluster's cloud credentials, then removes the finalizer.
+
+2. **`hive.openshift.io/dnsendpoint`** (dnsendpoint controller): Deletes
+   the NS delegation record from Hive's parent/root zone, then removes
+   the finalizer.
+
+**`PreserveOnDelete` only affects the hosted zone (finalizer 1).** When
+set, the dnszone controller skips cloud cleanup — the hosted zone and its
+records are left in place. This is primarily because the cluster's cloud
+credentials may no longer be valid.
+
+The dnsendpoint controller (finalizer 2) always deletes the NS delegation
+record from the parent zone, regardless of PreserveOnDelete. The
+delegation record is Hive-managed infrastructure — it lives in the
+parent zone, which is owned and operated by the Hive instance, not by
+the target cluster. Preserving it would leak a dangling reference: once
+the orphaned cluster is outside Hive's control, nothing would ever clean
+it up.
+
+**Consequence:** When a cluster is deleted with `preserveOnDelete=true`,
+DNS resolution for the orphaned cluster will break until its administrator
+configures their own DNS delegation (e.g., by pointing their own domain's
+NS records at the preserved hosted zone's nameservers).
 
 ### DNSZone
 [Source](../vendor/github.com/openshift/hive/apis/hive/v1/dnszone_types.go)

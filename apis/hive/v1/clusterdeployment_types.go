@@ -125,7 +125,10 @@ type ClusterDeploymentSpec struct {
 	PullSecretRef *corev1.LocalObjectReference `json:"pullSecretRef,omitempty"`
 
 	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it. This can also be
-	// used to abandon ongoing cluster deprovision.
+	// used to abandon ongoing cluster deprovision. When ManageDNS is true, this preserves the cloud-provider hosted
+	// zone but still removes the NS delegation record from Hive's parent zone to avoid leaking a dangling reference.
+	// DNS for the orphaned cluster will be broken until its administrator sets up their own delegation. See
+	// docs/managed-dns.md for details.
 	// +optional
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
 

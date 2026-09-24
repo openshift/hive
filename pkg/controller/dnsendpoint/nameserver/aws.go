@@ -86,8 +86,8 @@ func (q *awsQuery) Delete(rootDomain string, domain string, values sets.Set[stri
 		// delete using those values.
 		err = q.changeNameServers(awsClient, *zoneID, domain, values, route53types.ChangeActionDelete)
 		if err != nil {
-			erricb := route53types.InvalidChangeBatch{}
-			if !errors.As(err, erricb) {
+			var erricb *route53types.InvalidChangeBatch
+			if !errors.As(err, &erricb) {
 				return errors.Wrap(err, "error deleting the name server")
 			}
 			if strings.HasSuffix(*erricb.Message, "not found]") {

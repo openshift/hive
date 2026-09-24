@@ -218,6 +218,59 @@ func TestAWSGet(t *testing.T) {
 	}
 }
 
+func TestAWSDelete(t *testing.T) {
+	cases := []struct {
+		name        string
+		changeErr   error
+		expectError string
+	}{
+		{
+			name: "invalid change batch not found",
+			changeErr: &route53types.InvalidChangeBatch{
+				Message: aws.String("[Tried to delete resource record set [name='test-subdomain.' type='NS'] but it was not found]"),
+			},
+		},
+		{
+			name: "invalid change batch other message",
+			changeErr: &route53types.InvalidChangeBatch{
+				Message: aws.String("[some other invalid change]"),
+			},
+			expectError: "error deleting the name server",
+		},
+		{
+			name:        "non-invalid-change-batch error",
+			changeErr:   assert.AnError,
+			expectError: "error deleting the name server",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			mockAWSClient := mock.NewMockClient(mockCtrl)
+			awsQuery := &awsQuery{
+				getAWSClient: func() (awsclient.Client, error) {
+					return mockAWSClient, nil
+				},
+			}
+			mockAWSClient.EXPECT().
+				ListHostedZonesByName(gomock.Eq(&route53.ListHostedZonesByNameInput{
+					DNSName:  aws.String("test-domain."),
+					MaxItems: aws.Int32(5),
+				})).
+				Return(testListHostedZonesOutput(withHostedZones(testHostedZone("test-domain.", "test-zone-id"))), nil)
+			mockAWSClient.EXPECT().
+				ChangeResourceRecordSets(gomock.Any()).
+				Return(nil, tc.changeErr)
+			err := awsQuery.Delete("test-domain", "test-subdomain", sets.New("test-ns"))
+			if tc.expectError == "" {
+				assert.NoError(t, err, "expected no error from delete")
+			} else {
+				assert.ErrorContains(t, err, tc.expectError, "unexpected error from delete")
+			}
+		})
+	}
+}
+
 type listHostedZonesOutputOption func(*route53.ListHostedZonesByNameOutput)
 
 func testListHostedZonesOutput(opts ...listHostedZonesOutputOption) *route53.ListHostedZonesByNameOutput {

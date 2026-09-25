@@ -16,6 +16,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -43,11 +44,17 @@ const (
 	infraMachinePoolName  = "infra"
 	machineAPINamespace   = "openshift-machine-api"
 
-	machinePoolDiagnosticListLimit      = 100
-	machinePoolDiagnosticPodLimit       = 100
-	machinePoolDiagnosticLogTargetLimit = 20
-	machinePoolDiagnosticLogTailLines   = 2000
-	machinePoolDiagnosticLogLimitBytes  = 1 << 20
+	machinePoolDiagnosticListLimit              = 100
+	machinePoolDiagnosticEventScanLimit         = 1000
+	machinePoolDiagnosticEventPageLimit         = 100
+	machinePoolDiagnosticEventObjectLimit       = 20
+	machinePoolDiagnosticAffectedEventReserve   = 50
+	machinePoolDiagnosticControllerEventReserve = 25
+	machinePoolDiagnosticPodLimit               = 100
+	machinePoolDiagnosticLogTargetLimit         = 20
+	machinePoolDiagnosticLogTailLines           = 2000
+	machinePoolDiagnosticLogLimitBytes          = 1 << 20
+	machinePoolDiagnosticLogProbeBytes          = machinePoolDiagnosticLogLimitBytes + 1
 )
 
 func TestScaleMachinePool(t *testing.T) {
@@ -207,7 +214,7 @@ func TestNewMachinePool(t *testing.T) {
 	if err != nil {
 		// The wait has already expired. Capture diagnostics without retrying the wait
 		// or replacing its error so the original timeout remains authoritative.
-		captureMachinePoolDiagnostics(t, cfg, cd)
+		captureMachinePoolDiagnostics(t, cfg, cd, infraMachinePoolName)
 	}
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
@@ -496,7 +503,7 @@ func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, e
 	return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName), nil
 }
 
-func captureMachinePoolDiagnostics(t *testing.T, cfg *rest.Config, cd *hivev1.ClusterDeployment) {
+func captureMachinePoolDiagnostics(t *testing.T, cfg *rest.Config, cd *hivev1.ClusterDeployment, poolName string) {
 	t.Helper()
 
 	artifactDir := os.Getenv("ARTIFACT_DIR")
@@ -514,7 +521,7 @@ func captureMachinePoolDiagnostics(t *testing.T, cfg *rest.Config, cd *hivev1.Cl
 	if err != nil {
 		t.Logf("failed to create spoke client for MachinePool timeout diagnostics: %v", err)
 	} else {
-		captureSpokeMachinePoolResources(t, ctx, rc, artifactDir, prefix)
+		captureSpokeMachinePoolResources(t, ctx, rc, artifactDir, prefix, poolName)
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
@@ -525,7 +532,7 @@ func captureMachinePoolDiagnostics(t *testing.T, cfg *rest.Config, cd *hivev1.Cl
 	captureMachineAPIControllerLogs(t, ctx, kubeClient, artifactDir, prefix)
 }
 
-func captureSpokeMachinePoolResources(t *testing.T, ctx context.Context, rc client.Client, artifactDir, prefix string) {
+func captureSpokeMachinePoolResources(t *testing.T, ctx context.Context, rc client.Client, artifactDir, prefix, poolName string) {
 	t.Helper()
 
 	resources := []struct {
@@ -536,11 +543,6 @@ func captureSpokeMachinePoolResources(t *testing.T, ctx context.Context, rc clie
 		{name: "machines", list: &machinev1.MachineList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
 		{name: "machinesets", list: &machinev1.MachineSetList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
 		{name: "nodes", list: &corev1.NodeList{}, listOptions: []client.ListOption{client.Limit(machinePoolDiagnosticListLimit)}},
-		// Events are deliberately split into bounded scopes: Machine API namespace
-		// events cover the controllers and Machine objects, while Node events cover
-		// registration failures without collecting the cluster-wide Event history.
-		{name: "machine-api-events", list: &corev1.EventList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
-		{name: "node-events", list: &corev1.EventList{}, listOptions: []client.ListOption{client.MatchingFields{"involvedObject.kind": "Node"}, client.Limit(machinePoolDiagnosticListLimit)}},
 		{name: "machine-api-pods", list: &corev1.PodList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
 	}
 
@@ -556,6 +558,233 @@ func captureSpokeMachinePoolResources(t *testing.T, ctx context.Context, rc clie
 		}
 		writeMachinePoolDiagnostic(t, filepath.Join(artifactDir, fmt.Sprintf("%s_%s.yaml", prefix, resource.name)), data)
 	}
+
+	relevant, err := affectedMachinePoolObjects(ctx, rc, poolName)
+	if err != nil {
+		t.Logf("failed to identify affected MachinePool objects for timeout diagnostics: %v", err)
+	}
+	eventScopes := []struct {
+		name              string
+		listOptions       []client.ListOption
+		affectedKinds     map[string]struct{}
+		controllerReserve int
+	}{
+		{
+			name:              "machine-api-events",
+			listOptions:       []client.ListOption{client.InNamespace(machineAPINamespace)},
+			affectedKinds:     map[string]struct{}{"Machine": {}, "MachineSet": {}},
+			controllerReserve: machinePoolDiagnosticControllerEventReserve,
+		},
+		{
+			name:          "node-events",
+			listOptions:   []client.ListOption{client.MatchingFields{"involvedObject.kind": "Node"}},
+			affectedKinds: map[string]struct{}{"Node": {}},
+		},
+	}
+	for _, scope := range eventScopes {
+		events, listErr := listEventsForDiagnostics(ctx, rc, scope.listOptions...)
+		if listErr != nil {
+			t.Logf("failed to list spoke %s for MachinePool timeout diagnostics: %v", scope.name, listErr)
+			continue
+		}
+		affectedEvents, affectedErr := listAffectedObjectEvents(ctx, rc, relevant, scope.affectedKinds, scope.listOptions...)
+		if affectedErr != nil {
+			t.Logf("failed to list affected-object %s for MachinePool timeout diagnostics: %v", scope.name, affectedErr)
+		} else {
+			events.Items = append(events.Items, affectedEvents...)
+		}
+		events.Items = prioritizedEvents(events.Items, relevant, scope.controllerReserve)
+		data, marshalErr := yaml.Marshal(events)
+		if marshalErr != nil {
+			t.Logf("failed to marshal spoke %s for MachinePool timeout diagnostics: %v", scope.name, marshalErr)
+			continue
+		}
+		writeMachinePoolDiagnostic(t, filepath.Join(artifactDir, fmt.Sprintf("%s_%s.yaml", prefix, scope.name)), data)
+	}
+}
+
+type eventObjectKey struct {
+	kind string
+	name string
+}
+
+func affectedMachinePoolObjects(ctx context.Context, rc client.Client, poolName string) (map[eventObjectKey]struct{}, error) {
+	objects := map[eventObjectKey]struct{}{}
+	lists := []struct {
+		kind        string
+		list        client.ObjectList
+		listOptions []client.ListOption
+	}{
+		{
+			kind: "Machine",
+			list: &machinev1.MachineList{},
+			listOptions: []client.ListOption{
+				client.InNamespace(machineAPINamespace),
+				client.MatchingLabels{"openshift.io/machine-type": poolName},
+				client.Limit(machinePoolDiagnosticEventObjectLimit),
+			},
+		},
+		{
+			kind: "MachineSet",
+			list: &machinev1.MachineSetList{},
+			listOptions: []client.ListOption{
+				client.InNamespace(machineAPINamespace),
+				client.MatchingLabels{"hive.openshift.io/machine-pool": poolName},
+				client.Limit(machinePoolDiagnosticEventObjectLimit),
+			},
+		},
+		{
+			kind: "Node",
+			list: &corev1.NodeList{},
+			listOptions: []client.ListOption{
+				client.MatchingLabels{"openshift.io/machine-type": poolName},
+				client.Limit(machinePoolDiagnosticEventObjectLimit),
+			},
+		},
+	}
+	for _, objectList := range lists {
+		if err := rc.List(ctx, objectList.list, objectList.listOptions...); err != nil {
+			return objects, err
+		}
+		items, err := meta.ExtractList(objectList.list)
+		if err != nil {
+			return objects, err
+		}
+		for _, item := range items {
+			accessor, err := meta.Accessor(item)
+			if err != nil {
+				return objects, err
+			}
+			objects[eventObjectKey{kind: objectList.kind, name: accessor.GetName()}] = struct{}{}
+		}
+	}
+	return objects, nil
+}
+
+func listEventsForDiagnostics(ctx context.Context, rc client.Client, listOptions ...client.ListOption) (*corev1.EventList, error) {
+	events := &corev1.EventList{}
+	continueToken := ""
+	for len(events.Items) < machinePoolDiagnosticEventScanLimit {
+		page := &corev1.EventList{}
+		remaining := machinePoolDiagnosticEventScanLimit - len(events.Items)
+		limit := machinePoolDiagnosticEventPageLimit
+		if remaining < limit {
+			limit = remaining
+		}
+		options := append([]client.ListOption{}, listOptions...)
+		options = append(options, &client.ListOptions{Limit: int64(limit), Continue: continueToken})
+		if err := rc.List(ctx, page, options...); err != nil {
+			return events, err
+		}
+		events.Items = append(events.Items, page.Items...)
+		continueToken = page.Continue
+		if continueToken == "" {
+			break
+		}
+	}
+	return events, nil
+}
+
+func listAffectedObjectEvents(ctx context.Context, rc client.Client, relevant map[eventObjectKey]struct{}, affectedKinds map[string]struct{}, listOptions ...client.ListOption) ([]corev1.Event, error) {
+	keys := make([]eventObjectKey, 0, len(relevant))
+	for key := range relevant {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].kind != keys[j].kind {
+			return keys[i].kind < keys[j].kind
+		}
+		return keys[i].name < keys[j].name
+	})
+
+	events := make([]corev1.Event, 0)
+	for _, key := range keys {
+		if _, included := affectedKinds[key.kind]; !included {
+			continue
+		}
+		options := append([]client.ListOption{}, listOptions...)
+		options = append(options,
+			client.MatchingFields{"involvedObject.name": key.name},
+			client.Limit(machinePoolDiagnosticListLimit),
+		)
+		matching := &corev1.EventList{}
+		if err := rc.List(ctx, matching, options...); err != nil {
+			return events, err
+		}
+		for i := range matching.Items {
+			if matching.Items[i].InvolvedObject.Kind == key.kind {
+				events = append(events, matching.Items[i])
+			}
+		}
+	}
+	return events, nil
+}
+
+func prioritizedEvents(events []corev1.Event, relevant map[eventObjectKey]struct{}, controllerReserve int) []corev1.Event {
+	sort.SliceStable(events, func(i, j int) bool {
+		iWarning := events[i].Type == corev1.EventTypeWarning
+		jWarning := events[j].Type == corev1.EventTypeWarning
+		if iWarning != jWarning {
+			return iWarning
+		}
+		iTime := eventObservedTime(events[i])
+		jTime := eventObservedTime(events[j])
+		if !iTime.Equal(jTime) {
+			return iTime.After(jTime)
+		}
+		if events[i].Namespace != events[j].Namespace {
+			return events[i].Namespace < events[j].Namespace
+		}
+		return events[i].Name < events[j].Name
+	})
+
+	selected := make([]corev1.Event, 0, machinePoolDiagnosticListLimit)
+	seen := map[string]struct{}{}
+	appendMatching := func(limit int, matches func(corev1.Event) bool) {
+		for i := range events {
+			if len(selected) >= machinePoolDiagnosticListLimit || limit == 0 {
+				return
+			}
+			event := events[i]
+			key := string(event.UID)
+			if key == "" {
+				key = event.Namespace + "/" + event.Name
+			}
+			if _, alreadySelected := seen[key]; alreadySelected || !matches(event) {
+				continue
+			}
+			selected = append(selected, event)
+			seen[key] = struct{}{}
+			limit--
+		}
+	}
+	appendMatching(machinePoolDiagnosticAffectedEventReserve, func(event corev1.Event) bool {
+		_, ok := relevant[eventObjectKey{kind: event.InvolvedObject.Kind, name: event.InvolvedObject.Name}]
+		return ok
+	})
+	appendMatching(controllerReserve, func(event corev1.Event) bool {
+		switch event.InvolvedObject.Kind {
+		case "Machine", "MachineSet", "Node":
+			return false
+		default:
+			return true
+		}
+	})
+	appendMatching(machinePoolDiagnosticListLimit, func(corev1.Event) bool { return true })
+	return selected
+}
+
+func eventObservedTime(event corev1.Event) time.Time {
+	if event.Series != nil && !event.Series.LastObservedTime.IsZero() {
+		return event.Series.LastObservedTime.Time
+	}
+	if !event.EventTime.IsZero() {
+		return event.EventTime.Time
+	}
+	if !event.LastTimestamp.IsZero() {
+		return event.LastTimestamp.Time
+	}
+	return event.CreationTimestamp.Time
 }
 
 func captureMachineAPIControllerLogs(t *testing.T, ctx context.Context, kubeClient kubernetes.Interface, artifactDir, prefix string) {
@@ -583,31 +812,51 @@ func captureMachineAPIPodLogs(t *testing.T, ctx context.Context, pods []corev1.P
 	t.Helper()
 
 	for _, target := range machineAPILogTargets(pods) {
-		options := &corev1.PodLogOptions{
-			Container:  target.containerName,
-			TailLines:  ptr.To(int64(machinePoolDiagnosticLogTailLines)),
-			LimitBytes: ptr.To(int64(machinePoolDiagnosticLogLimitBytes)),
-		}
-		data, err := readLogs(ctx, target.podName, options)
+		data, err := newestBoundedPodLog(ctx, target, false, readLogs)
 		if err != nil {
 			t.Logf("failed to capture logs for Machine API pod %s container %s: %v", target.podName, target.containerName, err)
 		} else {
 			path := filepath.Join(artifactDir, fmt.Sprintf("%s_%s_%s.log", prefix, target.podName, target.containerName))
-			writeMachinePoolDiagnostic(t, path, boundedLogTail(data))
+			writeMachinePoolDiagnostic(t, path, data)
 		}
 
 		// Current and previous log requests are independent so a failed current
 		// request cannot hide the useful pre-restart stream.
 		if target.restarted {
-			options.Previous = true
-			previous, err := readLogs(ctx, target.podName, options)
+			previous, err := newestBoundedPodLog(ctx, target, true, readLogs)
 			if err != nil {
 				t.Logf("failed to capture previous logs for Machine API pod %s container %s: %v", target.podName, target.containerName, err)
 			} else {
 				previousPath := filepath.Join(artifactDir, fmt.Sprintf("%s_%s_%s_previous.log", prefix, target.podName, target.containerName))
-				writeMachinePoolDiagnostic(t, previousPath, boundedLogTail(previous))
+				writeMachinePoolDiagnostic(t, previousPath, previous)
 			}
 		}
+	}
+}
+
+func newestBoundedPodLog(ctx context.Context, target machineAPILogTarget, previous bool, readLogs podLogReader) ([]byte, error) {
+	tailLines := int64(machinePoolDiagnosticLogTailLines)
+	for {
+		options := &corev1.PodLogOptions{
+			Container: target.containerName,
+			Previous:  previous,
+			TailLines: ptr.To(tailLines),
+		}
+		// Kubernetes applies LimitBytes from the beginning of the selected tail.
+		// Probe one byte beyond the artifact limit and reduce the line window until
+		// the whole selection fits. For one oversized final line, the API has no
+		// suffix-byte option, so retrieve that one bounded line and keep its suffix.
+		if tailLines > 1 {
+			options.LimitBytes = ptr.To(int64(machinePoolDiagnosticLogProbeBytes))
+		}
+		data, err := readLogs(ctx, target.podName, options)
+		if err != nil {
+			return nil, err
+		}
+		if len(data) <= machinePoolDiagnosticLogLimitBytes || tailLines == 1 {
+			return boundedLogTail(data), nil
+		}
+		tailLines = (tailLines + 1) / 2
 	}
 }
 

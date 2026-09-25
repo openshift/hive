@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -27,25 +28,35 @@ func TestCaptureSpokeMachinePoolResources(t *testing.T) {
 		artifact string
 	}{
 		{
-			name:     "infra-machine",
-			object:   &machinev1.Machine{ObjectMeta: metav1.ObjectMeta{Name: "infra-machine", Namespace: machineAPINamespace}},
+			name: "infra-machine",
+			object: &machinev1.Machine{ObjectMeta: metav1.ObjectMeta{
+				Name: "infra-machine", Namespace: machineAPINamespace,
+				Labels: map[string]string{"openshift.io/machine-type": infraMachinePoolName},
+			}},
 			artifact: "machines",
 		},
 		{
-			name:     "infra-machineset",
-			object:   &machinev1.MachineSet{ObjectMeta: metav1.ObjectMeta{Name: "infra-machineset", Namespace: machineAPINamespace}},
+			name: "infra-machineset",
+			object: &machinev1.MachineSet{ObjectMeta: metav1.ObjectMeta{
+				Name: "infra-machineset", Namespace: machineAPINamespace,
+				Labels: map[string]string{"hive.openshift.io/machine-pool": infraMachinePoolName},
+			}},
 			artifact: "machinesets",
 		},
 		{
-			name:     "infra-node",
-			object:   &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "infra-node"}},
+			name: "infra-node",
+			object: &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+				Name:   "infra-node",
+				Labels: map[string]string{"openshift.io/machine-type": infraMachinePoolName},
+			}},
 			artifact: "nodes",
 		},
 		{
 			name: "machine-failed",
 			object: &corev1.Event{
-				ObjectMeta: metav1.ObjectMeta{Name: "machine-failed", Namespace: machineAPINamespace},
-				Reason:     "FailedCreate",
+				ObjectMeta:     metav1.ObjectMeta{Name: "machine-failed", Namespace: machineAPINamespace},
+				InvolvedObject: corev1.ObjectReference{Kind: "Machine", Name: "infra-machine"},
+				Reason:         "FailedCreate",
 			},
 			artifact: "machine-api-events",
 		},
@@ -69,6 +80,9 @@ func TestCaptureSpokeMachinePoolResources(t *testing.T) {
 		WithScheme(scheme.GetScheme()).
 		WithIndex(&corev1.Event{}, "involvedObject.kind", func(object client.Object) []string {
 			return []string{object.(*corev1.Event).InvolvedObject.Kind}
+		}).
+		WithIndex(&corev1.Event{}, "involvedObject.name", func(object client.Object) []string {
+			return []string{object.(*corev1.Event).InvolvedObject.Name}
 		})
 	for _, object := range objects {
 		builder = builder.WithObjects(object.object)
@@ -76,7 +90,7 @@ func TestCaptureSpokeMachinePoolResources(t *testing.T) {
 
 	artifactDir := t.TempDir()
 	prefix := "SPOKE_machinepool_timeout_test"
-	captureSpokeMachinePoolResources(t, context.Background(), builder.Build(), artifactDir, prefix)
+	captureSpokeMachinePoolResources(t, context.Background(), builder.Build(), artifactDir, prefix, infraMachinePoolName)
 
 	for _, object := range objects {
 		path := filepath.Join(artifactDir, fmt.Sprintf("%s_%s.yaml", prefix, object.artifact))
@@ -124,7 +138,7 @@ func TestCaptureMachineAPIPodLogsContinuesAfterCurrentLogError(t *testing.T) {
 	for _, request := range requests {
 		require.Equal(t, "machine-api-controllers", request.podName)
 		require.Equal(t, int64(machinePoolDiagnosticLogTailLines), *request.options.TailLines)
-		require.Equal(t, int64(machinePoolDiagnosticLogLimitBytes), *request.options.LimitBytes)
+		require.Equal(t, int64(machinePoolDiagnosticLogProbeBytes), *request.options.LimitBytes)
 	}
 	require.False(t, requests[0].options.Previous)
 	require.True(t, requests[1].options.Previous)
@@ -138,6 +152,90 @@ func TestCaptureMachineAPIPodLogsContinuesAfterCurrentLogError(t *testing.T) {
 	sibling, err := os.ReadFile(filepath.Join(artifactDir, prefix+"_machine-api-controllers_machineset-controller.log"))
 	require.NoError(t, err)
 	require.Equal(t, "current sibling logs", string(sibling))
+}
+
+func TestPrioritizedEventsRetainAffectedPoolAndControllerEvents(t *testing.T) {
+	baseTime := time.Date(2026, time.September, 25, 12, 0, 0, 0, time.UTC)
+	events := make([]corev1.Event, 0, machinePoolDiagnosticListLimit+2)
+	for i := 0; i < machinePoolDiagnosticListLimit; i++ {
+		events = append(events, corev1.Event{
+			ObjectMeta:    metav1.ObjectMeta{Name: fmt.Sprintf("warning-%03d", i)},
+			Type:          corev1.EventTypeWarning,
+			LastTimestamp: metav1.NewTime(baseTime.Add(time.Duration(i) * time.Minute)),
+			InvolvedObject: corev1.ObjectReference{
+				Kind: "Machine", Name: fmt.Sprintf("unrelated-%03d", i),
+			},
+		})
+	}
+	events = append(events,
+		corev1.Event{
+			ObjectMeta:     metav1.ObjectMeta{Name: "affected-infra-machine"},
+			LastTimestamp:  metav1.NewTime(baseTime.Add(-time.Hour)),
+			InvolvedObject: corev1.ObjectReference{Kind: "Machine", Name: "infra-machine"},
+		},
+		corev1.Event{
+			ObjectMeta:     metav1.ObjectMeta{Name: "controller-scheduling"},
+			LastTimestamp:  metav1.NewTime(baseTime.Add(-2 * time.Hour)),
+			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "machine-api-controllers"},
+		},
+	)
+
+	selected := prioritizedEvents(events, map[eventObjectKey]struct{}{
+		{kind: "Machine", name: "infra-machine"}: {},
+	}, machinePoolDiagnosticControllerEventReserve)
+
+	require.Len(t, selected, machinePoolDiagnosticListLimit)
+	names := make([]string, 0, len(selected))
+	for i := range selected {
+		names = append(names, selected[i].Name)
+	}
+	require.Contains(t, names, "affected-infra-machine")
+	require.Contains(t, names, "controller-scheduling")
+}
+
+func TestNewestBoundedPodLogRetriesWithSmallerTail(t *testing.T) {
+	target := machineAPILogTarget{podName: "machine-api-controllers", containerName: "machine-controller"}
+	requests := make([]corev1.PodLogOptions, 0)
+	readLogs := func(_ context.Context, _ string, options *corev1.PodLogOptions) ([]byte, error) {
+		requests = append(requests, *options)
+		if *options.TailLines > 2 {
+			return []byte(strings.Repeat("old", machinePoolDiagnosticLogProbeBytes/3+1)[:machinePoolDiagnosticLogProbeBytes]), nil
+		}
+		return []byte("newest-controller-message\n"), nil
+	}
+
+	data, err := newestBoundedPodLog(context.Background(), target, false, readLogs)
+
+	require.NoError(t, err)
+	require.Equal(t, "newest-controller-message\n", string(data))
+	require.Greater(t, len(requests), 1)
+	for _, request := range requests {
+		require.NotNil(t, request.LimitBytes)
+		require.Equal(t, int64(machinePoolDiagnosticLogProbeBytes), *request.LimitBytes)
+	}
+	require.Equal(t, int64(2), *requests[len(requests)-1].TailLines)
+}
+
+func TestNewestBoundedPodLogUsesOneLineFallbackForOversizedLastLine(t *testing.T) {
+	target := machineAPILogTarget{podName: "machine-api-controllers", containerName: "machine-controller"}
+	requests := make([]corev1.PodLogOptions, 0)
+	readLogs := func(_ context.Context, _ string, options *corev1.PodLogOptions) ([]byte, error) {
+		requests = append(requests, *options)
+		if *options.TailLines > 1 {
+			return []byte(strings.Repeat("x", machinePoolDiagnosticLogProbeBytes)), nil
+		}
+		return []byte("discarded" + strings.Repeat("n", machinePoolDiagnosticLogLimitBytes)), nil
+	}
+
+	data, err := newestBoundedPodLog(context.Background(), target, true, readLogs)
+
+	require.NoError(t, err)
+	require.Len(t, data, machinePoolDiagnosticLogLimitBytes)
+	require.Equal(t, strings.Repeat("n", machinePoolDiagnosticLogLimitBytes), string(data))
+	lastRequest := requests[len(requests)-1]
+	require.Equal(t, int64(1), *lastRequest.TailLines)
+	require.Nil(t, lastRequest.LimitBytes)
+	require.True(t, lastRequest.Previous)
 }
 
 func TestMachineAPILogTargetsAreBoundedAndPrioritizeProviderController(t *testing.T) {

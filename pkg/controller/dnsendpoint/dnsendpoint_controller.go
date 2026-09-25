@@ -53,7 +53,7 @@ func wrapWithRoute53Backoff(err error) error {
 	if err == nil {
 		return nil
 	}
-	return controllerutils.NewErrorWithCustomBackoff(err, []*controllerutils.CustomBackoff{Route53ThrottleBackoff})
+	return controllerutils.NewErrorWithCustomBackoff(err, Route53ThrottleBackoff)
 }
 
 // Add creates one controller for DNSZone and one with a nameServerScraper for each root domain in

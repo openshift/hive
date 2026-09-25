@@ -53,10 +53,10 @@ func (e ErrorWithCustomBackoff) Unwrap() error {
 // NewErrorWithCustomBackoff creates an ErrorWithCustomBackoff wrapping err with the
 // given backoff policies. Use this from external packages since the embedded error
 // field is unexported.
-func NewErrorWithCustomBackoff(err error, backoffs []*CustomBackoff) ErrorWithCustomBackoff {
-	return ErrorWithCustomBackoff{
+func NewErrorWithCustomBackoff(err error, cbs ...*CustomBackoff) *ErrorWithCustomBackoff {
+	return &ErrorWithCustomBackoff{
 		error:          err,
-		CustomBackoffs: backoffs,
+		CustomBackoffs: cbs,
 	}
 }
 
@@ -113,7 +113,7 @@ func (d *delayingReconciler) Reconcile(ctx context.Context, request reconcile.Re
 	// applies exponential backoff for the first match. If none match, the default backoff
 	// policy applies.
 	var matchedCB *CustomBackoff
-	var ecb ErrorWithCustomBackoff
+	var ecb *ErrorWithCustomBackoff
 	if errors.As(err, &ecb) {
 		for _, cb := range ecb.CustomBackoffs {
 			if matchedCB == nil && cb.Match(err) {

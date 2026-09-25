@@ -94,7 +94,7 @@ func (e *testOtherError) Error() string { return e.msg }
 
 func TestErrorWithCustomBackoff_Unwrap(t *testing.T) {
 	inner := &testThrottleError{msg: "throttled"}
-	ecb := ErrorWithCustomBackoff{
+	ecb := &ErrorWithCustomBackoff{
 		error:          inner,
 		CustomBackoffs: nil,
 	}
@@ -105,20 +105,20 @@ func TestErrorWithCustomBackoff_Unwrap(t *testing.T) {
 }
 
 func TestErrorWithCustomBackoff_Error(t *testing.T) {
-	ecb := ErrorWithCustomBackoff{
+	ecb := &ErrorWithCustomBackoff{
 		error: fmt.Errorf("boom"),
 	}
 	assert.Equal(t, "boom", ecb.Error())
 }
 
 func TestErrorWithCustomBackoff_NilErr(t *testing.T) {
-	ecb := ErrorWithCustomBackoff{}
+	ecb := &ErrorWithCustomBackoff{}
 	assert.Equal(t, "", ecb.Error())
 }
 
 func TestNewErrorWithCustomBackoff(t *testing.T) {
 	cb := &CustomBackoff{Name: "test", MinDelay: time.Second, MaxDelay: time.Minute}
-	ecb := NewErrorWithCustomBackoff(fmt.Errorf("boom"), []*CustomBackoff{cb})
+	ecb := NewErrorWithCustomBackoff(fmt.Errorf("boom"), cb)
 	assert.Equal(t, "boom", ecb.Error())
 	assert.Len(t, ecb.CustomBackoffs, 1)
 	assert.Equal(t, "test", ecb.CustomBackoffs[0].Name)
@@ -142,7 +142,7 @@ func TestDelayingReconciler_ExponentialBackoff(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, alwaysMatch)
 
 	inner := &fakeReconciler{
-		err: ErrorWithCustomBackoff{
+		err: &ErrorWithCustomBackoff{
 			error:          fmt.Errorf("throttled"),
 			CustomBackoffs: []*CustomBackoff{cb},
 		},
@@ -199,7 +199,7 @@ func TestDelayingReconciler_MultipleCustomBackoffs_FirstMatchWins(t *testing.T) 
 	cb2.Name = "long"
 
 	inner := &fakeReconciler{
-		err: ErrorWithCustomBackoff{
+		err: &ErrorWithCustomBackoff{
 			error:          fmt.Errorf("error"),
 			CustomBackoffs: []*CustomBackoff{cb1, cb2},
 		},
@@ -242,7 +242,7 @@ func TestDelayingReconciler_FirstMatchWins_SkipsSubsequentMatch(t *testing.T) {
 	cb2.Name = "second"
 
 	inner := &fakeReconciler{
-		err: ErrorWithCustomBackoff{
+		err: &ErrorWithCustomBackoff{
 			error:          fmt.Errorf("error"),
 			CustomBackoffs: []*CustomBackoff{cb1, cb2},
 		},
@@ -259,7 +259,7 @@ func TestDelayingReconciler_FirstMatchWins_SkipsSubsequentMatch(t *testing.T) {
 func TestDelayingReconciler_SuccessClearsCounters(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, alwaysMatch)
 
-	throttleErr := ErrorWithCustomBackoff{
+	throttleErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("throttled"),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -294,7 +294,7 @@ func TestDelayingReconciler_NonMatchingBackoffResetsCounter(t *testing.T) {
 		return matchCount <= 2
 	})
 
-	throttleErr := ErrorWithCustomBackoff{
+	throttleErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("error"),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -324,7 +324,7 @@ func TestDelayingReconciler_NonMatchingBackoffResetsCounter(t *testing.T) {
 func TestDelayingReconciler_NonCustomBackoffErrorClearsCounters(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, alwaysMatch)
 
-	throttleErr := ErrorWithCustomBackoff{
+	throttleErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("throttled"),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -357,7 +357,7 @@ func TestDelayingReconciler_MatchClearsOtherCounters(t *testing.T) {
 	cb2.Name = "policy2"
 
 	// Build up counter for cb1
-	err1 := ErrorWithCustomBackoff{
+	err1 := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("error1"),
 		CustomBackoffs: []*CustomBackoff{cb1},
 	}
@@ -369,7 +369,7 @@ func TestDelayingReconciler_MatchClearsOtherCounters(t *testing.T) {
 	// cb1 counter is now 2
 
 	// Now reconcile with cb2 — cb1's counter should be cleared
-	err2 := ErrorWithCustomBackoff{
+	err2 := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("error2"),
 		CustomBackoffs: []*CustomBackoff{cb2},
 	}
@@ -396,7 +396,7 @@ func TestDelayingReconciler_IndependentTrackingPerCustomBackoff(t *testing.T) {
 
 	// First: only cb1 triggers
 	inner1 := &fakeReconciler{
-		err: ErrorWithCustomBackoff{
+		err: &ErrorWithCustomBackoff{
 			error:          fmt.Errorf("error1"),
 			CustomBackoffs: []*CustomBackoff{cb1},
 		},
@@ -411,7 +411,7 @@ func TestDelayingReconciler_IndependentTrackingPerCustomBackoff(t *testing.T) {
 
 	// Now switch to cb2 — should start at its own minDelay since it has separate tracking
 	inner2 := &fakeReconciler{
-		err: ErrorWithCustomBackoff{
+		err: &ErrorWithCustomBackoff{
 			error:          fmt.Errorf("error2"),
 			CustomBackoffs: []*CustomBackoff{cb2},
 		},
@@ -427,7 +427,7 @@ func TestDelayingReconciler_IndependentTrackingPerCustomBackoff(t *testing.T) {
 func TestDelayingReconciler_IndependentTrackingPerNamespacedName(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, alwaysMatch)
 
-	throttleErr := ErrorWithCustomBackoff{
+	throttleErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("throttled"),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -467,7 +467,7 @@ func TestDelayingReconciler_ErrorsAsThroughWrapping(t *testing.T) {
 		return errors.As(err, &te)
 	})
 
-	wrappedErr := ErrorWithCustomBackoff{
+	wrappedErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("wrapper: %w", innerErr),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -485,7 +485,7 @@ func TestDelayingReconciler_ErrorsAsThroughWrapping(t *testing.T) {
 func TestDelayingReconciler_ErrorsAsFindsCustomBackoff(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, alwaysMatch)
 
-	innerECB := ErrorWithCustomBackoff{
+	innerECB := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("throttled"),
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -515,7 +515,7 @@ func TestDelayingReconciler_NoBackoffWhenNoMatch(t *testing.T) {
 	cb := newTestCustomBackoff(5*time.Second, 320*time.Second, neverMatch)
 
 	origErr := fmt.Errorf("some error")
-	wrappedErr := ErrorWithCustomBackoff{
+	wrappedErr := &ErrorWithCustomBackoff{
 		error:          origErr,
 		CustomBackoffs: []*CustomBackoff{cb},
 	}
@@ -537,7 +537,7 @@ func TestDelayingReconciler_MultipleBackoffs_OnlyMatchingContribute(t *testing.T
 	cbNoMatch := newTestCustomBackoff(100*time.Second, 1000*time.Second, neverMatch)
 	cbNoMatch.Name = "nonmatching"
 
-	wrappedErr := ErrorWithCustomBackoff{
+	wrappedErr := &ErrorWithCustomBackoff{
 		error:          fmt.Errorf("error"),
 		CustomBackoffs: []*CustomBackoff{cbMatch, cbNoMatch},
 	}

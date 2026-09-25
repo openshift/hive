@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
@@ -32,12 +34,20 @@ import (
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/util/scheme"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
 const (
 	workerMachinePoolName = "worker"
 	infraMachinePoolName  = "infra"
+	machineAPINamespace   = "openshift-machine-api"
+
+	machinePoolDiagnosticListLimit      = 100
+	machinePoolDiagnosticPodLimit       = 100
+	machinePoolDiagnosticLogTargetLimit = 20
+	machinePoolDiagnosticLogTailLines   = 2000
+	machinePoolDiagnosticLogLimitBytes  = 1 << 20
 )
 
 func TestScaleMachinePool(t *testing.T) {
@@ -194,6 +204,11 @@ func TestNewMachinePool(t *testing.T) {
 			return false
 		},
 	)
+	if err != nil {
+		// The wait has already expired. Capture diagnostics without retrying the wait
+		// or replacing its error so the original timeout remains authoritative.
+		captureMachinePoolDiagnostics(t, cfg, cd)
+	}
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
 	// Now remove the infra machinepool and make sure that any machinesets associated
@@ -479,6 +494,173 @@ func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDe
 
 func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, error) {
 	return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName), nil
+}
+
+func captureMachinePoolDiagnostics(t *testing.T, cfg *rest.Config, cd *hivev1.ClusterDeployment) {
+	t.Helper()
+
+	artifactDir := os.Getenv("ARTIFACT_DIR")
+	if artifactDir == "" {
+		t.Log("ARTIFACT_DIR is not set; cannot capture MachinePool timeout diagnostics")
+		return
+	}
+	prefix := fmt.Sprintf("SPOKE_machinepool_timeout_%s_%s", cd.Namespace, cd.Name)
+
+	rc, err := client.New(cfg, client.Options{Scheme: scheme.GetScheme()})
+	// Bound diagnostics independently of the completed Node wait. Every capture is
+	// best-effort and reports its own error without changing the test's timeout error.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err != nil {
+		t.Logf("failed to create spoke client for MachinePool timeout diagnostics: %v", err)
+	} else {
+		captureSpokeMachinePoolResources(t, ctx, rc, artifactDir, prefix)
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		t.Logf("failed to create spoke Kubernetes client for Machine API logs: %v", err)
+		return
+	}
+	captureMachineAPIControllerLogs(t, ctx, kubeClient, artifactDir, prefix)
+}
+
+func captureSpokeMachinePoolResources(t *testing.T, ctx context.Context, rc client.Client, artifactDir, prefix string) {
+	t.Helper()
+
+	resources := []struct {
+		name        string
+		list        client.ObjectList
+		listOptions []client.ListOption
+	}{
+		{name: "machines", list: &machinev1.MachineList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
+		{name: "machinesets", list: &machinev1.MachineSetList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
+		{name: "nodes", list: &corev1.NodeList{}, listOptions: []client.ListOption{client.Limit(machinePoolDiagnosticListLimit)}},
+		// Events are deliberately split into bounded scopes: Machine API namespace
+		// events cover the controllers and Machine objects, while Node events cover
+		// registration failures without collecting the cluster-wide Event history.
+		{name: "machine-api-events", list: &corev1.EventList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
+		{name: "node-events", list: &corev1.EventList{}, listOptions: []client.ListOption{client.MatchingFields{"involvedObject.kind": "Node"}, client.Limit(machinePoolDiagnosticListLimit)}},
+		{name: "machine-api-pods", list: &corev1.PodList{}, listOptions: []client.ListOption{client.InNamespace(machineAPINamespace), client.Limit(machinePoolDiagnosticListLimit)}},
+	}
+
+	for _, resource := range resources {
+		if err := rc.List(ctx, resource.list, resource.listOptions...); err != nil {
+			t.Logf("failed to list spoke %s for MachinePool timeout diagnostics: %v", resource.name, err)
+			continue
+		}
+		data, err := yaml.Marshal(resource.list)
+		if err != nil {
+			t.Logf("failed to marshal spoke %s for MachinePool timeout diagnostics: %v", resource.name, err)
+			continue
+		}
+		writeMachinePoolDiagnostic(t, filepath.Join(artifactDir, fmt.Sprintf("%s_%s.yaml", prefix, resource.name)), data)
+	}
+}
+
+func captureMachineAPIControllerLogs(t *testing.T, ctx context.Context, kubeClient kubernetes.Interface, artifactDir, prefix string) {
+	t.Helper()
+
+	pods, err := kubeClient.CoreV1().Pods(machineAPINamespace).List(ctx, metav1.ListOptions{Limit: machinePoolDiagnosticPodLimit})
+	if err != nil {
+		t.Logf("failed to list Machine API pods for controller logs: %v", err)
+		return
+	}
+	captureMachineAPIPodLogs(t, ctx, pods.Items, artifactDir, prefix, func(ctx context.Context, podName string, options *corev1.PodLogOptions) ([]byte, error) {
+		return kubeClient.CoreV1().Pods(machineAPINamespace).GetLogs(podName, options).DoRaw(ctx)
+	})
+}
+
+type machineAPILogTarget struct {
+	podName       string
+	containerName string
+	restarted     bool
+}
+
+type podLogReader func(context.Context, string, *corev1.PodLogOptions) ([]byte, error)
+
+func captureMachineAPIPodLogs(t *testing.T, ctx context.Context, pods []corev1.Pod, artifactDir, prefix string, readLogs podLogReader) {
+	t.Helper()
+
+	for _, target := range machineAPILogTargets(pods) {
+		options := &corev1.PodLogOptions{
+			Container:  target.containerName,
+			TailLines:  ptr.To(int64(machinePoolDiagnosticLogTailLines)),
+			LimitBytes: ptr.To(int64(machinePoolDiagnosticLogLimitBytes)),
+		}
+		data, err := readLogs(ctx, target.podName, options)
+		if err != nil {
+			t.Logf("failed to capture logs for Machine API pod %s container %s: %v", target.podName, target.containerName, err)
+		} else {
+			path := filepath.Join(artifactDir, fmt.Sprintf("%s_%s_%s.log", prefix, target.podName, target.containerName))
+			writeMachinePoolDiagnostic(t, path, boundedLogTail(data))
+		}
+
+		// Current and previous log requests are independent so a failed current
+		// request cannot hide the useful pre-restart stream.
+		if target.restarted {
+			options.Previous = true
+			previous, err := readLogs(ctx, target.podName, options)
+			if err != nil {
+				t.Logf("failed to capture previous logs for Machine API pod %s container %s: %v", target.podName, target.containerName, err)
+			} else {
+				previousPath := filepath.Join(artifactDir, fmt.Sprintf("%s_%s_%s_previous.log", prefix, target.podName, target.containerName))
+				writeMachinePoolDiagnostic(t, previousPath, boundedLogTail(previous))
+			}
+		}
+	}
+}
+
+func machineAPILogTargets(pods []corev1.Pod) []machineAPILogTarget {
+	targets := make([]machineAPILogTarget, 0)
+	for i := range pods {
+		pod := &pods[i]
+		for _, container := range pod.Spec.Containers {
+			targets = append(targets, machineAPILogTarget{
+				podName:       pod.Name,
+				containerName: container.Name,
+				restarted:     containerRestarted(pod, container.Name),
+			})
+		}
+	}
+	sort.Slice(targets, func(i, j int) bool {
+		iProvider := targets[i].containerName == "machine-controller"
+		jProvider := targets[j].containerName == "machine-controller"
+		if iProvider != jProvider {
+			return iProvider
+		}
+		if targets[i].podName != targets[j].podName {
+			return targets[i].podName < targets[j].podName
+		}
+		return targets[i].containerName < targets[j].containerName
+	})
+	if len(targets) > machinePoolDiagnosticLogTargetLimit {
+		targets = targets[:machinePoolDiagnosticLogTargetLimit]
+	}
+	return targets
+}
+
+func boundedLogTail(data []byte) []byte {
+	if len(data) <= machinePoolDiagnosticLogLimitBytes {
+		return data
+	}
+	return data[len(data)-machinePoolDiagnosticLogLimitBytes:]
+}
+
+func containerRestarted(pod *corev1.Pod, containerName string) bool {
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == containerName {
+			return status.RestartCount > 0
+		}
+	}
+	return false
+}
+
+func writeMachinePoolDiagnostic(t *testing.T, path string, data []byte) {
+	t.Helper()
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Logf("failed to write MachinePool timeout diagnostic %s: %v", path, err)
+	}
 }
 
 func captureManifests(t *testing.T, rc client.WithWatch, infix string) {

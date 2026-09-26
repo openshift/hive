@@ -2,8 +2,11 @@ package dnsendpoint
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -30,6 +33,28 @@ import (
 const (
 	ControllerName = hivev1.DNSEndpointControllerName
 )
+
+// Route53ThrottleBackoff applies exponential backoff when Route53 returns a
+// ThrottlingException. The pointer identity is used as part of the tracking
+// key inside DelayingReconciler, so this must be a package-level variable.
+var Route53ThrottleBackoff = &controllerutils.CustomBackoff{
+	Name:     "Route53Throttle",
+	MinDelay: 5 * time.Second,
+	MaxDelay: 320 * time.Second,
+	Match: func(err error) bool {
+		var te *types.ThrottlingException
+		return stderrors.As(err, &te)
+	},
+}
+
+// wrapWithRoute53Backoff wraps an error with Route53ThrottleBackoff so the
+// DelayingReconciler can apply exponential backoff for throttling errors.
+func wrapWithRoute53Backoff(err error) error {
+	if err == nil {
+		return nil
+	}
+	return controllerutils.NewErrorWithCustomBackoff(err, Route53ThrottleBackoff)
+}
 
 // Add creates one controller for DNSZone and one with a nameServerScraper for each root domain in
 // HiveConfig.spec.managedDomains.domains[]. The controllers are added to the Manager with default
@@ -262,7 +287,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		dnsLog.Info("creating/updating NS records for subdomain")
 		if err := nsTool.queryClient.CreateOrUpdate(rootDomain, fullDomain, desiredNameServers); err != nil {
 			dnsLog.WithError(err).Error("error creating NS record")
-			return reconcile.Result{}, err
+			return reconcile.Result{}, wrapWithRoute53Backoff(err)
 		}
 
 		// Sync the cache so the nameserverscraper doesn't re-notify this controller the next time
@@ -280,7 +305,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		dnsLog.Info("deleting NS records")
 		if err := nsTool.queryClient.Delete(rootDomain, fullDomain, scrapedNameServers); err != nil {
 			dnsLog.WithError(err).Error("error deleting NS record")
-			return reconcile.Result{}, err
+			return reconcile.Result{}, wrapWithRoute53Backoff(err)
 		}
 		nsTool.scraper.RemoveEndpoint(fullDomain)
 	}

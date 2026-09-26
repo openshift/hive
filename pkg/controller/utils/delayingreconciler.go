@@ -128,9 +128,8 @@ func (d *delayingReconciler) Reconcile(ctx context.Context, request reconcile.Re
 				}).WithError(err).Info("Custom backoff triggered. Requeueing request with delay.")
 				result = reconcile.Result{RequeueAfter: delay}
 				err = nil
+				break
 			}
-			// Continue iterating; post-loop cleanup handles counter clearing
-			// for remaining policies.
 		}
 	}
 

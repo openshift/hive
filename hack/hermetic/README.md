@@ -14,9 +14,7 @@ The mechanism is to maintain a list ("lock file") of all the RPMs we require/exp
 ## Updating
 MintMaker is [configured](../../renovate.json) to propose PRs to keep our lockfile up to date.
 
-If that fails or lags behind, we have a never-run [periodic](https://github.com/openshift/release/blob/c36cb7de5b6c2f66cc54e27802d128bbee678bb0/ci-operator/jobs/infra-periodics.yaml#L3479) that can be triggered on demand.
-
-And as a last resort, the process to do it manually is described [below](#manual-process) (though you may be better off using the script embedded in the periodic).
+As a last resort, the process to do it manually is described [below](#manual-process) (though you may be better off using the script embedded in [this obsolete periodic](https://github.com/openshift/release/blob/5c1f3fe562fff62e8ccafb24af51eb715ef85c85/ci-operator/jobs/infra-periodics.yaml#L3735)).
 
 ## Manual Process
 

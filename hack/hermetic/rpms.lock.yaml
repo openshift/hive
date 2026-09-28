@@ -501,13 +501,13 @@ arches:
     name: libxcrypt
     evr: 4.4.18-3.el9
     sourcerpm: libxcrypt-4.4.18-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.4.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.5.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 754646
-    checksum: sha256:10417dde519f111c6248fae0eb6fb9889efd3e68c575caced652823d7ef4f169
+    size: 754850
+    checksum: sha256:39e0ffab5e42aa3688a39a9f27cecb77ee8dbf03682ca5b38c3e15ebc5493863
     name: libxml2
-    evr: 2.9.13-14.el9_8.4
-    sourcerpm: libxml2-2.9.13-14.el9_8.4.src.rpm
+    evr: 2.9.13-14.el9_8.5
+    sourcerpm: libxml2-2.9.13-14.el9_8.5.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libzstd-1.5.5-1.el9.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 283159
@@ -1261,13 +1261,13 @@ arches:
     name: libxcrypt
     evr: 4.4.18-3.el9
     sourcerpm: libxcrypt-4.4.18-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.4.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.5.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 848848
-    checksum: sha256:6f6b25cf2206acdbaeb27722aeac871c415adb4c72a09c0fdbaae59b410bd68e
+    size: 849744
+    checksum: sha256:267461e4d4e7428d7e0f375370ec97b0c910f26e5236204d052fa2fc6ebdd413
     name: libxml2
-    evr: 2.9.13-14.el9_8.4
-    sourcerpm: libxml2-2.9.13-14.el9_8.4.src.rpm
+    evr: 2.9.13-14.el9_8.5
+    sourcerpm: libxml2-2.9.13-14.el9_8.5.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libzstd-1.5.5-1.el9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 329280
@@ -2014,13 +2014,13 @@ arches:
     name: libxcrypt
     evr: 4.4.18-3.el9
     sourcerpm: libxcrypt-4.4.18-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.4.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.5.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 734166
-    checksum: sha256:1ad6ef220ab2ca03325ba296fdb0e345c3f56fbfb261c18278dccdf3145ff300
+    size: 734699
+    checksum: sha256:866077b2b08672a703e77c7154dd9d23ea8908926657d74ec2a12156f48c69a7
     name: libxml2
-    evr: 2.9.13-14.el9_8.4
-    sourcerpm: libxml2-2.9.13-14.el9_8.4.src.rpm
+    evr: 2.9.13-14.el9_8.5
+    sourcerpm: libxml2-2.9.13-14.el9_8.5.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libzstd-1.5.5-1.el9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 283786
@@ -2760,13 +2760,13 @@ arches:
     name: libxcrypt
     evr: 4.4.18-3.el9
     sourcerpm: libxcrypt-4.4.18-3.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.4.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libxml2-2.9.13-14.el9_8.5.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 772646
-    checksum: sha256:3b2b7f705584d2aa9dc1a110ef1b00dbefb3305285877a24a24605fcb9567eb0
+    size: 773693
+    checksum: sha256:d55744c4fe83a63a71906ca41607c5c0deff227a69b957708cc6a37537be4a29
     name: libxml2
-    evr: 2.9.13-14.el9_8.4
-    sourcerpm: libxml2-2.9.13-14.el9_8.4.src.rpm
+    evr: 2.9.13-14.el9_8.5
+    sourcerpm: libxml2-2.9.13-14.el9_8.5.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libzstd-1.5.5-1.el9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 304135

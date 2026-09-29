@@ -78,18 +78,51 @@ fi
 # 4) Rerun postdeploy tests, which wait for everything to come up
 echo "Running post-deploy tests in new namespace $HIVE_NS"
 make test-e2e-postdeploy
-# 5) Make sure the old namespace is "clean" (modulo the garbage that k8s/openshift leave behind, sad-face)
-rc=0
-for resource in secret configmap role rolebinding serviceaccount deployment replicaset statefulset pod; do
-  echo "Checking for stale $resource resources in original namespace $ORIG_NS"
-  if R=$(oc get $resource -n $ORIG_NS | grep hive); then
-    echo "FAIL: found stale $resource $R in original namespace $ORIG_NS"
-    rc=1
+# 5) Make sure the old namespace is "clean" (modulo the garbage that k8s/openshift leave behind, sad-face).
+# Workloads can still be terminating after the new namespace becomes ready. Give only
+# those resources a bounded grace period; resources that have not started deletion fail
+# immediately, and resources stuck terminating beyond the grace period still fail.
+migration_cleanup_grace_seconds=120
+migration_cleanup_poll_seconds=5
+migration_cleanup_deadline=$((SECONDS + migration_cleanup_grace_seconds))
+migration_resources=(secret configmap role rolebinding serviceaccount deployment replicaset statefulset pod)
+
+while true; do
+  rc=0
+  terminating=0
+
+  for resource in "${migration_resources[@]}"; do
+    resources=$(oc get "$resource" -n "$ORIG_NS" -o json)
+    active_names=$(jq -r '.items[] | select((.metadata.name | contains("hive")) and (.metadata.deletionTimestamp == null)) | .metadata.name' <<<"$resources")
+    terminating_names=$(jq -r '.items[] | select((.metadata.name | contains("hive")) and (.metadata.deletionTimestamp != null)) | .metadata.name' <<<"$resources")
+
+    if [[ -n "$active_names" ]]; then
+      echo "FAIL: found stale $resource resources not terminating in original namespace $ORIG_NS:"
+      oc get "$resource" -n "$ORIG_NS" -o custom-columns='NAME:.metadata.name,DELETION_TIMESTAMP:.metadata.deletionTimestamp,PHASE:.status.phase' | grep hive || true
+      rc=1
+    fi
+    if [[ -n "$terminating_names" ]]; then
+      terminating=1
+    fi
+  done
+
+  if [[ $rc -ne 0 ]]; then
+    exit 1
   fi
+  if [[ $terminating -eq 0 ]]; then
+    break
+  fi
+  if [[ $SECONDS -ge $migration_cleanup_deadline ]]; then
+    echo "FAIL: Hive resources are still terminating in original namespace $ORIG_NS after ${migration_cleanup_grace_seconds}s:"
+    for resource in "${migration_resources[@]}"; do
+      oc get "$resource" -n "$ORIG_NS" -o custom-columns='NAME:.metadata.name,DELETION_TIMESTAMP:.metadata.deletionTimestamp,PHASE:.status.phase' | grep hive || true
+    done
+    exit 1
+  fi
+
+  echo "Waiting up to $((migration_cleanup_deadline - SECONDS))s for terminating Hive resources to leave original namespace $ORIG_NS"
+  sleep "$migration_cleanup_poll_seconds"
 done
-if [[ $rc -ne 0 ]]; then
-  exit 1
-fi
 
 if [[ "${CLOUD}" == "openstack" ]]; then
   export CLUSTER_NAME=$(get_osp_resources "${SHARED_DIR}/HIVE_CLUSTER_NAME")

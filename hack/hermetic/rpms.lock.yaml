@@ -932,13 +932,13 @@ arches:
     name: gmp
     evr: 1:6.2.0-13.el9
     sourcerpm: gmp-6.2.0-13.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/g/gnutls-3.8.10-8.el9_8.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/g/gnutls-3.8.10-9.el9_8.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 1387663
-    checksum: sha256:ff8aac961aa42bbd5707c6a00902f74d60a9df0dbba90d10e92f1a149d6b6229
+    size: 1387107
+    checksum: sha256:463eb83e9ecab029724f145ba7a7a5a4a8abceee64c80b88b1895783e6599eb3
     name: gnutls
-    evr: 3.8.10-8.el9_8
-    sourcerpm: gnutls-3.8.10-8.el9_8.src.rpm
+    evr: 3.8.10-9.el9_8
+    sourcerpm: gnutls-3.8.10-9.el9_8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/g/grep-3.6-5.el9.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 288035
@@ -1002,13 +1002,13 @@ arches:
     name: libblkid
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libbrotli-1.0.9-9.el9_7.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 349508
-    checksum: sha256:ff72df4a441c2f8ee8e1bcde8dcbd5bbd89250db9caf8792ff253b7af3e1c51c
+    size: 349850
+    checksum: sha256:42e896518cf1eafcacb3de33fc0bd827d574413543166a218ee69b22653ccea9
     name: libbrotli
-    evr: 1.0.9-9.el9_7
-    sourcerpm: brotli-1.0.9-9.el9_7.src.rpm
+    evr: 1.0.9-10.el9_8
+    sourcerpm: brotli-1.0.9-10.el9_8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libcap-2.48-10.el9_8.1.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 82771
@@ -1692,13 +1692,13 @@ arches:
     name: gmp
     evr: 1:6.2.0-13.el9
     sourcerpm: gmp-6.2.0-13.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/g/gnutls-3.8.10-8.el9_8.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/g/gnutls-3.8.10-9.el9_8.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 1255886
-    checksum: sha256:152884dbc31ed56618107930a14504ffd083a1acd3f6328a6ad09805561f34b7
+    size: 1256149
+    checksum: sha256:7c2e3450f0c4c6b9f43388d6abd4b019c476cd017df3b8534a9f08e765df4ba1
     name: gnutls
-    evr: 3.8.10-8.el9_8
-    sourcerpm: gnutls-3.8.10-8.el9_8.src.rpm
+    evr: 3.8.10-9.el9_8
+    sourcerpm: gnutls-3.8.10-9.el9_8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/g/grep-3.6-5.el9.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 280207
@@ -1762,13 +1762,13 @@ arches:
     name: libblkid
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libbrotli-1.0.9-9.el9_7.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 329308
-    checksum: sha256:ea47c24d8670923c31472fac1c2887ee8124b0a142ffb8a3c4953da8bf65c238
+    size: 329468
+    checksum: sha256:1d94d6401d4dd4c75b96b810046f1918c82460e0c3e9651e98d0e0c810ba0e22
     name: libbrotli
-    evr: 1.0.9-9.el9_7
-    sourcerpm: brotli-1.0.9-9.el9_7.src.rpm
+    evr: 1.0.9-10.el9_8
+    sourcerpm: brotli-1.0.9-10.el9_8.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libcap-2.48-10.el9_8.1.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 77818

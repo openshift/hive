@@ -385,7 +385,23 @@ install-tools:
 	go install $(GO_MOD_FLAGS) go.uber.org/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
+	go install $(GO_MOD_FLAGS) sigs.k8s.io/controller-runtime/tools/setup-envtest
+	go install $(GO_MOD_FLAGS) golang.org/x/perf/cmd/benchstat
 
 .PHONY: coverage
 coverage:
 	hack/codecov.sh
+
+.PHONY: setup-envtest
+# Downloads envtest binaries and prints the required export KUBEBUILDER_ASSETS=... command.
+# Run the printed export command (or add it to your shell rc) before running benchmarks.
+setup-envtest:
+	hack/setup-envtest.sh
+
+.PHONY: benchmark
+# Runs the benchmark suites. Manual tooling: not part of 'make test', and
+# nothing schedules it (no CI job, no cron); see "Automation Status" in
+# test/benchmark/README.md. Uses a local envtest instance by default; set
+# BENCHMARK_KUBECONFIG=/path/to/kubeconfig to run against an existing cluster.
+benchmark:
+	hack/run-benchmarks.sh

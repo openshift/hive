@@ -54,7 +54,7 @@ type Builder interface {
 // The controllerName is needed for metrics.
 // If the ClusterDeployment carries the fake cluster annotation, a fake client will be returned populated with
 // runtime.Objects we need to query for in all our controllers.
-func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
+func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName, opts ...RESTConfigOption) Builder {
 	if utils.IsFakeCluster(cd) {
 		clusterVersion := ""
 		if cd.Status.InstallVersion != nil {
@@ -70,6 +70,7 @@ func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hi
 		cd:             cd,
 		controllerName: controllerName,
 		urlToUse:       activeURL,
+		restConfigOpts: opts,
 	}
 }
 
@@ -185,11 +186,32 @@ func SetUnreachableCondition(cd *hivev1.ClusterDeployment, connectionError error
 	return
 }
 
+// RESTConfigOption customizes the REST config returned by Builder.RESTConfig().
+type RESTConfigOption func(*rest.Config)
+
+// WithTransportWrapper returns a RESTConfigOption that wraps the HTTP transport
+// of the REST config. The wrapper is applied after the controller metrics
+// transport, so it sits on the outermost layer and observes all HTTP round trips.
+func WithTransportWrapper(wrapper func(http.RoundTripper) http.RoundTripper) RESTConfigOption {
+	return func(cfg *rest.Config) {
+		cfg.Wrap(wrapper)
+	}
+}
+
+// applyRESTConfigOptions applies opts to cfg, in order.
+func applyRESTConfigOptions(cfg *rest.Config, opts ...RESTConfigOption) *rest.Config {
+	for _, o := range opts {
+		o(cfg)
+	}
+	return cfg
+}
+
 type builder struct {
 	c              client.Client
 	cd             *hivev1.ClusterDeployment
 	controllerName hivev1.ControllerName
 	urlToUse       int
+	restConfigOpts []RESTConfigOption
 }
 
 const (
@@ -286,7 +308,8 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 		cfg.Proxy = machnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 
-	return cfg, nil
+	// Apply options last so they observe the final config.
+	return applyRESTConfigOptions(cfg, b.restConfigOpts...), nil
 }
 
 func unadulteratedRESTConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {

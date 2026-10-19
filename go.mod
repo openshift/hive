@@ -49,11 +49,11 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/vmware/govmomi v0.53.0
-	golang.org/x/crypto v0.57.0
+	golang.org/x/crypto v0.58.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/oauth2 v0.36.0
+	golang.org/x/net v0.61.0 // indirect
+	golang.org/x/oauth2 v0.37.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.287.1
 	gopkg.in/ini.v1 v1.67.3
@@ -71,6 +71,7 @@ require (
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/cluster-api-provider-azure v1.24.2
 	sigs.k8s.io/controller-runtime v0.24.1
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250911215635-f3b9e4f96392
 	sigs.k8s.io/controller-tools v0.19.0
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -117,7 +118,7 @@ require (
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
-	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743 // indirect
+	golang.org/x/exp v0.0.0-20261007192929-f45ad48fbe92 // indirect
 	sigs.k8s.io/cluster-api v1.13.4 // indirect
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.12.1 // indirect
 	sigs.k8s.io/cluster-api-provider-gcp v1.13.1-0.20260810150012-23049b61863d // indirect
@@ -153,8 +154,10 @@ require (
 )
 
 require (
+	github.com/gobuffalo/flect v1.0.3
 	github.com/openshift/client-go v0.0.0-20260806041845-b74fb348f1e7
 	go.uber.org/mock v0.6.0
+	golang.org/x/perf v0.0.0-20261009192801-be2c69fb417e
 )
 
 require (
@@ -198,6 +201,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
+	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
 	github.com/alingse/nilnesserr v0.1.2 // indirect
@@ -272,7 +276,6 @@ require (
 	github.com/go-toolsmith/typep v1.1.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.3 // indirect
-	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gofrs/uuid/v5 v5.3.0 // indirect
@@ -413,11 +416,11 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
 	google.golang.org/grpc v1.83.2 // indirect

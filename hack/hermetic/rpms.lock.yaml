@@ -214,13 +214,13 @@ arches:
     name: keyutils-libs
     evr: 1.6.3-1.el9
     sourcerpm: keyutils-1.6.3-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.1.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 793489
-    checksum: sha256:f8bbc9abe0da1ebe5bc028154bd54d465fe0682ddbb64c45882b84ff09f40e1d
+    size: 793631
+    checksum: sha256:35ea4e07d704837be334a199e8deb950db2ac7e655b2edc578d0ac309d08ce59
     name: krb5-libs
-    evr: 1.21.1-10.el9_8
-    sourcerpm: krb5-1.21.1-10.el9_8.src.rpm
+    evr: 1.21.1-10.el9_8.1
+    sourcerpm: krb5-1.21.1-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 31468
@@ -249,13 +249,13 @@ arches:
     name: libblkid
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.aarch64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.1.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
-    size: 325419
-    checksum: sha256:04d157b138153dcd27c04d81ae985e8190ddc542d63620f3d1ae0a690a1041b7
+    size: 325599
+    checksum: sha256:f1b700ba7bfa1bb8d0b0f8af47c9a5afd8a44c74cec4ef17627b268c518c358b
     name: libbrotli
-    evr: 1.0.9-10.el9_8
-    sourcerpm: brotli-1.0.9-10.el9_8.src.rpm
+    evr: 1.0.9-10.el9_8.1
+    sourcerpm: brotli-1.0.9-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/os/Packages/l/libcap-2.48-10.el9_8.1.aarch64.rpm
     repoid: ubi-9-for-aarch64-baseos-rpms
     size: 78021
@@ -967,13 +967,13 @@ arches:
     name: keyutils-libs
     evr: 1.6.3-1.el9
     sourcerpm: keyutils-1.6.3-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.1.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 872744
-    checksum: sha256:29c5c7dbdd6ab6b3a72a229dccb60dc2596fb121ac7ddc5f8e37c3bf0b51f528
+    size: 873073
+    checksum: sha256:f831a49841e0b99f296a43e9a747cd74030002b35f84b9c3f6d296f2cc0742d5
     name: krb5-libs
-    evr: 1.21.1-10.el9_8
-    sourcerpm: krb5-1.21.1-10.el9_8.src.rpm
+    evr: 1.21.1-10.el9_8.1
+    sourcerpm: krb5-1.21.1-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 34015
@@ -1002,13 +1002,13 @@ arches:
     name: libblkid
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.ppc64le.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.1.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
-    size: 349850
-    checksum: sha256:42e896518cf1eafcacb3de33fc0bd827d574413543166a218ee69b22653ccea9
+    size: 349955
+    checksum: sha256:8329633babd918125a00e4a3ee4c1fd45509152a6a9bfa4b7e2f7545f24a567a
     name: libbrotli
-    evr: 1.0.9-10.el9_8
-    sourcerpm: brotli-1.0.9-10.el9_8.src.rpm
+    evr: 1.0.9-10.el9_8.1
+    sourcerpm: brotli-1.0.9-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/os/Packages/l/libcap-2.48-10.el9_8.1.ppc64le.rpm
     repoid: ubi-9-for-ppc64le-baseos-rpms
     size: 82771
@@ -1727,13 +1727,13 @@ arches:
     name: keyutils-libs
     evr: 1.6.3-1.el9
     sourcerpm: keyutils-1.6.3-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.1.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 772565
-    checksum: sha256:cb487b335eeba5bad4d090a56bed7d0d173392fd6aab85a5471792a01eb3c4ef
+    size: 772469
+    checksum: sha256:71db63cf970cc699e802bb8d9bc7a1d963767b3557520490518dd8176fab42e9
     name: krb5-libs
-    evr: 1.21.1-10.el9_8
-    sourcerpm: krb5-1.21.1-10.el9_8.src.rpm
+    evr: 1.21.1-10.el9_8.1
+    sourcerpm: krb5-1.21.1-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 31509
@@ -1762,13 +1762,13 @@ arches:
     name: libblkid
     evr: 2.37.4-25.el9
     sourcerpm: util-linux-2.37.4-25.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.s390x.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libbrotli-1.0.9-10.el9_8.1.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
-    size: 329468
-    checksum: sha256:1d94d6401d4dd4c75b96b810046f1918c82460e0c3e9651e98d0e0c810ba0e22
+    size: 329618
+    checksum: sha256:2a071bfab5eee915ec90cfd4ef7e87434fabd282ab910ea5b6f41c10aee03d98
     name: libbrotli
-    evr: 1.0.9-10.el9_8
-    sourcerpm: brotli-1.0.9-10.el9_8.src.rpm
+    evr: 1.0.9-10.el9_8.1
+    sourcerpm: brotli-1.0.9-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/s390x/baseos/os/Packages/l/libcap-2.48-10.el9_8.1.s390x.rpm
     repoid: ubi-9-for-s390x-baseos-rpms
     size: 77818
@@ -2480,13 +2480,13 @@ arches:
     name: keyutils-libs
     evr: 1.6.3-1.el9
     sourcerpm: keyutils-1.6.3-1.el9.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/k/krb5-libs-1.21.1-10.el9_8.1.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 790743
-    checksum: sha256:8906be9f2d414c5f4e1218db0c94955c2b3394b43a04b7dbcc2ef66c4340ebc6
+    size: 790530
+    checksum: sha256:867bf5fb56f787d3515053cb0f5f14e6aced3ba43999f03f255c2d3f6c0c8f36
     name: krb5-libs
-    evr: 1.21.1-10.el9_8
-    sourcerpm: krb5-1.21.1-10.el9_8.src.rpm
+    evr: 1.21.1-10.el9_8.1
+    sourcerpm: krb5-1.21.1-10.el9_8.1.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/l/libacl-2.4.0-1.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 31657

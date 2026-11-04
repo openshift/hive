@@ -132,11 +132,6 @@ func (in *AWSNetworkLoadBalancerParameters) DeepCopyInto(out *AWSNetworkLoadBala
 		*out = make([]EIPAllocation, len(*in))
 		copy(*out, *in)
 	}
-	if in.SecurityGroups != nil {
-		in, out := &in.SecurityGroups, &out.SecurityGroups
-		*out = make([]SecurityGroupID, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

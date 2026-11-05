@@ -71,6 +71,8 @@ type Client interface {
 
 	GetServiceAttachment(serviceAttachment string, region string) (*compute.ServiceAttachment, error)
 
+	ListServiceAttachments(region string) ([]*compute.ServiceAttachment, error)
+
 	DeleteServiceAttachment(serviceAttachment string, region string) error
 
 	GetNetwork(name string) (*compute.Network, error)
@@ -501,6 +503,23 @@ func (c *gcpClient) GetServiceAttachment(serviceAttachment string, region string
 	defer cancel()
 
 	return c.computeClient.ServiceAttachments.Get(c.projectName, region, serviceAttachment).Context(ctx).Do()
+}
+
+// ListServiceAttachments returns all the service attachments in the given region of the project.
+func (c *gcpClient) ListServiceAttachments(region string) ([]*compute.ServiceAttachment, error) {
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+
+	var serviceAttachments []*compute.ServiceAttachment
+	err := c.computeClient.ServiceAttachments.List(c.projectName, region).Pages(ctx, func(page *compute.ServiceAttachmentList) error {
+		serviceAttachments = append(serviceAttachments, page.Items...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return serviceAttachments, nil
 }
 
 func (c *gcpClient) GetNetwork(network string) (*compute.Network, error) {

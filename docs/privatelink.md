@@ -267,6 +267,7 @@ The clusterDeployment service account requires the following permissions in addi
     - compute.serviceAttachments.create
     - compute.serviceAttachments.delete
     - compute.serviceAttachments.get
+    - compute.serviceAttachments.list
     - compute.subnetworks.get
 - Subnet
     - compute.networks.get

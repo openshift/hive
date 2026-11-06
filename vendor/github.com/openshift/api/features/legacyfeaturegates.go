@@ -95,6 +95,8 @@ var legacyFeatureGates = sets.New(
 	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereDriverConfiguration",
 	// never add to this list, if you think you have an exception ask @deads2k
+	"VSphereMultiNetworks",
+	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereMultiVCenters",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereStaticIPs",

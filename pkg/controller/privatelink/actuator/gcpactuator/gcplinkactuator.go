@@ -3,6 +3,7 @@ package gcpactuator
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -453,6 +454,13 @@ func (a *GCPLinkActuator) ensureServiceAttachment(cd *hivev1.ClusterDeployment, 
 	serviceAttachmentName := metadata.InfraID + "psc"
 	serviceAttachment, err := a.gcpClientSpoke.GetServiceAttachment(serviceAttachmentName, cd.Spec.Platform.GCP.Region)
 	if isNotFound(err) {
+		// A Private Service Connect subnet can only be bound to a single service attachment. When a
+		// preexisting subnet is reused (e.g. by a new cluster before an old, failed one is deprovisioned),
+		// GCP rejects CreateServiceAttachment with RESOURCE_IN_USE_BY_OTHER_RESOURCE. Detect this up front
+		// so we surface an actionable error rather than retrying until the install times out.
+		if err := a.verifyServiceAttachmentSubnetAvailable(cd, serviceAttachmentName, subnet); err != nil {
+			return false, nil, err
+		}
 		newServiceAttachment, err := a.createServiceAttachment(serviceAttachmentName, cd.Spec.Platform.GCP.Region, forwardingRule, subnet)
 		if err != nil {
 			return false, nil, err
@@ -473,6 +481,49 @@ func (a *GCPLinkActuator) ensureServiceAttachment(cd *hivev1.ClusterDeployment, 
 	}
 
 	return modified, serviceAttachment, nil
+}
+
+// verifyServiceAttachmentSubnetAvailable checks whether the PSC subnet is already bound to a service
+// attachment other than the one we are about to create. A Private Service Connect subnet cannot be used
+// in more than one service attachment, so if it is already in use we return an actionable error instead
+// of attempting a creation that GCP will reject with RESOURCE_IN_USE_BY_OTHER_RESOURCE.
+func (a *GCPLinkActuator) verifyServiceAttachmentSubnetAvailable(cd *hivev1.ClusterDeployment, serviceAttachmentName string, subnet *compute.Subnetwork) error {
+	existingServiceAttachments, err := a.gcpClientSpoke.ListServiceAttachments(cd.Spec.Platform.GCP.Region)
+	if err != nil {
+		return errors.Wrap(err, "error listing existing service attachments")
+	}
+
+	for _, existing := range existingServiceAttachments {
+		if existing.Name == serviceAttachmentName {
+			continue
+		}
+		for _, natSubnet := range existing.NatSubnets {
+			if sameSubnet(natSubnet, subnet.SelfLink) {
+				return errors.Errorf("the Service Attachment Subnet %q is already in use by Service Attachment %q; "+
+					"a Private Service Connect subnet cannot be used by more than one service attachment. "+
+					"Ensure the previous cluster using this subnet is fully deprovisioned before reusing it",
+					subnet.Name, existing.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+// sameSubnet compares two subnet references which may be full self-links or partial URLs by matching
+// their trailing path (project/region/subnet) components.
+func sameSubnet(a, b string) bool {
+	if a == b {
+		return true
+	}
+	trim := func(s string) string {
+		parts := strings.Split(s, "/")
+		if n := len(parts); n >= 5 {
+			return strings.Join(parts[n-5:], "/")
+		}
+		return s
+	}
+	return trim(a) == trim(b)
 }
 
 // createServiceAttachment creates the service attachment.

@@ -1626,8 +1626,9 @@ func Test_ensureServiceAttachment(t *testing.T) {
 	cdBuilder := testcd.FullBuilder(testNameSpace, testClusterDeployment, scheme.GetScheme())
 
 	cases := []struct {
-		name string
-		cd   *hivev1.ClusterDeployment
+		name   string
+		cd     *hivev1.ClusterDeployment
+		subnet *compute.Subnetwork
 
 		gcpClientConfig func(*mockclient.MockClient)
 
@@ -1647,6 +1648,7 @@ func Test_ensureServiceAttachment(t *testing.T) {
 		gcpClientConfig: func(m *mockclient.MockClient) {
 			m.EXPECT().GetProjectName().Return(testProjectName)
 			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return(nil, nil)
 			m.EXPECT().CreateServiceAttachment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusUnauthorized, "AccessDenied", "not authorized to CreateServiceAttachment"))
 		},
 		expectError: "error creating the Service Attachment: googleapi: Error 401: not authorized to CreateServiceAttachment, AccessDenied",
@@ -1662,11 +1664,85 @@ func Test_ensureServiceAttachment(t *testing.T) {
 		gcpClientConfig: func(m *mockclient.MockClient) {
 			m.EXPECT().GetProjectName().Return(testProjectName)
 			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return(nil, nil)
 			m.EXPECT().CreateServiceAttachment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
 		},
 		expect:         mockServiceAttachment,
 		expectModified: true,
 		expectStatus:   mockServiceAttachment.SelfLink,
+	}, { // There should be an actionable error when the PSC subnet is already bound to another service attachment
+		name: "subnet already in use by another service attachment",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{},
+			}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return([]*compute.ServiceAttachment{{
+				Name:       "other-cluster-psc",
+				NatSubnets: []string{mockSubnet.SelfLink},
+			}}, nil)
+		},
+		expectError: `the Service Attachment Subnet "testsubnet" is already in use by Service Attachment "other-cluster-psc"; a Private Service Connect subnet cannot be used by more than one service attachment. Ensure the previous cluster using this subnet is fully deprovisioned before reusing it`,
+	}, { // The subnet-in-use detection should match even when references differ (self-link vs. partial URL)
+		name: "subnet in use matched via partial url",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{},
+			}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		subnet: &compute.Subnetwork{
+			Name:     "testsubnet",
+			SelfLink: "https://www.googleapis.com/compute/v1/projects/testproject/regions/testregion/subnetworks/testsubnet",
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return([]*compute.ServiceAttachment{{
+				Name:       "other-cluster-psc",
+				NatSubnets: []string{"projects/testproject/regions/testregion/subnetworks/testsubnet"},
+			}}, nil)
+		},
+		expectError: `the Service Attachment Subnet "testsubnet" is already in use by Service Attachment "other-cluster-psc"; a Private Service Connect subnet cannot be used by more than one service attachment. Ensure the previous cluster using this subnet is fully deprovisioned before reusing it`,
+	}, { // The cluster's own stale service attachment should be ignored and creation should proceed
+		name: "ignores own service attachment when checking subnet usage",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{},
+			}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetProjectName().Return(testProjectName)
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return([]*compute.ServiceAttachment{{
+				Name:       testInfraID + "psc",
+				NatSubnets: []string{mockSubnet.SelfLink},
+			}}, nil)
+			m.EXPECT().CreateServiceAttachment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
+		},
+		expect:         mockServiceAttachment,
+		expectModified: true,
+		expectStatus:   mockServiceAttachment.SelfLink,
+	}, { // There should be an error when listing existing service attachments fails
+		name: "ListServiceAttachments failed",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{},
+			}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().ListServiceAttachments(gomock.Any()).Return(nil, newGoogleApiError(http.StatusUnauthorized, "AccessDenied", "not authorized to ListServiceAttachments"))
+		},
+		expectError: "error listing existing service attachments: googleapi: Error 401: not authorized to ListServiceAttachments, AccessDenied",
 	}, { // There should be an error on failure to GetServiceAttachment
 		name: "GetServiceAttachment failed",
 		cd: cdBuilder.Build(
@@ -1720,7 +1796,11 @@ func Test_ensureServiceAttachment(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			modified, result, err := gcpLinkActuator.ensureServiceAttachment(test.cd, test.cd.Spec.ClusterMetadata, mockForwardingRule, mockSubnet)
+			subnet := mockSubnet
+			if test.subnet != nil {
+				subnet = test.subnet
+			}
+			modified, result, err := gcpLinkActuator.ensureServiceAttachment(test.cd, test.cd.Spec.ClusterMetadata, mockForwardingRule, subnet)
 
 			if test.expectError == "" {
 				assert.NoError(t, err)

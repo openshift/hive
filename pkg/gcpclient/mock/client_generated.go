@@ -362,6 +362,21 @@ func (mr *MockClientMockRecorder) GetServiceAttachment(serviceAttachment, region
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceAttachment", reflect.TypeOf((*MockClient)(nil).GetServiceAttachment), serviceAttachment, region)
 }
 
+// ListServiceAttachments mocks base method.
+func (m *MockClient) ListServiceAttachments(region string) ([]*compute.ServiceAttachment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListServiceAttachments", region)
+	ret0, _ := ret[0].([]*compute.ServiceAttachment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListServiceAttachments indicates an expected call of ListServiceAttachments.
+func (mr *MockClientMockRecorder) ListServiceAttachments(region any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceAttachments", reflect.TypeOf((*MockClient)(nil).ListServiceAttachments), region)
+}
+
 // GetSubnet mocks base method.
 func (m *MockClient) GetSubnet(name, region, project string) (*compute.Subnetwork, error) {
 	m.ctrl.T.Helper()

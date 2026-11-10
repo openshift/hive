@@ -276,11 +276,21 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, err
 	}
 
-	switch cd.Spec.ClusterPoolRef.ClaimName {
-	case "":
+	poolRef := cd.Spec.ClusterPoolRef
+	switch {
+	case poolRef == nil:
+		// A non-pool cluster cannot be assigned to a claim.
+		logger.Error("clusterdeployment has no ClusterPoolRef")
+		return reconcile.Result{}, nil
+	case poolRef.Namespace != claim.Namespace:
+		// Reject cross-namespace assignments; claim.spec.namespace is user-settable.
+		return r.reconcileForInvalidAssignment(claim,
+			fmt.Sprintf("ClusterDeployment %s/%s belongs to pool namespace %q, not claim namespace %q",
+				cd.Namespace, cd.Name, poolRef.Namespace, claim.Namespace), logger)
+	case poolRef.ClaimName == "":
 		logger.Debugf("clusterdeployment %s has not yet been assigned to claim", cd.Name)
 		return reconcile.Result{}, nil
-	case claim.Name:
+	case poolRef.ClaimName == claim.Name:
 		return r.reconcileForExistingAssignment(claim, cd, logger)
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
@@ -522,6 +532,31 @@ func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.Clu
 	)
 	if err := r.Update(context.Background(), claim); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update spec of ClusterClaim")
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterClaim) reconcileForInvalidAssignment(claim *hivev1.ClusterClaim, message string, logger log.FieldLogger) (reconcile.Result, error) {
+	logger.Info(message)
+	claim.Status.Conditions = controllerutils.SetClusterClaimCondition(
+		claim.Status.Conditions,
+		hivev1.ClusterClaimPendingCondition,
+		corev1.ConditionTrue,
+		"InvalidAssignment",
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	claim.Status.Conditions = controllerutils.SetClusterClaimCondition(
+		claim.Status.Conditions,
+		hivev1.ClusterRunningCondition,
+		corev1.ConditionFalse,
+		"InvalidAssignment",
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if err := r.Status().Update(context.Background(), claim); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

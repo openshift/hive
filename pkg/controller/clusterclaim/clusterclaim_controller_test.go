@@ -740,6 +740,67 @@ func TestReconcileClusterClaim(t *testing.T) {
 	}
 }
 
+// TestReconcileClusterClaimCrossPoolAssignment ensures that a claim whose user-settable
+// spec.namespace points at a ClusterDeployment belonging to a different pool's
+// namespace does not get hive-claim-owner RBAC created in that namespace.
+func TestReconcileClusterClaimCrossPoolAssignment(t *testing.T) {
+	scheme := scheme.GetScheme()
+	claim := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
+		testclaim.WithSubjects(subjects),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionFalse,
+			Type:   hivev1.ClusterClaimPendingCondition,
+		}),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionTrue,
+			Type:   hivev1.ClusterRunningCondition,
+		}),
+		testclaim.WithCluster(clusterName),
+	).Build()
+	// CD lives in clusterName namespace but belongs to another pool's namespace.
+	cd := testcd.FullBuilder(clusterName, clusterName, scheme).Build(
+		testcd.WithClusterPoolReference("other-pool-namespace", "test-pool", claimName),
+	)
+
+	c := testfake.NewFakeClientBuilder().WithRuntimeObjects(claim, cd).Build()
+	logger := log.New()
+	logger.SetLevel(log.DebugLevel)
+	rcp := &ReconcileClusterClaim{Client: c, logger: logger}
+
+	_, err := rcp.Reconcile(context.TODO(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Namespace: claimNamespace, Name: claimName},
+	})
+	require.NoError(t, err, "unexpected error from Reconcile")
+
+	claim = &hivev1.ClusterClaim{}
+	err = c.Get(context.Background(), client.ObjectKey{Namespace: claimNamespace, Name: claimName}, claim)
+	require.NoError(t, err, "unexpected error getting claim")
+	assert.Equal(t, clusterName, claim.Spec.Namespace, "invalid assignment must remain unchanged")
+
+	cond := controllerutils.FindCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
+	if assert.NotNil(t, cond, "did not find pending condition") {
+		assert.Equal(t, corev1.ConditionTrue, cond.Status)
+		assert.Equal(t, "InvalidAssignment", cond.Reason)
+		assert.Equal(t, "ClusterDeployment test-cluster/test-cluster belongs to pool namespace \"other-pool-namespace\", not claim namespace \"claim-namespace\"", cond.Message)
+	}
+
+	runningCond := controllerutils.FindCondition(claim.Status.Conditions, hivev1.ClusterRunningCondition)
+	if assert.NotNil(t, runningCond, "did not find running condition") {
+		assert.Equal(t, corev1.ConditionFalse, runningCond.Status)
+		assert.Equal(t, "InvalidAssignment", runningCond.Reason)
+		if cond != nil {
+			assert.Equal(t, cond.Message, runningCond.Message)
+		}
+	}
+
+	role := &rbacv1.Role{}
+	err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName}, role)
+	assert.True(t, apierrors.IsNotFound(err), "expected no hive-claim-owner role to be created")
+	roleBinding := &rbacv1.RoleBinding{}
+	err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName}, roleBinding)
+	assert.True(t, apierrors.IsNotFound(err), "expected no hive-claim-owner role binding to be created")
+}
+
 func Test_getClaimLifetime(t *testing.T) {
 	cases := []struct {
 		name string

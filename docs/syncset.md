@@ -5,6 +5,7 @@
   - [How to use `applyBehavior`](#how-to-use-applybehavior)
   - [Patch and Resource Templates](#patch-and-resource-templates)
     - [`fromCDLabel` Custom Function](#fromcdlabel-custom-function)
+  - [Secret Mapping Templates](#secret-mapping-templates)
   - [Example of SyncSet use](#example-of-syncset-use)
 - [SelectorSyncSet Object Definition](#selectorsyncset-object-definition)
 - [Ordering](#ordering)
@@ -41,6 +42,7 @@ spec:
 
   enablePatchTemplates: false
   enableResourceTemplates: false
+  enableSecretMappingTemplates: false
 
   resources:
   - apiVersion: user.openshift.io/v1
@@ -75,6 +77,7 @@ spec:
 | `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to `resources` and `secretMappings` (but not `patches`). More details [below](#how-to-use-applybehavior). |
 | `enablePatchTemplates  ` | If true, special use of golang's `text/templates` is allowed in `patches[].patch`. More details [below](#patch-and-resource-templates). |
 | `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#patch-and-resource-templates). |
+| `enableSecretMappingTemplates` | Enables Go templates in `secretMappings[].sourceRef.name`. Defaults to false. See [Secret Mapping Templates](#secret-mapping-templates). |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
 | `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. |
 | `secretMappings` | A list of secret mappings. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
@@ -165,6 +168,17 @@ data:
 
 If the ClusterDeployment has no labels, or if there is no label with the specified key,
 the empty string is substituted.
+
+### Secret Mapping Templates
+
+Set `spec.enableSecretMappingTemplates: true` to use Go templates in
+`secretMappings[].sourceRef.name` for SyncSets and SelectorSyncSets. Templates can use
+[`fromCDLabel`](#fromcdlabel-custom-function) to read labels from the target ClusterDeployment.
+Hive evaluates the source name for each ClusterDeployment and copies the selected
+Secret to the configured target.
+
+Namespaces, target references, and Secret contents remain literal. Template errors
+and empty or invalid rendered names are reported in the ClusterSync status.
 
 ### Example of SyncSet use
 

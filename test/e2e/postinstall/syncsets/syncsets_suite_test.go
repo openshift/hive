@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -96,7 +97,21 @@ const (
 	// Stages at which a spec captures the state of the scenario.
 	artifactStageBefore = "before"
 	artifactStageAfter  = "after"
+
+	// burstConvergeTimeout bounds the wait for the target cluster to reach the contents the
+	// source secrets end the burst with. A re-apply that carries them lands within seconds; if
+	// none does, the next one is a periodic re-apply two hours later, so waiting longer than
+	// this only delays the failure.
+	burstConvergeTimeout = 3 * time.Minute
+	// burstTriggerTimeout bounds a single trigger attempt. It is short on purpose: a trigger
+	// that blocks would serialize the burst it is meant to keep going.
+	burstTriggerTimeout = 30 * time.Second
 )
+
+// burstConfigMapData builds the contents of the ConfigMap a burst scenario adds to its SyncSet.
+func burstConfigMapData() map[string]string {
+	return map[string]string{"burst": "value-configmap"}
+}
 
 var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 
@@ -113,6 +128,15 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 		deleteSecret(targetClusterClient, "default", "test-aws-creds")
 		deleteSecret(targetClusterClient, secretMappingTargetNamespace, secretMappingTargetSecretName)
 		deleteSecret(hiveClient, clusterNamespace, secretMappingSourceSecretName)
+		for _, scenario := range burstScenarios {
+			for _, pair := range scenario.pairs {
+				deleteSecret(targetClusterClient, secretMappingTargetNamespace, pair.targetName)
+				deleteSecret(hiveClient, clusterNamespace, pair.sourceName)
+			}
+			if scenario.changesSyncSet() {
+				deleteConfigMap(targetClusterClient, secretMappingTargetNamespace, scenario.configMapName)
+			}
+		}
 	})
 	Describe("Test SyncSet", func() {
 		Context("Test SynSet of resources,patches,and secretMappings", func() {
@@ -393,7 +417,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 
 				// Capture the state of the scenario on the way out, on success as well as on
 				// failure, and before AfterEach removes the objects.
-				defer captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageAfter, scenarioStart)
+				defer captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageAfter, scenarioStart, defaultSecretMappingPairs)
 
 				createSecretMappingSyncSet(hiveClient, targetClusterClient, kubeClient, syncSetName, initialData, scenarioStart)
 
@@ -463,7 +487,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				scenarioStart := time.Now()
 				syncSetName := "test-syncsecret-converge"
 
-				defer captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageAfter, scenarioStart)
+				defer captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageAfter, scenarioStart, defaultSecretMappingPairs)
 
 				createSecretMappingSyncSet(hiveClient, targetClusterClient, kubeClient, syncSetName, secretMappingData("value-1"), scenarioStart)
 
@@ -490,6 +514,61 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				err = reapplyUntilTargetSecretMatches(hiveClient, targetClusterClient, secretMappingData("value-5"))
 				Ω(err).ShouldNot(HaveOccurred())
 				verifyMappedSecret(hiveClient, targetClusterClient, secretMappingData("value-5"))
+			})
+
+			// Burst coverage: a SyncSet carrying two SecretMappings is created and the contents
+			// of its source secrets are changed several times in a row, with no wait for the
+			// target cluster in between and none after the SyncSet is created. What is required
+			// at the end is that the target cluster holds exactly what the source secrets hold.
+			//
+			// Each mutation is followed by a single attempt at deleting the ClusterSyncLease.
+			// The attempt never waits for the lease to exist and is never repeated, so no
+			// mutation waits for its own re-apply to settle and the burst stays a burst. Every
+			// outcome is recorded in the timeline artifact: a lease that was deleted, one that
+			// definitely was not (absent, or replaced since it was read), one that could not be
+			// read, or a deletion whose effect cannot be known. The last two fail the scenario
+			// before it waits for anything, because the trigger either never reached the
+			// deletion call or left no way to tell what it did; the first two are legitimate
+			// results of firing triggers faster than the controller recreates the lease.
+			//
+			// Limits, so this is not read as more than it is:
+			//   - Only the final contents are asserted. A refresh missed by one of the earlier
+			//     re-applies is covered by a later one and does not fail these specs; catching
+			//     a single missed refresh is the single-trigger spec's job.
+			//   - Nothing orders these updates against the controller. An update may reach the
+			//     hub while an apply is running or between two applies; the specs do not force
+			//     either and do not assert that either happened. An update that lands while an
+			//     earlier apply is in flight is covered deterministically by the clustersync
+			//     controller unit tests, which place it there directly.
+			//   - No attempt is required to have deleted anything. Finding no lease, or finding
+			//     that the one it read has just been replaced, is a legitimate result of
+			//     firing an attempt into a burst: an earlier attempt may have removed a lease
+			//     the controller has not recreated yet, or has recreated since. A burst in
+			//     which every attempt ends that way is a run of the scenario like any other.
+			//   - The controller reads source secrets through a cache and does not watch them,
+			//     so a re-apply that ran before the last writes reached that cache leaves the
+			//     target holding earlier contents until the periodic re-apply hours later. A
+			//     scenario whose re-applies all fell that way reaches its convergence timeout
+			//     and fails. That failure is the result of the scenario, with the artifacts to
+			//     show what the triggers and the controller did; nothing is issued afterwards
+			//     to bring the contents in line. How often real runs land there is not known:
+			//     these scenarios have not been run against a cluster yet.
+			It("Test syncSet secretMappings converge when only the source secrets are updated in a burst", func() {
+				// The SyncSet is created once and never touched again, and the only thing this
+				// scenario does after a source secret changes is the single lease deletion
+				// attempt that accompanies it -- which may well find no lease. Nothing is done
+				// afterwards to make a re-apply happen. What the apply caused by the creation
+				// of the SyncSet does, and what the controller retries of its own accord, is
+				// the controller's business and is not driven from here.
+				runSecretMappingBurst(hiveClient, targetClusterClient, kubeClient, sourcesOnlyBurst)
+			})
+
+			It("Test syncSet secretMappings converge when a burst of source updates is followed by a syncSet change", func() {
+				// The burst ends by adding a resource to the SyncSet, so a SyncSet and the
+				// secrets it maps change together. The generation change is a trigger of its
+				// own, independent of the lease: it can cover a refresh an earlier re-apply
+				// missed, which is why the scenario above exists alongside this one.
+				runSecretMappingBurst(hiveClient, targetClusterClient, kubeClient, syncSetChangeBurst)
 			})
 		})
 
@@ -828,6 +907,90 @@ func deleteConfigMap(c client.Client, namespace, name string) {
 
 }
 
+// secretMappingPair names a source secret on the hub and the secret a SecretMapping copies it to
+// on the target cluster. Captures are taken for these pairs only, so a spec can never snapshot a
+// secret it did not create.
+type secretMappingPair struct {
+	sourceName string
+	targetName string
+}
+
+var (
+	defaultSecretMappingPair = secretMappingPair{
+		sourceName: secretMappingSourceSecretName,
+		targetName: secretMappingTargetSecretName,
+	}
+	defaultSecretMappingPairs = []secretMappingPair{defaultSecretMappingPair}
+
+	// sourcesOnlyBurst changes nothing but the contents of the source secrets: the SyncSet is
+	// created once and left alone, so the only triggers the scenario has are its one-shot lease
+	// deletions.
+	sourcesOnlyBurst = burstScenario{
+		syncSetName: "test-syncsecret-burst-sources",
+		pairs: []secretMappingPair{
+			{sourceName: "test-secretmapping-burst-sources-source-one", targetName: "test-secretmapping-burst-sources-copy-one"},
+			{sourceName: "test-secretmapping-burst-sources-source-two", targetName: "test-secretmapping-burst-sources-copy-two"},
+		},
+	}
+	// syncSetChangeBurst ends its burst by adding a resource to the SyncSet, which covers a
+	// SyncSet and the secrets it maps changing together.
+	syncSetChangeBurst = burstScenario{
+		syncSetName: "test-syncsecret-burst-syncset-change",
+		pairs: []secretMappingPair{
+			{sourceName: "test-secretmapping-burst-change-source-one", targetName: "test-secretmapping-burst-change-copy-one"},
+			{sourceName: "test-secretmapping-burst-change-source-two", targetName: "test-secretmapping-burst-change-copy-two"},
+		},
+		configMapName: "test-secretmapping-burst-change-configmap",
+	}
+	burstScenarios = []burstScenario{sourcesOnlyBurst, syncSetChangeBurst}
+)
+
+// burstScenario is one burst variant. Each has its own SyncSet, its own source and target
+// secrets and its own timeline artifact. The ClusterSync and the ClusterSyncLease are per
+// ClusterDeployment and so are necessarily shared, which is harmless: the suite is serial, so
+// only one scenario drives the lease at a time.
+type burstScenario struct {
+	syncSetName string
+	pairs       []secretMappingPair
+	// configMapName, when set, is a resource added to the SyncSet at the end of the burst. That
+	// changes the SyncSet spec, and so its generation, which is a trigger in its own right.
+	configMapName string
+}
+
+// changesSyncSet reports whether the scenario modifies the SyncSet after creating it.
+func (s burstScenario) changesSyncSet() bool { return s.configMapName != "" }
+
+// leaseDeleteOutcome is what a single attempt at deleting the ClusterSyncLease achieved.
+type leaseDeleteOutcome string
+
+const (
+	// leaseDeleted: the attempt removed the lease that was read, so it triggered a re-apply.
+	leaseDeleted leaseDeleteOutcome = "Deleted"
+	// leaseNotDeleted: the attempt definitely removed nothing, because the lease was not there
+	// or had already been replaced by another one. No re-apply was triggered by it.
+	leaseNotDeleted leaseDeleteOutcome = "NotDeleted"
+	// leaseNotDeletedReadFailed: the lease could not be read, so no deletion was ever issued.
+	// Nothing was removed, and the reason is kept separate from the ordinary case so that a
+	// flaky hub does not read as a lease that was simply absent.
+	leaseNotDeletedReadFailed leaseDeleteOutcome = "NotDeletedReadFailed"
+	// leaseDeleteUnknown: the attempt failed in a way that leaves its effect unknown -- the API
+	// server may or may not have applied the deletion. It is recorded as such and never counted
+	// as either of the above.
+	leaseDeleteUnknown leaseDeleteOutcome = "Unknown"
+)
+
+// burstMutation records one mutation of a burst scenario and the outcome of the single trigger
+// attempt that followed it. Only synthetic identifiers, resource versions, generations and times
+// are recorded; no secret contents.
+type burstMutation struct {
+	Name                   string             `json:"name"`
+	AtUTC                  string             `json:"atUTC"`
+	SourceResourceVersions map[string]string  `json:"sourceResourceVersions,omitempty"`
+	SyncSetGeneration      string             `json:"syncSetGeneration"`
+	LeaseDeleteOutcome     leaseDeleteOutcome `json:"leaseDeleteOutcome"`
+	LeaseDeleteDetail      string             `json:"leaseDeleteDetail,omitempty"`
+}
+
 // secretMappingData builds the contents of the synthetic source secret. The "rotating" key carries
 // the value under test; the "static" key is never changed, so that asserting on the whole data map
 // also catches a re-apply that drops or corrupts the keys which did not change.
@@ -873,12 +1036,185 @@ func secretMappingSyncSet(name string) *hivev1.SyncSet {
 	}
 }
 
+// burstSecretMappingSyncSet builds the SyncSet of a burst scenario: one SecretMapping per pair,
+// so that the burst covers a SyncSet carrying more than one mapped secret. When withResource is
+// set the SyncSet also carries a ConfigMap, which is how a scenario changes the SyncSet itself at
+// the end of its burst.
+func burstSecretMappingSyncSet(scenario burstScenario, withResource bool) *hivev1.SyncSet {
+	syncSet := &hivev1.SyncSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      scenario.syncSetName,
+			Namespace: clusterNamespace,
+		},
+		Spec: hivev1.SyncSetSpec{
+			ClusterDeploymentRefs: []corev1.LocalObjectReference{
+				{
+					Name: clusterName,
+				},
+			},
+			SyncSetCommonSpec: hivev1.SyncSetCommonSpec{
+				ResourceApplyMode: hivev1.SyncResourceApplyMode,
+			},
+		},
+	}
+	for _, pair := range scenario.pairs {
+		syncSet.Spec.Secrets = append(syncSet.Spec.Secrets, hivev1.SecretMapping{
+			SourceRef: hivev1.SecretReference{Name: pair.sourceName, Namespace: clusterNamespace},
+			TargetRef: hivev1.SecretReference{Name: pair.targetName, Namespace: secretMappingTargetNamespace},
+		})
+	}
+	if withResource && scenario.changesSyncSet() {
+		syncSet.Spec.Resources = []runtime.RawExtension{
+			{
+				Object: &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ConfigMap",
+						APIVersion: "v1",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      scenario.configMapName,
+						Namespace: secretMappingTargetNamespace,
+					},
+					Data: burstConfigMapData(),
+				},
+			},
+		}
+	}
+	return syncSet
+}
+
+// burstSourceData builds the contents a source secret holds at a given revision of a burst.
+func burstSourceData(sourceIndex, revision int) map[string][]byte {
+	return secretMappingData(fmt.Sprintf("burst-source-%d-value-%d", sourceIndex+1, revision))
+}
+
+// runSecretMappingBurst creates the fixtures of a burst scenario and runs it: the source secrets
+// are updated several times in a row with no wait for the target cluster in between, each
+// mutation followed by a single attempt at deleting the ClusterSyncLease, and the final contents
+// are then observed by reading only.
+func runSecretMappingBurst(hiveClient, targetClusterClient client.Client, kubeClient kclient.Interface, scenario burstScenario) {
+	ctx := context.TODO()
+	// The sequence of updates below is written for two mapped secrets.
+	Ω(scenario.pairs).Should(HaveLen(2))
+	scenarioStart := time.Now()
+	var mutations []burstMutation
+
+	defer captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, scenario.syncSetName, artifactStageAfter, scenarioStart, scenario.pairs)
+	defer func() { writeBurstTimeline(scenario.syncSetName, mutations) }()
+
+	By("Create the dedicated source secrets of the scenario in the cluster namespace")
+	for i, pair := range scenario.pairs {
+		err := createNamedSourceSecret(hiveClient, pair.sourceName, burstSourceData(i, 1))
+		Ω(err).ShouldNot(HaveOccurred())
+	}
+
+	// Everything that talks to a cluster before the burst happens here, while the SyncSet does
+	// not exist yet. Capturing after the SyncSet was created would put several API calls, and a
+	// controller log fetch, between its creation and the first update.
+	By("Snapshot the state of the scenario before the syncSet is created")
+	captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, scenario.syncSetName, artifactStageBefore, scenarioStart, scenario.pairs)
+
+	By("Create the syncSet mapping the source secrets to the target cluster")
+	createdSyncSet := burstSecretMappingSyncSet(scenario, false)
+	err := hiveClient.Create(ctx, createdSyncSet)
+	Ω(err).ShouldNot(HaveOccurred())
+	// The object the API server returned, written from memory so that nothing stands between the
+	// creation of the SyncSet and the first update of a source secret.
+	writeArtifact(fmt.Sprintf("secretmapping-%s-%s-syncset-create-response.yaml", scenario.syncSetName, artifactStageBefore), createdSyncSet)
+
+	// The updates below are issued without waiting for the mapping to converge on the target
+	// cluster. Whether any of them reaches the hub while an apply is actually running is left to
+	// the runtime: this spec does not order them against the controller, and does not assert
+	// that it did. writeSource keeps the contents each source secret last received, so that the
+	// final assertions cannot drift away from what the burst actually wrote.
+	latest := make([]map[string][]byte, len(scenario.pairs))
+	writeSource := func(index, revision int) {
+		data := burstSourceData(index, revision)
+		Ω(updateNamedSourceSecretData(hiveClient, scenario.pairs[index].sourceName, data)).ShouldNot(HaveOccurred())
+		latest[index] = data
+	}
+
+	By("Update one source secret without waiting for the initial convergence, and trigger once")
+	writeSource(0, 2)
+	mutations = append(mutations, recordBurstMutation(hiveClient, "update-one-without-waiting-for-initial-convergence", scenario.pairs, scenario.syncSetName))
+
+	By("Update both source secrets without waiting for the target cluster, and trigger once")
+	writeSource(0, 3)
+	writeSource(1, 2)
+	mutations = append(mutations, recordBurstMutation(hiveClient, "update-both", scenario.pairs, scenario.syncSetName))
+
+	By("Update both source secrets to their final contents, and trigger once")
+	writeSource(0, 4)
+	writeSource(1, 3)
+	mutations = append(mutations, recordBurstMutation(hiveClient, "update-both-final", scenario.pairs, scenario.syncSetName))
+
+	if scenario.changesSyncSet() {
+		By("Change the syncSet itself at the end of the burst, and trigger once")
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			syncSet := &hivev1.SyncSet{}
+			if err := hiveClient.Get(ctx, client.ObjectKey{Name: scenario.syncSetName, Namespace: clusterNamespace}, syncSet); err != nil {
+				return err
+			}
+			syncSet.Spec.Resources = burstSecretMappingSyncSet(scenario, true).Spec.Resources
+			return hiveClient.Update(ctx, syncSet)
+		})
+		Ω(err).ShouldNot(HaveOccurred())
+		mutations = append(mutations, recordBurstMutation(hiveClient, "add-resource-to-syncset", scenario.pairs, scenario.syncSetName))
+	}
+
+	// Nothing else is written to the hub or the target cluster from here on, beyond the
+	// diagnostics and the cleanup. In particular the burst is not followed by another
+	// lease deletion, by a wait for one to become possible, or by any other way of making a
+	// re-apply happen: what the target cluster ends up with is what the mutations above, and the
+	// attempts that accompanied them, brought about.
+
+	// Both checks below run before the spec waits for anything, so that an attempt which could
+	// not do its work is reported as itself rather than as the propagation timeout that would
+	// follow it. Neither requires an attempt to have deleted a lease: an attempt that found
+	// none did exactly what a one-shot trigger does in a burst.
+	By("Verify no trigger attempt of the burst ended with an unknown effect")
+	Ω(triggerOutcomes(mutations, leaseDeleteUnknown)).Should(BeEmpty(),
+		"a lease deletion failed leaving its effect unknown, so the triggers this burst fired cannot be established")
+	By("Verify every trigger attempt of the burst got as far as the deletion call")
+	Ω(triggerOutcomes(mutations, leaseNotDeletedReadFailed)).Should(BeEmpty(),
+		"a lease could not be read, so that trigger never attempted a deletion")
+
+	// Reads only from here on. No further trigger is issued, in particular not to repair
+	// contents that have not arrived.
+	By("Verify the mapped secrets end up holding exactly what their source secrets hold")
+	for i, pair := range scenario.pairs {
+		err = waitForNamedTargetSecretData(targetClusterClient, pair.targetName, latest[i], burstConvergeTimeout)
+		Ω(err).ShouldNot(HaveOccurred())
+		verifyNamedMappedSecret(hiveClient, targetClusterClient, pair, latest[i])
+	}
+
+	finalSyncSet := &hivev1.SyncSet{}
+	err = hiveClient.Get(ctx, client.ObjectKey{Name: scenario.syncSetName, Namespace: clusterNamespace}, finalSyncSet)
+	Ω(err).ShouldNot(HaveOccurred())
+	if scenario.changesSyncSet() {
+		By("Verify the resource added to the syncSet during the burst is applied as well")
+		err = waitForTargetConfigMapData(targetClusterClient, scenario.configMapName, burstConfigMapData(), burstConvergeTimeout)
+		Ω(err).ShouldNot(HaveOccurred())
+	} else {
+		By("Verify the syncSet was not touched after it was created")
+		Ω(finalSyncSet.Generation).Should(Equal(createdSyncSet.Generation))
+		Ω(finalSyncSet.Spec).Should(Equal(createdSyncSet.Spec))
+	}
+
+	By("Verify the syncSet is reported as applied at the generation it ends the burst with")
+	// The status is written at the end of a re-apply pass, after the objects it applied, so it
+	// is waited for rather than read straight after the contents arrived.
+	err = waitForSyncSetApplied(clusterNamespace, clusterName, scenario.syncSetName, "syncset")
+	Ω(err).ShouldNot(HaveOccurred())
+	verifySyncSetStatus(hiveClient, scenario.syncSetName, finalSyncSet.Generation)
+}
+
 // createSecretMappingSyncSet creates the synthetic source secret along with a SyncSet mapping it
 // to the target cluster, waits until the mapped secret holds the contents of the source, and
 // snapshots the state the scenario starts from.
 func createSecretMappingSyncSet(hiveClient, targetClusterClient client.Client, kubeClient kclient.Interface, syncSetName string, data map[string][]byte, scenarioStart time.Time) {
 	By("Create a dedicated source secret in the cluster namespace")
-	err := createSourceSecret(hiveClient, data)
+	err := createNamedSourceSecret(hiveClient, secretMappingSourceSecretName, data)
 	Ω(err).ShouldNot(HaveOccurred())
 
 	By("Create a syncSet mapping the source secret to the target cluster and verify it is applied")
@@ -893,23 +1229,23 @@ func createSecretMappingSyncSet(hiveClient, targetClusterClient client.Client, k
 	verifyMappedSecret(hiveClient, targetClusterClient, data)
 
 	By("Snapshot the syncSet, source secret, clusterSync, lease and target secret before the source secret is updated")
-	captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageBefore, scenarioStart)
+	captureSecretMappingArtifacts(hiveClient, targetClusterClient, kubeClient, syncSetName, artifactStageBefore, scenarioStart, defaultSecretMappingPairs)
 }
 
-// createSourceSecret creates the synthetic source secret in the cluster namespace. A secret left
-// behind by an earlier spec whose cleanup did not complete is updated instead, so that one failing
-// spec does not cascade into the next.
-func createSourceSecret(c client.Client, data map[string][]byte) error {
+// createNamedSourceSecret creates a synthetic source secret in the cluster namespace. A secret
+// left behind by an earlier spec whose cleanup did not complete is updated instead, so that one
+// failing spec does not cascade into the next.
+func createNamedSourceSecret(c client.Client, name string, data map[string][]byte) error {
 	err := c.Create(context.TODO(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretMappingSourceSecretName,
+			Name:      name,
 			Namespace: clusterNamespace,
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: data,
 	})
 	if errors.IsAlreadyExists(err) {
-		return updateSourceSecretData(c, data)
+		return updateNamedSourceSecretData(c, name, data)
 	}
 	return err
 }
@@ -917,9 +1253,14 @@ func createSourceSecret(c client.Client, data map[string][]byte) error {
 // updateSourceSecretData changes the contents of the source secret, leaving every other object --
 // in particular the SyncSet referencing it -- untouched.
 func updateSourceSecretData(c client.Client, data map[string][]byte) error {
+	return updateNamedSourceSecretData(c, secretMappingSourceSecretName, data)
+}
+
+// updateNamedSourceSecretData changes the contents of the named source secret only.
+func updateNamedSourceSecretData(c client.Client, name string, data map[string][]byte) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		secret := &corev1.Secret{}
-		if err := c.Get(context.TODO(), client.ObjectKey{Name: secretMappingSourceSecretName, Namespace: clusterNamespace}, secret); err != nil {
+		if err := c.Get(context.TODO(), client.ObjectKey{Name: name, Namespace: clusterNamespace}, secret); err != nil {
 			return err
 		}
 		secret.Data = data
@@ -971,6 +1312,94 @@ func deleteClusterSyncLease(c client.Client) (types.UID, error) {
 	return deletedUID, nil
 }
 
+// tryDeleteClusterSyncLeaseOnce makes a single attempt at deleting the ClusterSyncLease of the
+// cluster under test. Unlike deleteClusterSyncLease it does not wait for the lease to exist and
+// never retries, which is what lets a burst scenario fire one trigger per mutation without the
+// trigger itself turning into a wait for the previous re-apply.
+//
+// The outcome is returned rather than asserted: a lease that was not there is a legitimate result
+// of a burst, since an earlier attempt may have deleted one the controller has not recreated yet.
+// An attempt whose effect cannot be known is reported as such and never rounded to either of the
+// definite outcomes.
+func tryDeleteClusterSyncLeaseOnce(c client.Client) (leaseDeleteOutcome, string) {
+	ctx, cancel := context.WithTimeout(context.Background(), burstTriggerTimeout)
+	defer cancel()
+
+	lease := &hiveintv1alpha1.ClusterSyncLease{}
+	switch err := c.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: clusterNamespace}, lease); {
+	case errors.IsNotFound(err):
+		return leaseNotDeleted, "lease did not exist"
+	case err != nil:
+		// No deletion was issued, so this attempt certainly removed nothing.
+		return leaseNotDeletedReadFailed, fmt.Sprintf("could not read the lease: %v", err)
+	}
+	switch err := c.Delete(ctx, lease, client.Preconditions{UID: &lease.UID}); {
+	case err == nil:
+		return leaseDeleted, fmt.Sprintf("deleted lease with uid %s", lease.UID)
+	case errors.IsNotFound(err):
+		return leaseNotDeleted, "lease was gone by the time it was deleted"
+	case errors.IsConflict(err):
+		return leaseNotDeleted, "lease had been replaced by another one"
+	default:
+		return leaseDeleteUnknown, fmt.Sprintf("delete failed with an unknown effect: %v", err)
+	}
+}
+
+// recordBurstMutation reads the resource versions the mutations produced, fires a single trigger
+// attempt and returns what the attempt achieved, as one entry of the burst timeline.
+func recordBurstMutation(c client.Client, name string, pairs []secretMappingPair, syncSetName string) burstMutation {
+	ctx := context.TODO()
+	mutation := burstMutation{
+		Name:                   name,
+		AtUTC:                  time.Now().UTC().Format(time.RFC3339Nano),
+		SourceResourceVersions: map[string]string{},
+	}
+	for _, pair := range pairs {
+		secret := &corev1.Secret{}
+		if err := c.Get(ctx, client.ObjectKey{Name: pair.sourceName, Namespace: clusterNamespace}, secret); err != nil {
+			mutation.SourceResourceVersions[pair.sourceName] = fmt.Sprintf("unavailable: %v", err)
+			continue
+		}
+		mutation.SourceResourceVersions[pair.sourceName] = secret.ResourceVersion
+	}
+	syncSet := &hivev1.SyncSet{}
+	if err := c.Get(ctx, client.ObjectKey{Name: syncSetName, Namespace: clusterNamespace}, syncSet); err != nil {
+		mutation.SyncSetGeneration = fmt.Sprintf("unavailable: %v", err)
+	} else {
+		mutation.SyncSetGeneration = strconv.FormatInt(syncSet.Generation, 10)
+	}
+
+	outcome, detail := tryDeleteClusterSyncLeaseOnce(c)
+	mutation.LeaseDeleteOutcome = outcome
+	mutation.LeaseDeleteDetail = detail
+	fmt.Fprintf(GinkgoWriter, "burst mutation %s at %s: trigger %s (%s)\n", name, mutation.AtUTC, outcome, detail)
+	return mutation
+}
+
+// writeBurstTimeline stores the mutations of a burst as an artifact, so that the order of the
+// mutations, the resource versions they produced and the outcome of each trigger attempt can be
+// lined up with the manifests and the controller log captured alongside them.
+func writeBurstTimeline(syncSetName string, mutations []burstMutation) {
+	content, err := yaml.Marshal(map[string]any{"mutations": mutations})
+	if err != nil {
+		fmt.Fprintf(GinkgoWriter, "artifact timeline for %s: could not serialize: %v\n", syncSetName, err)
+		return
+	}
+	writeArtifactBytes(fmt.Sprintf("secretmapping-%s-timeline.yaml", syncSetName), content)
+}
+
+// triggerOutcomes returns the mutations whose trigger attempt ended with the given outcome, named
+// along with the detail recorded for them.
+func triggerOutcomes(mutations []burstMutation, outcome leaseDeleteOutcome) []string {
+	var matching []string
+	for _, mutation := range mutations {
+		if mutation.LeaseDeleteOutcome == outcome {
+			matching = append(matching, fmt.Sprintf("%s: %s", mutation.Name, mutation.LeaseDeleteDetail))
+		}
+	}
+	return matching
+}
+
 // waitForFullSyncSetReapply waits for the clustersync controller to recreate a ClusterSyncLease
 // that was deleted. The controller writes the lease at the end of a full re-apply pass, so a
 // lease carrying a UID other than the deleted one means such a pass ran through to its end.
@@ -999,12 +1428,18 @@ func waitForFullSyncSetReapply(c client.Client, deletedUID types.UID) error {
 // waitForTargetSecretData waits for the mapped secret on the target cluster to hold exactly the
 // expected contents.
 func waitForTargetSecretData(c client.Client, want map[string][]byte, timeout time.Duration) error {
+	return waitForNamedTargetSecretData(c, secretMappingTargetSecretName, want, timeout)
+}
+
+// waitForNamedTargetSecretData waits for the named mapped secret on the target cluster to hold
+// exactly the expected contents.
+func waitForNamedTargetSecretData(c client.Client, name string, want map[string][]byte, timeout time.Duration) error {
 	var observed map[string][]byte
 	var lastGetErr error
 	if err := wait.PollUntilContextTimeout(context.Background(), secretMappingPollInterval, timeout, true,
 		func(ctx context.Context) (bool, error) {
 			secret := &corev1.Secret{}
-			if err := c.Get(ctx, client.ObjectKey{Name: secretMappingTargetSecretName, Namespace: secretMappingTargetNamespace}, secret); err != nil {
+			if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: secretMappingTargetNamespace}, secret); err != nil {
 				// The secret may not have been created yet, and connectivity to the target
 				// cluster can blip; keep polling until the timeout expires.
 				lastGetErr = err
@@ -1016,7 +1451,27 @@ func waitForTargetSecretData(c client.Client, want map[string][]byte, timeout ti
 			return reflect.DeepEqual(secret.Data, want), nil
 		}); err != nil {
 		return fmt.Errorf("secret %s/%s on the target cluster did not reach the expected contents (keys not matching: %v, last get error: %v): %w",
-			secretMappingTargetNamespace, secretMappingTargetSecretName, mismatchedKeys(want, observed), lastGetErr, err)
+			secretMappingTargetNamespace, name, mismatchedKeys(want, observed), lastGetErr, err)
+	}
+	return nil
+}
+
+// waitForTargetConfigMapData waits for a ConfigMap applied by a SyncSet to hold the expected
+// contents on the target cluster.
+func waitForTargetConfigMapData(c client.Client, name string, want map[string]string, timeout time.Duration) error {
+	var lastErr error
+	if err := wait.PollUntilContextTimeout(context.Background(), secretMappingPollInterval, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			configMap := &corev1.ConfigMap{}
+			if err := c.Get(ctx, client.ObjectKey{Name: name, Namespace: secretMappingTargetNamespace}, configMap); err != nil {
+				lastErr = err
+				return false, nil
+			}
+			lastErr = nil
+			return reflect.DeepEqual(configMap.Data, want), nil
+		}); err != nil {
+		return fmt.Errorf("configMap %s/%s on the target cluster did not reach the expected contents (last get error: %v): %w",
+			secretMappingTargetNamespace, name, lastErr, err)
 	}
 	return nil
 }
@@ -1075,15 +1530,21 @@ func reapplyUntilTargetSecretMatches(hiveClient, targetClusterClient client.Clie
 // verifyMappedSecret asserts that the secret the SecretMapping targetRef names on the target
 // cluster is a faithful copy of the source secret.
 func verifyMappedSecret(hiveClient, targetClusterClient client.Client, want map[string][]byte) {
+	verifyNamedMappedSecret(hiveClient, targetClusterClient, defaultSecretMappingPair, want)
+}
+
+// verifyNamedMappedSecret asserts that the target of the given mapping is a faithful copy of its
+// source.
+func verifyNamedMappedSecret(hiveClient, targetClusterClient client.Client, pair secretMappingPair, want map[string][]byte) {
 	ctx := context.TODO()
 
 	sourceSecret := &corev1.Secret{}
-	err := hiveClient.Get(ctx, client.ObjectKey{Name: secretMappingSourceSecretName, Namespace: clusterNamespace}, sourceSecret)
+	err := hiveClient.Get(ctx, client.ObjectKey{Name: pair.sourceName, Namespace: clusterNamespace}, sourceSecret)
 	Ω(err).ShouldNot(HaveOccurred())
 	Ω(sourceSecret.Data).Should(Equal(want))
 
 	targetSecret := &corev1.Secret{}
-	err = targetClusterClient.Get(ctx, client.ObjectKey{Name: secretMappingTargetSecretName, Namespace: secretMappingTargetNamespace}, targetSecret)
+	err = targetClusterClient.Get(ctx, client.ObjectKey{Name: pair.targetName, Namespace: secretMappingTargetNamespace}, targetSecret)
 	Ω(err).ShouldNot(HaveOccurred())
 	Ω(targetSecret.Data).Should(Equal(sourceSecret.Data))
 	Ω(targetSecret.Type).Should(Equal(sourceSecret.Type))
@@ -1145,9 +1606,10 @@ type captureMetadata struct {
 // failure under investigation is neither masked nor left waiting on its own diagnostics. Callers
 // run it before AfterEach deletes the objects.
 //
-// Both secrets written out are created by this suite and hold only its synthetic values; no other
-// secret of the hub or of the target cluster is read.
-func captureSecretMappingArtifacts(hiveClient, targetClusterClient client.Client, kubeClient kclient.Interface, syncSetName, stage string, since time.Time) {
+// Secrets are captured for the pairs the caller passes and for no others, and callers pass pairs
+// this suite created: no secret of the hub or of the target cluster that the suite does not own
+// is read, let alone written out.
+func captureSecretMappingArtifacts(hiveClient, targetClusterClient client.Client, kubeClient kclient.Interface, syncSetName, stage string, since time.Time, pairs []secretMappingPair) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(GinkgoWriter, "artifact capture for %s panicked: %v\n", syncSetName, r)
@@ -1187,12 +1649,14 @@ func captureSecretMappingArtifacts(hiveClient, targetClusterClient client.Client
 	clusterKey := client.ObjectKey{Name: clusterName, Namespace: clusterNamespace}
 	capture(hiveClient, client.ObjectKey{Name: syncSetName, Namespace: clusterNamespace},
 		&hivev1.SyncSet{}, "syncset")
-	capture(hiveClient, client.ObjectKey{Name: secretMappingSourceSecretName, Namespace: clusterNamespace},
-		&corev1.Secret{}, "source-secret")
 	capture(hiveClient, clusterKey, &hiveintv1alpha1.ClusterSync{}, "clustersync")
 	capture(hiveClient, clusterKey, &hiveintv1alpha1.ClusterSyncLease{}, "clustersynclease")
-	capture(targetClusterClient, client.ObjectKey{Name: secretMappingTargetSecretName, Namespace: secretMappingTargetNamespace},
-		&corev1.Secret{}, "target-secret")
+	for _, pair := range pairs {
+		capture(hiveClient, client.ObjectKey{Name: pair.sourceName, Namespace: clusterNamespace},
+			&corev1.Secret{}, fmt.Sprintf("source-secret-%s", pair.sourceName))
+		capture(targetClusterClient, client.ObjectKey{Name: pair.targetName, Namespace: secretMappingTargetNamespace},
+			&corev1.Secret{}, fmt.Sprintf("target-secret-%s", pair.targetName))
+	}
 
 	// The log of a stage covers the whole spec up to that point, so collecting it once, at the
 	// end, is enough.

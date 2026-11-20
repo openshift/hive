@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -736,6 +737,101 @@ func TestReconcileClusterClaim(t *testing.T) {
 				assert.True(t, apierrors.IsNotFound(getRoleError), "expected no role")
 				assert.True(t, apierrors.IsNotFound(getRoleBindingError), "expected no role binding")
 			}
+		})
+	}
+}
+
+// TestReconcileClusterClaimInvalidAssignment marks unclaimable cluster assignments without
+// creating hive-claim-owner RBAC or changing the user's assignment.
+func TestReconcileClusterClaimInvalidAssignment(t *testing.T) {
+	for _, test := range []struct {
+		name            string
+		poolRef         *hivev1.ClusterPoolReference
+		expectedMessage string
+	}{
+		{
+			name:            "missing pool reference",
+			expectedMessage: "ClusterDeployment test-cluster/test-cluster does not belong to a ClusterPool.",
+		},
+		{
+			name: "cross-pool assignment",
+			poolRef: &hivev1.ClusterPoolReference{
+				Namespace: "other-pool-namespace",
+				PoolName:  "test-pool",
+				ClaimName: claimName,
+			},
+			expectedMessage: "ClusterDeployment test-cluster/test-cluster belongs to pool namespace \"other-pool-namespace\", not claim namespace \"claim-namespace\"",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			scheme := scheme.GetScheme()
+			claim := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
+				testclaim.WithSubjects(subjects),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Status: corev1.ConditionFalse,
+					Type:   hivev1.ClusterClaimPendingCondition,
+				}),
+				testclaim.WithCondition(hivev1.ClusterClaimCondition{
+					Status: corev1.ConditionTrue,
+					Type:   hivev1.ClusterRunningCondition,
+				}),
+				testclaim.WithCluster(clusterName),
+			).Build()
+			cd := testcd.FullBuilder(clusterName, clusterName, scheme).Build(func(cd *hivev1.ClusterDeployment) {
+				cd.Spec.ClusterPoolRef = test.poolRef
+			})
+
+			var statusUpdates int
+			builder := testfake.NewFakeClientBuilder()
+			builder.ClientBuilder.WithInterceptorFuncs(interceptor.Funcs{
+				SubResourceUpdate: func(ctx context.Context, c client.Client, subResourceName string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+					if subResourceName == "status" {
+						statusUpdates++
+					}
+					return c.SubResource(subResourceName).Update(ctx, obj, opts...)
+				},
+			})
+			c := builder.WithRuntimeObjects(claim, cd).Build()
+			logger := log.New()
+			logger.SetLevel(log.DebugLevel)
+			rcp := &ReconcileClusterClaim{Client: c, logger: logger}
+			request := reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: claimNamespace, Name: claimName},
+			}
+
+			for i := 0; i < 2; i++ {
+				result, err := rcp.Reconcile(context.TODO(), request)
+				require.NoError(t, err, "unexpected error from Reconcile")
+				assert.Zero(t, result.RequeueAfter, "expected no requeue after")
+				assert.Equal(t, 1, statusUpdates, "expected only the first reconciliation to update status")
+			}
+
+			claim = &hivev1.ClusterClaim{}
+			err := c.Get(context.Background(), client.ObjectKey{Namespace: claimNamespace, Name: claimName}, claim)
+			require.NoError(t, err, "unexpected error getting claim")
+			assert.Equal(t, clusterName, claim.Spec.Namespace, "invalid assignment must remain unchanged")
+
+			for _, condition := range []struct {
+				typeName hivev1.ClusterClaimConditionType
+				status   corev1.ConditionStatus
+			}{
+				{hivev1.ClusterClaimPendingCondition, corev1.ConditionTrue},
+				{hivev1.ClusterRunningCondition, corev1.ConditionFalse},
+			} {
+				cond := controllerutils.FindCondition(claim.Status.Conditions, condition.typeName)
+				if assert.NotNil(t, cond, "did not find condition %s", condition.typeName) {
+					assert.Equal(t, condition.status, cond.Status)
+					assert.Equal(t, "InvalidAssignment", cond.Reason)
+					assert.Equal(t, test.expectedMessage, cond.Message)
+				}
+			}
+
+			role := &rbacv1.Role{}
+			err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName}, role)
+			assert.True(t, apierrors.IsNotFound(err), "expected no hive-claim-owner role to be created")
+			roleBinding := &rbacv1.RoleBinding{}
+			err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName}, roleBinding)
+			assert.True(t, apierrors.IsNotFound(err), "expected no hive-claim-owner role binding to be created")
 		})
 	}
 }

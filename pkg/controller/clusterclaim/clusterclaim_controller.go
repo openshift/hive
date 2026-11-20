@@ -276,11 +276,20 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, err
 	}
 
-	switch cd.Spec.ClusterPoolRef.ClaimName {
-	case "":
+	poolRef := cd.Spec.ClusterPoolRef
+	switch {
+	case poolRef == nil:
+		return reconcile.Result{}, r.reconcileForInvalidAssignment(claim,
+			fmt.Sprintf("ClusterDeployment %s/%s does not belong to a ClusterPool.", cd.Namespace, cd.Name), logger)
+	case poolRef.Namespace != claim.Namespace:
+		// Reject cross-namespace assignments; claim.spec.namespace is user-settable.
+		return reconcile.Result{}, r.reconcileForInvalidAssignment(claim,
+			fmt.Sprintf("ClusterDeployment %s/%s belongs to pool namespace %q, not claim namespace %q",
+				cd.Namespace, cd.Name, poolRef.Namespace, claim.Namespace), logger)
+	case poolRef.ClaimName == "":
 		logger.Debugf("clusterdeployment %s has not yet been assigned to claim", cd.Name)
 		return reconcile.Result{}, nil
-	case claim.Name:
+	case poolRef.ClaimName == claim.Name:
 		return r.reconcileForExistingAssignment(claim, cd, logger)
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
@@ -525,6 +534,34 @@ func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterClaim) reconcileForInvalidAssignment(claim *hivev1.ClusterClaim, message string, logger log.FieldLogger) error {
+	logger.Info(message)
+	conds, pendingChanged := controllerutils.SetClusterClaimConditionWithChangeCheck(
+		claim.Status.Conditions,
+		hivev1.ClusterClaimPendingCondition,
+		corev1.ConditionTrue,
+		"InvalidAssignment",
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	conds, runningChanged := controllerutils.SetClusterClaimConditionWithChangeCheck(
+		conds,
+		hivev1.ClusterRunningCondition,
+		corev1.ConditionFalse,
+		"InvalidAssignment",
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if pendingChanged || runningChanged {
+		claim.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), claim); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {

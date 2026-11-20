@@ -602,6 +602,139 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 	}
 }
 
+// TestReconcileClusterSync_SourceSecretUpdatedWhileApplyInFlight pins down what happens to an
+// update of a mapped source Secret that lands after a re-apply has read that Secret and before
+// the re-apply has finished with it: the next re-apply has to carry the new contents.
+//
+// The update is made from inside the mocked apply of the single SecretMapping, which places it
+// exactly between the read and the end of that apply. The re-apply that follows does not happen
+// by itself: the test deletes the lease and calls Reconcile a second time. Nothing here runs
+// concurrently -- it is one goroutine and a fake client answering from its own tracker -- so what
+// this establishes is the controller's own ordering: every apply reads the source Secret afresh,
+// rather than reusing contents carried over from an earlier reconcile. It says nothing about the informer cache a
+// real manager reads through, nor about watch delivery, which remain the domain of the e2e specs
+// -- and those in turn cannot place a write at this point of an apply.
+func TestReconcileClusterSync_SourceSecretUpdatedWhileApplyInFlight(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	scheme := scheme.GetScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+		testsyncset.WithSecrets(testSecretMapping("test-secret", "dest-namespace", "dest-name")),
+	)
+	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("first-value")),
+	)
+	rt := newReconcileTest(mockCtrl,
+		cdBuilder(scheme).Build(),
+		clusterSyncBuilder(scheme).Build(),
+		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+			teststatefulset.WithCurrentReplicas(3),
+			teststatefulset.WithReplicas(3),
+		),
+		syncSet,
+		srcSecret,
+	)
+
+	// There is no lease, so the first reconcile does a full re-apply. It applies the contents the
+	// source Secret had when it read it, and the update lands while that apply is in flight.
+	firstApply := rt.mockResourceHelper.EXPECT().
+		Apply(newApplyMatcher(testMappedSecret(scheme, "first-value"))).
+		Do(func([]byte) {
+			inFlight := &corev1.Secret{}
+			require.NoError(t,
+				rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: "test-secret"}, inFlight),
+				"unexpected error reading the source secret from within the apply")
+			inFlight.Data = map[string][]byte{"test-key": []byte("second-value")}
+			require.NoError(t, rt.c.Update(context.Background(), inFlight),
+				"unexpected error updating the source secret from within the apply")
+		}).
+		Return(resource.CreatedApplyResult, nil)
+	// The re-apply that follows must carry the update that landed during the first one.
+	secondApply := rt.mockResourceHelper.EXPECT().
+		Apply(newApplyMatcher(testMappedSecret(scheme, "second-value"))).
+		Return(resource.CreatedApplyResult, nil)
+	gomock.InOrder(firstApply, secondApply)
+
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset", withResourcesToDelete(testSecretRef("dest-namespace", "dest-name"))),
+	}
+	rt.run(t)
+
+	// Delete the lease once, as a caller asking for one more full re-apply would, and reconcile
+	// again. The expectations above require that second pass to apply the updated contents.
+	lease := &hiveintv1alpha1.ClusterSyncLease{}
+	require.NoError(t,
+		rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, lease),
+		"unexpected error getting lease for ClusterSync")
+	require.NoError(t, rt.c.Delete(context.Background(), lease), "unexpected error deleting lease for ClusterSync")
+
+	_, err := rt.r.Reconcile(context.TODO(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Namespace: testNamespace, Name: testCDName},
+	})
+	require.NoError(t, err, "unexpected error from the second Reconcile")
+
+	clusterSync := &hiveintv1alpha1.ClusterSync{}
+	require.NoError(t,
+		rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testClusterSyncName}, clusterSync),
+		"unexpected error getting ClusterSync")
+	require.Len(t, clusterSync.Status.SyncSets, 1, "expected a status for the syncset")
+	assert.Equal(t, hiveintv1alpha1.SuccessSyncSetResult, clusterSync.Status.SyncSets[0].Result,
+		"expected the syncset to be applied successfully")
+	assert.Equal(t, int64(1), clusterSync.Status.SyncSets[0].ObservedGeneration,
+		"expected the syncset generation to be unchanged by the update of the source secret")
+	assert.NoError(t,
+		rt.c.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeaseName}, &hiveintv1alpha1.ClusterSyncLease{}),
+		"expected the lease to have been recreated")
+}
+
+// TestReconcileClusterSync_SecretMappingReappliedWhenLeaseMissing covers what the e2e specs rely
+// on when they delete the ClusterSyncLease: with the lease missing and nothing else changed --
+// the SyncSet keeps the generation the ClusterSync status has already observed -- the mapped
+// Secret is applied again, carrying the contents the source Secret holds at that moment.
+func TestReconcileClusterSync_SecretMappingReappliedWhenLeaseMissing(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	scheme := scheme.GetScheme()
+	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithGeneration(1),
+		testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+		testsyncset.WithSecrets(testSecretMapping("test-secret", "dest-namespace", "dest-name")),
+	)
+	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
+		testsecret.WithDataKeyValue("test-key", []byte("updated-value")),
+	)
+	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(
+		buildSyncStatus("test-syncset",
+			withTransitionInThePast(),
+			withFirstSuccessTimeInThePast(),
+			withResourcesToDelete(testSecretRef("dest-namespace", "dest-name")),
+		),
+	))
+	rt := newReconcileTest(mockCtrl,
+		cdBuilder(scheme).Build(),
+		clusterSync,
+		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+			teststatefulset.WithCurrentReplicas(3),
+			teststatefulset.WithReplicas(3),
+		),
+		syncSet,
+		srcSecret,
+	)
+	rt.mockResourceHelper.EXPECT().
+		Apply(newApplyMatcher(testMappedSecret(scheme, "updated-value"))).
+		Return(resource.CreatedApplyResult, nil)
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+		buildSyncStatus("test-syncset",
+			withTransitionInThePast(),
+			withFirstSuccessTimeInThePast(),
+			withResourcesToDelete(testSecretRef("dest-namespace", "dest-name")),
+		),
+	}
+	rt.run(t)
+}
+
 func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	scheme := scheme.GetScheme()
@@ -2393,6 +2526,18 @@ func testConfigMapRef(namespace, name string) hiveintv1alpha1.SyncResourceRefere
 		Namespace:  namespace,
 		Name:       name,
 	}
+}
+
+// testMappedSecret builds the Secret the controller is expected to apply to the target cluster
+// for a SecretMapping of "test-secret" onto dest-namespace/dest-name.
+func testMappedSecret(scheme *runtime.Scheme, value string) *corev1.Secret {
+	return testsecret.BasicBuilder().GenericOptions(
+		testgeneric.WithNamespace("dest-namespace"),
+		testgeneric.WithName("dest-name"),
+		testgeneric.WithTypeMeta(scheme),
+	).Build(
+		testsecret.WithDataKeyValue("test-key", []byte(value)),
+	)
 }
 
 func testSecretMapping(srcName, destNamespace, destName string) hivev1.SecretMapping {

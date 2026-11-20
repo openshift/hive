@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "enabledManagers": ["tekton", "dockerfile", "rpm-lockfile"],
+  "enabledManagers": ["tekton", "dockerfile", "rpm-lockfile", "gomod"],
   "extends": [
     "github>konflux-ci/mintmaker-presets:refresh-rpm-lockfiles"
   ],
@@ -8,5 +8,11 @@
     "enabled": true,
     "recreateWhen": "always",
     "schedule": ["at any time"]
-  }
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "postUpdateOptions": ["gomodTidy"]
+    }
+  ]
 }

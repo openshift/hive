@@ -776,8 +776,8 @@ github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8 
 github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8/go.mod h1:CvKrrnAcvvtrZIc9y9WaqWmJhK0AJ9sWnh+VP4d7jcM=
 github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8 h1:38vY9w7dXqB7tI9g1GCUnpahNDyBbp9Yylq+BQ154YE=
 github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8/go.mod h1:399nvdaqoU9rTI25UdFw2EWcVjmJPpeZPIhfDAIx/XU=
-github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c h1:gJvhduWIrpzoUTwrJjjeul+hGETKkhRhEZosBg/X3Hg=
-github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
+github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b h1:ErTc+6D1n/rpRaUYP++h0YlOzM+q7UaAdqDZrzhA0ho=
+github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/client-go v0.0.0-20260806041845-b74fb348f1e7 h1:Lphm0uMAyM26ibbOca0+dg7uLz7GmmrIdeWjzOh5R/U=
 github.com/openshift/client-go v0.0.0-20260806041845-b74fb348f1e7/go.mod h1:u08LcpI8Hq3IpelQLbciGRa/P158cE/O3uQe2Bt3Roo=
 github.com/openshift/cloud-credential-operator v0.0.0-20250925191450-a3e50aeacc55 h1:l4vr7i3v6Z+Ho2X6Msr7dUK1HqyGjwqNvsZ8qITyzxc=

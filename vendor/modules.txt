@@ -1543,9 +1543,10 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/metal3-io/baremetal-operator/apis v0.4.0 => github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8
-## explicit; go 1.20
+# github.com/metal3-io/baremetal-operator/apis v0.4.0 => github.com/openshift/baremetal-operator/apis v0.0.0-20261118162424-2546720da8aa
+## explicit; go 1.26.0
 github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1
+github.com/metal3-io/baremetal-operator/apis/metal3.io/v1beta1
 # github.com/metal3-io/baremetal-operator/pkg/hardwareutils v0.4.0 => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8
 ## explicit; go 1.20
 github.com/metal3-io/baremetal-operator/pkg/hardwareutils/bmc
@@ -1768,7 +1769,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.42.1
+# github.com/onsi/gomega v1.44.0
 ## explicit; go 1.25.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -2282,13 +2283,15 @@ github.com/stbenjam/no-sprintf-host-port/pkg/analyzer
 # github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.5
 ## explicit; go 1.20
 github.com/std-uritemplate/std-uritemplate/go/v2
-# github.com/stretchr/objx v0.5.2
+# github.com/stretchr/objx v0.5.3
 ## explicit; go 1.20
 github.com/stretchr/objx
-# github.com/stretchr/testify v1.11.1
+# github.com/stretchr/testify v1.12.1
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
+github.com/stretchr/testify/internal/difflib
+github.com/stretchr/testify/internal/spew
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
@@ -4373,7 +4376,7 @@ sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/kyaml
 # github.com/openshift/hive/apis => ./apis
 # github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20231128154154-6736c9b9c6c8
-# github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8
+# github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20261118162424-2546720da8aa
 # github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8
 # k8s.io/cloud-provider-vsphere => github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb4928
 # github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0

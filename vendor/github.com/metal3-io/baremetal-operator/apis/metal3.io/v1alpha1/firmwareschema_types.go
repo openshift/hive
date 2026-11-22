@@ -25,29 +25,36 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// Additional data describing the firmware setting
+// Additional data describing the firmware setting.
 type SettingSchema struct {
 
 	// The type of setting.
 	// +kubebuilder:validation:Enum=Enumeration;String;Integer;Boolean;Password
+	//nolint:tagliatelle
 	AttributeType string `json:"attribute_type,omitempty"`
 
+	//nolint:tagliatelle
 	// The allowable value for an Enumeration type setting.
 	AllowableValues []string `json:"allowable_values,omitempty"`
 
 	// The lowest value for an Integer type setting.
+	//nolint:tagliatelle
 	LowerBound *int `json:"lower_bound,omitempty"`
 
 	// The highest value for an Integer type setting.
+	//nolint:tagliatelle
 	UpperBound *int `json:"upper_bound,omitempty"`
 
 	// Minimum length for a String type setting.
+	//nolint:tagliatelle
 	MinLength *int `json:"min_length,omitempty"`
 
 	// Maximum length for a String type setting.
+	//nolint:tagliatelle
 	MaxLength *int `json:"max_length,omitempty"`
 
 	// Whether or not this setting is read only.
+	//nolint:tagliatelle
 	ReadOnly *bool `json:"read_only,omitempty"`
 
 	// Whether or not this setting's value is unique to this node, e.g.
@@ -65,8 +72,7 @@ func (e SchemaSettingError) Error() string {
 }
 
 func (schema *SettingSchema) Validate(name string, value intstr.IntOrString) error {
-
-	if schema.ReadOnly != nil && *schema.ReadOnly == true {
+	if schema.ReadOnly != nil && *schema.ReadOnly {
 		return SchemaSettingError{name: name, message: "it is ReadOnly"}
 	}
 
@@ -82,7 +88,7 @@ func (schema *SettingSchema) Validate(name string, value intstr.IntOrString) err
 				return nil
 			}
 		}
-		return SchemaSettingError{name: name, message: fmt.Sprintf("unknown enumeration value - %s", value.String())}
+		return SchemaSettingError{name: name, message: "unknown enumeration value - " + value.String()}
 
 	case "Integer":
 		if value.Type == intstr.String {
@@ -112,7 +118,7 @@ func (schema *SettingSchema) Validate(name string, value intstr.IntOrString) err
 		if value.String() == "true" || value.String() == "false" {
 			return nil
 		}
-		return SchemaSettingError{name: name, message: fmt.Sprintf("%s is not a boolean", value.String())}
+		return SchemaSettingError{name: name, message: value.String() + " is not a boolean"}
 
 	case "Password":
 		// Prevent sets of password types
@@ -124,11 +130,11 @@ func (schema *SettingSchema) Validate(name string, value intstr.IntOrString) err
 
 	default:
 		// Unexpected attribute type
-		return SchemaSettingError{name: name, message: fmt.Sprintf("unexpected attribute type %s", schema.AttributeType)}
+		return SchemaSettingError{name: name, message: "unexpected attribute type " + schema.AttributeType}
 	}
 }
 
-// FirmwareSchemaSpec defines the desired state of FirmwareSchema
+// FirmwareSchemaSpec defines the desired state of FirmwareSchema.
 type FirmwareSchemaSpec struct {
 
 	// The hardware vendor associated with this schema
@@ -145,7 +151,7 @@ type FirmwareSchemaSpec struct {
 
 //+kubebuilder:object:root=true
 
-// FirmwareSchema is the Schema for the firmwareschemas API
+// FirmwareSchema is the Schema for the firmwareschemas API.
 type FirmwareSchema struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -153,9 +159,8 @@ type FirmwareSchema struct {
 	Spec FirmwareSchemaSpec `json:"spec,omitempty"`
 }
 
-// Check whether the setting's name and value is valid using the schema
+// Check whether the setting's name and value is valid using the schema.
 func (host *FirmwareSchema) ValidateSetting(name string, value intstr.IntOrString, schemas map[string]SettingSchema) error {
-
 	schema, ok := schemas[name]
 	if !ok {
 		return SchemaSettingError{name: name, message: "it is not in the associated schema"}
@@ -166,7 +171,7 @@ func (host *FirmwareSchema) ValidateSetting(name string, value intstr.IntOrStrin
 
 //+kubebuilder:object:root=true
 
-// FirmwareSchemaList contains a list of FirmwareSchema
+// FirmwareSchemaList contains a list of FirmwareSchema.
 type FirmwareSchemaList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

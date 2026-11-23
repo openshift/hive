@@ -13,6 +13,25 @@
     {
       "matchManagers": ["gomod"],
       "postUpdateOptions": ["gomodTidy"]
+    },
+    {
+      "description": "Group Kubernetes Go modules (k8s.io, sigs.k8s.io) with generic-admission-server, whose go.mod directly requires k8s.io modules at the Kubernetes minor it targets",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**",
+        "github.com/openshift/generic-admission-server"
+      ],
+      "groupName": "Kubernetes Go dependencies"
+    },
+    {
+      "description": "Group the OpenShift baremetal-operator fork root and submodules, which go.mod uses as replace targets that Renovate updates by digest",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "github.com/openshift/baremetal-operator",
+        "github.com/openshift/baremetal-operator/**"
+      ],
+      "groupName": "baremetal-operator Go dependencies"
     }
   ]
 }

@@ -21,11 +21,13 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
+// The state sets do not contain shutting-down. An instance in that state can only move to
+// terminated, and EC2 rejects a StartInstances call for it.
 var (
 	runningStates           = sets.New(ec2types.InstanceStateNameRunning)
 	stoppedStates           = sets.New(ec2types.InstanceStateNameStopped)
 	pendingStates           = sets.New(ec2types.InstanceStateNamePending)
-	stoppingStates          = sets.New(ec2types.InstanceStateNameStopping, ec2types.InstanceStateNameShuttingDown)
+	stoppingStates          = sets.New(ec2types.InstanceStateNameStopping)
 	runningOrPendingStates  = runningStates.Union(pendingStates)
 	stoppedOrStoppingStates = stoppedStates.Union(stoppingStates)
 	notRunningStates        = stoppedOrStoppingStates.Union(pendingStates)

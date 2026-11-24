@@ -50,7 +50,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/vmware/govmomi v0.53.0
 	golang.org/x/crypto v0.58.0
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+	golang.org/x/lint v0.0.0-20241112194109-818c5a804067
 	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0

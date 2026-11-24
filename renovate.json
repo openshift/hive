@@ -32,6 +32,21 @@
         "github.com/openshift/baremetal-operator/**"
       ],
       "groupName": "baremetal-operator Go dependencies"
+    },
+    {
+      "description": "Enable and group updates for the OpenTelemetry Go stable-v1 modules in go.mod, which upstream releases together at one shared version; they are indirect requirements, which Renovate does not update by default. Other indirect modules, including OpenTelemetry auto, contrib and proto, are still not updated",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "go.opentelemetry.io/otel/sdk/metric",
+        "go.opentelemetry.io/otel/trace"
+      ],
+      "enabled": true,
+      "groupName": "OpenTelemetry Go stable modules"
     }
   ]
 }

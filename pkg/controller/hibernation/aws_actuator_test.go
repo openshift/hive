@@ -92,6 +92,22 @@ func TestStopAndStartMachines(t *testing.T) {
 			},
 		},
 		{
+			name:      "start no shutting-down instances",
+			testFunc:  "StartMachines",
+			instances: map[string]int{"shutting-down": 1, "running": 3},
+		},
+		{
+			name:      "start stopped instances, not shutting-down instances",
+			testFunc:  "StartMachines",
+			instances: map[string]int{"stopped": 3, "shutting-down": 1},
+			setupClient: func(t *testing.T, c *mockawsclient.MockClient) {
+				c.EXPECT().StartInstances(gomock.Any()).Do(
+					func(input *ec2.StartInstancesInput) {
+						matchInstanceIDs(t, input.InstanceIds, map[string]int{"stopped": 3})
+					}).Return(nil, nil)
+			},
+		},
+		{
 			name:      "start stopped and stopping instances",
 			testFunc:  "StartMachines",
 			instances: map[string]int{"stopped": 3, "stopping": 1, "terminated": 3},
@@ -210,6 +226,18 @@ func TestMachinesStoppedAndRunning(t *testing.T) {
 			instances: map[string]int{"running": 3, "terminated": 2},
 		},
 		{
+			name:      "Stopped - All machines stopped or shutting-down",
+			testFunc:  "MachinesStopped",
+			expected:  true,
+			instances: map[string]int{"stopped": 3, "shutting-down": 1},
+		},
+		{
+			name:      "Running - All machines running or shutting-down",
+			testFunc:  "MachinesRunning",
+			expected:  true,
+			instances: map[string]int{"running": 3, "shutting-down": 1},
+		},
+		{
 			name:      "Running - All machines running or terminated",
 			testFunc:  "MachinesRunning",
 			expected:  true,
@@ -222,10 +250,10 @@ func TestMachinesStoppedAndRunning(t *testing.T) {
 			instances: map[string]int{"running": 3, "terminated": 2, "pending": 1},
 		},
 		{
-			name:      "Running - Some machines stopped or shutting-down",
+			name:      "Running - Some machines stopped",
 			testFunc:  "MachinesRunning",
 			expected:  false,
-			instances: map[string]int{"running": 3, "terminated": 2, "stopped": 1, "shutting-down": 3},
+			instances: map[string]int{"running": 3, "terminated": 2, "stopped": 1},
 		},
 	}
 

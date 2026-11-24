@@ -37,7 +37,7 @@ require (
 	github.com/openshift/installer v1.5.0-rc-2
 	github.com/openshift/library-go v0.0.0-20260910143634-1bc72d914e6c
 	github.com/openshift/machine-api-operator v0.2.1-0.20251128002018-85c00c0d525f // indirect
-	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20260113091719-80740861bb2a
+	github.com/openshift/machine-api-provider-gcp 0210d09f6ebb
 	github.com/openshift/machine-api-provider-ibmcloud v0.0.0-20231207164151-6b0b8ea7b16d
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.84.0

@@ -1,5 +1,10 @@
 # go-test/deep Changelog
 
+## v1.1.2 released 2026-10-13
+
+* Fixed issue #32: Equal not called outside struct field (PR #72) (@guocn)
+* Updated test matrix to go1.24–go1.27 inclusive
+
 ## v1.1.1 released 2024-06-23
 
 * Added `NilPointersAreZero` option: causes a nil pointer to be equal to a zero value (PR #61) (@seveas)
@@ -59,6 +64,6 @@
 
 * Fixed issue #12: Arrays are not properly compared (@samlitowitz)
 
-## v1.0.0 releaesd 2017-10-27 
+## v1.0.0 released 2017-10-27
 
 * First release

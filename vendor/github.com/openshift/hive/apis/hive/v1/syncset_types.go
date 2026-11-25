@@ -248,6 +248,13 @@ type SyncSetCommonSpec struct {
 	// patch string must be valid JSON after interpolation. This may make for odd-looking quoting
 	// in the uninterpolated string.
 	EnablePatchTemplates bool `json:"enablePatchTemplates,omitempty"`
+
+	// EnableSecretMappingTemplates enables Go text/templates in Secrets[].SourceRef.Name.
+	// The fromCDLabel function reads labels from the target ClusterDeployment.
+	// Rendered names must be valid, non-empty Kubernetes Secret names.
+	// Namespaces, target references, and Secret contents are not templated.
+	// +optional
+	EnableSecretMappingTemplates bool `json:"enableSecretMappingTemplates,omitempty"`
 }
 
 // SelectorSyncSetSpec defines the SyncSetCommonSpec resources and patches to sync along

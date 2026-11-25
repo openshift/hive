@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"reflect"
 	"sort"
@@ -821,6 +822,21 @@ func (r *ReconcileClusterSync) applySecret(
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "cannot read secret")
 		return errors.Wrapf(err, "failed to read secret %d", secretIndex), true
 	}
+	// Record which revision of the source Secret this mapping is about to propagate. This has to
+	// happen here, after a successful read and before the ObjectMeta below is replaced, because
+	// the replacement discards the UID and the resourceVersion. The UID is what keeps two
+	// different source objects that happen to carry the same resourceVersion from reading as the
+	// same object. Every field recorded here is identity metadata: none of them is derived from
+	// the Secret's data, and resourceVersion is carried as an opaque string, never parsed or
+	// ordered.
+	logger = logger.WithFields(log.Fields{
+		"sourceSecretNamespace":       srcNamespace,
+		"sourceSecretName":            secretMapping.SourceRef.Name,
+		"sourceSecretUID":             string(secret.UID),
+		"sourceSecretResourceVersion": secret.ResourceVersion,
+		"syncSetGeneration":           syncSet.AsMetaObject().GetGeneration(),
+	})
+	logger.Debug("read source secret revision")
 	// Clear out the fields of the metadata which are specific to the cluster to which the secret belongs.
 	secret.ObjectMeta = metav1.ObjectMeta{
 		Namespace:   secretMapping.TargetRef.Namespace,
@@ -830,9 +846,68 @@ func (r *ReconcileClusterSync) applySecret(
 	}
 	logger.Debug("applying secret")
 	if err := applyToTargetCluster(secret, applyFnMetricsLabel, applyFn, logger); err != nil {
+		// The captured source revision is still on the logger, so this reports which revision
+		// failed to land, next to a category that can be selected on without reading the error.
+		// This is not a redaction of the error: applyToTargetCluster has already logged it in
+		// full, and applySyncSets puts it in the ClusterSync status. It is a stable, closed-
+		// vocabulary summary of the same failure at the level where the source revision is known.
+		logger.WithField("applyErrorCategory", applyErrorCategory(err)).
+			Log(controllerutils.LogLevel(err), "failed to apply secret for observed source revision")
 		return errors.Wrapf(err, "failed to apply secret %d", secretIndex), true
 	}
+	logger.Info("applied secret for observed source revision")
 	return nil, false
+}
+
+// applyErrorCategory reduces an apply error to one of a fixed set of categories, so that an apply
+// outcome can be selected on and counted without parsing the error. The set is enumerated here
+// rather than derived from apierrors.ReasonForError so that it stays closed: a reason added by a
+// future apimachinery release cannot introduce a category this repository never reviewed.
+//
+// The mapping is deliberately lossy in two places: ServerTimeout is reported as Timeout, and both
+// ServiceUnavailable and InternalError are reported as ServerError. Timeouts that never reached a
+// server, such as a transport or context deadline, carry no Kubernetes status and are recognized
+// separately. Anything else is reported as "Other" rather than described, because an apply error
+// can quote the object that was being applied, which on this path is a Secret.
+func applyErrorCategory(err error) string {
+	switch {
+	// Reachable only if a caller other than applySecret passes a nil error; applySecret calls
+	// this inside its error branch.
+	case err == nil:
+		return "None"
+	case apierrors.IsNotFound(err):
+		return "NotFound"
+	case apierrors.IsAlreadyExists(err):
+		return "AlreadyExists"
+	case apierrors.IsConflict(err):
+		return "Conflict"
+	case apierrors.IsInvalid(err):
+		return "Invalid"
+	case apierrors.IsForbidden(err):
+		return "Forbidden"
+	case apierrors.IsUnauthorized(err):
+		return "Unauthorized"
+	case apierrors.IsTooManyRequests(err):
+		return "TooManyRequests"
+	case apierrors.IsServerTimeout(err), apierrors.IsTimeout(err), isDeadlineOrNetworkTimeout(err):
+		return "Timeout"
+	case apierrors.IsServiceUnavailable(err), apierrors.IsInternalError(err):
+		return "ServerError"
+	default:
+		return "Other"
+	}
+}
+
+// isDeadlineOrNetworkTimeout reports whether the error is a timeout that never produced a
+// Kubernetes status: the request's context expired, or the transport timed out before a response
+// arrived. These are the ordinary way a slow or unreachable target cluster fails, and the
+// apierrors timeout predicates do not recognize them because there is no API status to read.
+func isDeadlineOrNetworkTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func (r *ReconcileClusterSync) applyPatch(

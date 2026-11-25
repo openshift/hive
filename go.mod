@@ -8,7 +8,7 @@ require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.30
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.13
-	github.com/Azure/go-autorest/autorest/to v0.4.0
+	github.com/Azure/go-autorest/autorest/to v0.4.1
 	github.com/IBM/go-sdk-core/v5 v5.21.2
 	github.com/IBM/networking-go-sdk v0.51.15
 	github.com/IBM/platform-services-go-sdk v0.91.0

@@ -101,7 +101,7 @@ require (
 	github.com/go-openapi/runtime v0.33.0 // indirect
 	github.com/go-openapi/spec v0.22.9 // indirect
 	github.com/go-openapi/validate v0.26.1 // indirect
-	github.com/go-test/deep v1.1.1
+	github.com/go-test/deep v1.1.2
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/hashicorp/go-version v1.9.0 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect

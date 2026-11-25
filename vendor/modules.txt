@@ -1543,7 +1543,7 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/metal3-io/baremetal-operator/apis v0.4.0 => github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8
+# github.com/metal3-io/baremetal-operator/apis v0.8.1 => github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8
 ## explicit; go 1.20
 github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1
 # github.com/metal3-io/baremetal-operator/pkg/hardwareutils v0.4.0 => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8

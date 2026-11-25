@@ -471,6 +471,10 @@ func (c *gcpClient) CreateServiceAttachment(serviceAttachment string, region str
 
 	done, err := c.waitforRegionOperation(op, region)
 	if err != nil || !done {
+		var opErr *OperationError
+		if errors.As(err, &opErr) && opErr.Message != "" {
+			return nil, fmt.Errorf("%w: %s", err, opErr.Message)
+		}
 		return nil, err
 	}
 
@@ -650,11 +654,27 @@ func (c *gcpClient) GetProjectName() string {
 	return c.projectName
 }
 
+// OperationError preserves the code and message of a failed GCP operation.
+type OperationError struct {
+	Code    string
+	Message string
+}
+
+func (e *OperationError) Error() string {
+	return fmt.Sprintf("operation completed with error: %s", e.Code)
+}
+
+// operationError builds an *OperationError from the first error reported by a completed operation.
+func operationError(op *compute.Operation) error {
+	e := op.Error.Errors[0]
+	return &OperationError{Code: e.Code, Message: e.Message}
+}
+
 func (c *gcpClient) waitforGlobalOperation(op *compute.Operation) (bool, error) {
 	// See if the op was already done
 	if op.Status == "DONE" {
 		if op.Error != nil && len(op.Error.Errors) > 0 {
-			return true, fmt.Errorf("operation completed with error: %s", op.Error.Errors[0].Code)
+			return true, operationError(op)
 		}
 		return true, nil
 	}
@@ -670,7 +690,7 @@ func (c *gcpClient) waitforGlobalOperation(op *compute.Operation) (bool, error) 
 
 	done := op.Status == "DONE"
 	if op.Error != nil && len(op.Error.Errors) > 0 {
-		return done, fmt.Errorf("operation completed with error: %s", op.Error.Errors[0].Code)
+		return done, operationError(op)
 	}
 
 	return done, nil
@@ -680,7 +700,7 @@ func (c *gcpClient) waitforRegionOperation(op *compute.Operation, region string)
 	// See if the op was already done
 	if op.Status == "DONE" {
 		if op.Error != nil && len(op.Error.Errors) > 0 {
-			return true, fmt.Errorf("operation completed with error: %s", op.Error.Errors[0].Code)
+			return true, operationError(op)
 		}
 		return true, nil
 	}
@@ -696,7 +716,7 @@ func (c *gcpClient) waitforRegionOperation(op *compute.Operation, region string)
 
 	done := op.Status == "DONE"
 	if op.Error != nil && len(op.Error.Errors) > 0 {
-		return done, fmt.Errorf("operation completed with error: %s", op.Error.Errors[0].Code)
+		return done, operationError(op)
 	}
 
 	return done, nil

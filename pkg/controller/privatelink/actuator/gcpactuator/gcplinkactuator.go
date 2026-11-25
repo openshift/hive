@@ -480,8 +480,11 @@ func (a *GCPLinkActuator) createServiceAttachment(serviceAttachmentName string, 
 	subnets := []string{subnet.SelfLink}
 	allowedProjects := []string{a.gcpClientHub.GetProjectName()}
 	serviceAttachment, err := a.gcpClientSpoke.CreateServiceAttachment(serviceAttachmentName, region, forwardingRule.SelfLink, subnets, allowedProjects)
-	if err != nil || serviceAttachment == nil {
-		return nil, errors.Wrap(err, "error creating the Service Attachment")
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating the Service Attachment %q in region %q with PSC subnet %q and forwarding rule %q", serviceAttachmentName, region, subnet.SelfLink, forwardingRule.Name)
+	}
+	if serviceAttachment == nil {
+		return nil, errors.New("error creating the Service Attachment: received nil service attachment")
 	}
 
 	return serviceAttachment, nil

@@ -71,8 +71,6 @@ type Client interface {
 
 	GetServiceAttachment(serviceAttachment string, region string) (*compute.ServiceAttachment, error)
 
-	ListServiceAttachments(region string) ([]*compute.ServiceAttachment, error)
-
 	DeleteServiceAttachment(serviceAttachment string, region string) error
 
 	GetNetwork(name string) (*compute.Network, error)
@@ -473,6 +471,10 @@ func (c *gcpClient) CreateServiceAttachment(serviceAttachment string, region str
 
 	done, err := c.waitforRegionOperation(op, region)
 	if err != nil || !done {
+		var opErr *OperationError
+		if errors.As(err, &opErr) && opErr.Message != "" {
+			return nil, fmt.Errorf("%w: %s", err, opErr.Message)
+		}
 		return nil, err
 	}
 
@@ -503,23 +505,6 @@ func (c *gcpClient) GetServiceAttachment(serviceAttachment string, region string
 	defer cancel()
 
 	return c.computeClient.ServiceAttachments.Get(c.projectName, region, serviceAttachment).Context(ctx).Do()
-}
-
-// ListServiceAttachments returns all the service attachments in the given region of the project.
-func (c *gcpClient) ListServiceAttachments(region string) ([]*compute.ServiceAttachment, error) {
-	ctx, cancel := contextWithTimeout(context.TODO())
-	defer cancel()
-
-	var serviceAttachments []*compute.ServiceAttachment
-	err := c.computeClient.ServiceAttachments.List(c.projectName, region).Pages(ctx, func(page *compute.ServiceAttachmentList) error {
-		serviceAttachments = append(serviceAttachments, page.Items...)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return serviceAttachments, nil
 }
 
 func (c *gcpClient) GetNetwork(network string) (*compute.Network, error) {
@@ -669,13 +654,7 @@ func (c *gcpClient) GetProjectName() string {
 	return c.projectName
 }
 
-// ResourceInUseReason is the GCP error reason/code returned when a resource (e.g. a Private Service
-// Connect subnet) is already bound to another resource.
-const ResourceInUseReason = "RESOURCE_IN_USE_BY_OTHER_RESOURCE"
-
-// OperationError describes a GCP asynchronous operation that completed with an error. It preserves the
-// structured error code so callers can discriminate specific conditions (e.g. ResourceInUseReason)
-// instead of string-matching on the message.
+// OperationError preserves the code and message of a failed GCP operation.
 type OperationError struct {
 	Code    string
 	Message string
@@ -689,28 +668,6 @@ func (e *OperationError) Error() string {
 func operationError(op *compute.Operation) error {
 	e := op.Error.Errors[0]
 	return &OperationError{Code: e.Code, Message: e.Message}
-}
-
-// IsResourceInUseError returns true when err indicates GCP rejected an operation because the target
-// resource is already bound to another resource. It handles both synchronous *googleapi.Error responses
-// and asynchronous operation errors (*OperationError).
-func IsResourceInUseError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var oe *OperationError
-	if errors.As(err, &oe) && oe.Code == ResourceInUseReason {
-		return true
-	}
-	var ae *googleapi.Error
-	if errors.As(err, &ae) {
-		for _, e := range ae.Errors {
-			if e.Reason == ResourceInUseReason {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (c *gcpClient) waitforGlobalOperation(op *compute.Operation) (bool, error) {

@@ -74,11 +74,19 @@ var (
 			Buckets: []float64{5, 10, 20, 30, 60, 90, 120, 180, 240, 300, 360, 480, 600},
 		}, []string{"phase"},
 	)
+
+	VsphereRequestDurationSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "mapi_vsphere_request_duration_seconds",
+			Help:    "Duration of requests made by the Machine API Operator to vSphere.",
+			Buckets: []float64{0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 180},
+		}, []string{"client", "operation", "status"},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(MachineCollectorUp)
-	metrics.Registry.MustRegister(MachinePhaseTransitionSeconds)
+	metrics.Registry.MustRegister(MachinePhaseTransitionSeconds, VsphereRequestDurationSeconds)
 	metrics.Registry.MustRegister(
 		failedInstanceCreateCount,
 		failedInstanceUpdateCount,

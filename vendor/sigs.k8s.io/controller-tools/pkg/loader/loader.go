@@ -1,5 +1,5 @@
 /*
-Copyright 2019-2022 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -290,7 +290,10 @@ func (l *loader) typeCheck(pkg *Package) {
 	illTyped := len(errs) > 0
 	if !illTyped {
 		for _, importedPkg := range pkg.Imports() {
-			if importedPkg.IllTyped {
+			importedPkg.Lock()
+			isIllTyped := importedPkg.IllTyped
+			importedPkg.Unlock()
+			if isIllTyped {
 				illTyped = true
 				break
 			}

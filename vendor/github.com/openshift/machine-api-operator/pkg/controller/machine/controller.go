@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -112,7 +112,7 @@ func AddWithActuatorOpts(mgr manager.Manager, actuator Actuator, opts controller
 func newReconciler(mgr manager.Manager, actuator Actuator, gate featuregate.MutableFeatureGate) reconcile.Reconciler {
 	r := &ReconcileMachine{
 		Client:        mgr.GetClient(),
-		eventRecorder: mgr.GetEventRecorderFor("machine-controller"),
+		eventRecorder: mgr.GetEventRecorder("machine-controller"),
 		config:        mgr.GetConfig(),
 		scheme:        mgr.GetScheme(),
 		actuator:      actuator,
@@ -142,7 +142,7 @@ type ReconcileMachine struct {
 	config *rest.Config
 	scheme *runtime.Scheme
 
-	eventRecorder record.EventRecorder
+	eventRecorder events.EventRecorder
 
 	actuator Actuator
 	gate     featuregate.MutableFeatureGate
@@ -237,7 +237,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 	if errList := validateMachine(m); len(errList) > 0 {
 		err := fmt.Errorf("%v: machine validation failed: %v", machineName, errList.ToAggregate().Error())
 		klog.Error(err)
-		r.eventRecorder.Eventf(m, corev1.EventTypeWarning, "FailedValidate", err.Error())
+		r.eventRecorder.Eventf(m, nil, corev1.EventTypeWarning, "FailedValidate", "Validate", err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -346,7 +346,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 			"Failed to check if machine exists: %v", err,
 		))
 
-		if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
+		if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), err, originalConditions); patchErr != nil {
 			klog.Errorf("%v: error patching status: %v", machineName, patchErr)
 		}
 
@@ -358,7 +358,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		if err := r.actuator.Update(ctx, m); err != nil {
 			klog.Errorf("%v: error updating machine: %v, retrying in %v seconds", machineName, err, requeueAfter)
 
-			if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
+			if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), err, originalConditions); patchErr != nil {
 				klog.Errorf("%v: error patching status: %v", machineName, patchErr)
 			}
 

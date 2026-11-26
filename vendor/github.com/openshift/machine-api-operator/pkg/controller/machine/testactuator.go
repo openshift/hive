@@ -26,17 +26,21 @@ import (
 var _ Actuator = &TestActuator{}
 
 type TestActuator struct {
-	unblock         chan string
-	BlockOnCreate   bool
-	BlockOnDelete   bool
-	BlockOnUpdate   bool
-	BlockOnExists   bool
-	CreateCallCount int64
-	DeleteCallCount int64
-	UpdateCallCount int64
-	ExistsCallCount int64
-	ExistsValue     bool
-	Lock            sync.Mutex
+	unblock           chan string
+	BlockOnCreate     bool
+	BlockOnDelete     bool
+	BlockOnUpdate     bool
+	BlockOnExists     bool
+	CreateCallCount   int64
+	DeleteCallCount   int64
+	UpdateCallCount   int64
+	ExistsCallCount   int64
+	ExistsValue       bool
+	ExistsErr         error
+	UpdateErr         error
+	ExistsMachineHook func(*machinev1.Machine)
+	UpdateMachineHook func(*machinev1.Machine)
+	Lock              sync.Mutex
 }
 
 func (a *TestActuator) Create(context.Context, *machinev1.Machine) error {
@@ -74,10 +78,13 @@ func (a *TestActuator) Update(ctx context.Context, machine *machinev1.Machine) e
 	a.Lock.Lock()
 	defer a.Lock.Unlock()
 	a.UpdateCallCount++
-	return nil
+	if a.UpdateMachineHook != nil {
+		a.UpdateMachineHook(machine)
+	}
+	return a.UpdateErr
 }
 
-func (a *TestActuator) Exists(context.Context, *machinev1.Machine) (bool, error) {
+func (a *TestActuator) Exists(_ context.Context, machine *machinev1.Machine) (bool, error) {
 	defer func() {
 		if a.BlockOnExists {
 			<-a.unblock
@@ -87,7 +94,10 @@ func (a *TestActuator) Exists(context.Context, *machinev1.Machine) (bool, error)
 	a.Lock.Lock()
 	defer a.Lock.Unlock()
 	a.ExistsCallCount++
-	return a.ExistsValue, nil
+	if a.ExistsMachineHook != nil {
+		a.ExistsMachineHook(machine)
+	}
+	return a.ExistsValue, a.ExistsErr
 }
 
 func newTestActuator() *TestActuator {

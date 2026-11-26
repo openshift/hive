@@ -38,7 +38,7 @@ import (
 // VpcV1 : The IBM Cloud Virtual Private Cloud (VPC) API can be used to programmatically provision and manage virtual
 // server instances, along with subnets, volumes, load balancers, and more.
 //
-// API Version: 2025-11-17
+// API Version: 2025-12-09
 type VpcV1 struct {
 	Service *core.BaseService
 
@@ -46,8 +46,8 @@ type VpcV1 struct {
 	// `2`.
 	Generation *int64
 
-	// The API version, in format `YYYY-MM-DD`. For the API behavior documented here, specify any date between `2025-09-16`
-	// and `2025-11-17`.
+	// The API version, in format `YYYY-MM-DD`. For the API behavior documented here, specify any date between `2025-12-09`
+	// and `2025-12-17`.
 	Version *string
 }
 
@@ -67,8 +67,8 @@ type VpcV1Options struct {
 	// `2`.
 	Generation *int64
 
-	// The API version, in format `YYYY-MM-DD`. For the API behavior documented here, specify any date between `2025-09-16`
-	// and `2025-11-17`.
+	// The API version, in format `YYYY-MM-DD`. For the API behavior documented here, specify any date between `2025-12-09`
+	// and `2025-12-17`.
 	Version *string
 }
 
@@ -133,7 +133,7 @@ func NewVpcV1(options *VpcV1Options) (service *VpcV1, err error) {
 	}
 
 	if options.Version == nil {
-		options.Version = core.StringPtr("2025-11-17")
+		options.Version = core.StringPtr("2025-12-16")
 	}
 
 	service = &VpcV1{
@@ -6693,9 +6693,6 @@ func (vpc *VpcV1) ListEndpointGatewaysWithContext(ctx context.Context, listEndpo
 
 	builder.AddQuery("version", fmt.Sprint(*vpc.Version))
 	builder.AddQuery("generation", fmt.Sprint(*vpc.Generation))
-	if listEndpointGatewaysOptions.AllowResourceBinding != nil {
-		builder.AddQuery("allow_resource_binding", fmt.Sprint(*listEndpointGatewaysOptions.AllowResourceBinding))
-	}
 	if listEndpointGatewaysOptions.Name != nil {
 		builder.AddQuery("name", fmt.Sprint(*listEndpointGatewaysOptions.Name))
 	}
@@ -6720,8 +6717,8 @@ func (vpc *VpcV1) ListEndpointGatewaysWithContext(ctx context.Context, listEndpo
 	if listEndpointGatewaysOptions.VPCName != nil {
 		builder.AddQuery("vpc.name", fmt.Sprint(*listEndpointGatewaysOptions.VPCName))
 	}
-	if listEndpointGatewaysOptions.AllowDnsResolutionBinding != nil {
-		builder.AddQuery("allow_dns_resolution_binding", fmt.Sprint(*listEndpointGatewaysOptions.AllowDnsResolutionBinding))
+	if listEndpointGatewaysOptions.DnsResolutionBindingMode != nil {
+		builder.AddQuery("dns_resolution_binding_mode", strings.Join(listEndpointGatewaysOptions.DnsResolutionBindingMode, ","))
 	}
 
 	request, err := builder.Build()
@@ -6802,11 +6799,8 @@ func (vpc *VpcV1) CreateEndpointGatewayWithContext(ctx context.Context, createEn
 	if createEndpointGatewayOptions.VPC != nil {
 		body["vpc"] = createEndpointGatewayOptions.VPC
 	}
-	if createEndpointGatewayOptions.AllowDnsResolutionBinding != nil {
-		body["allow_dns_resolution_binding"] = createEndpointGatewayOptions.AllowDnsResolutionBinding
-	}
-	if createEndpointGatewayOptions.AllowResourceBinding != nil {
-		body["allow_resource_binding"] = createEndpointGatewayOptions.AllowResourceBinding
+	if createEndpointGatewayOptions.DnsResolutionBindingMode != nil {
+		body["dns_resolution_binding_mode"] = createEndpointGatewayOptions.DnsResolutionBindingMode
 	}
 	if createEndpointGatewayOptions.Ips != nil {
 		body["ips"] = createEndpointGatewayOptions.Ips
@@ -30212,17 +30206,14 @@ func (vpc *VpcV1) UpdateVPCAddressPrefixWithContext(ctx context.Context, updateV
 //
 // If the VPC specified by the identifier in the URL is a DNS hub VPC (has `dns.enable_hub` set to `true`) then there is
 // one binding for each VPC bound to the hub VPC. The endpoint gateways in the bound VPCs can allow (using
-// `allow_dns_resolution_binding`) the hub VPC to centralize resolution of their DNS names.
+// `dns_resolution_binding_mode`) the hub VPC to centralize resolution of their DNS names.
 //
 // If the VPC specified by the identifier in the URL is not a DNS hub VPC, then there is at most one binding (to a hub
 // VPC). The endpoint gateways in the VPC specified by the identifier in the URL can allow (using
-// `allow_dns_resolution_binding`) its hub VPC to centralize resolution of their DNS names.
+// `dns_resolution_binding_mode`) its hub VPC to centralize resolution of their DNS names.
 //
 // To make use of centralized DNS resolution, a VPC bound to a DNS hub VPC must delegate DNS resolution to its hub VPC
 // by setting `dns.resolver.type` to `delegate`.
-//
-// The bindings will be sorted by their `created_at` property values, with newest bindings first. Bindings with
-// identical `created_at` property values will in turn be sorted by ascending `name` property values.
 func (vpc *VpcV1) ListVPCDnsResolutionBindings(listVPCDnsResolutionBindingsOptions *ListVPCDnsResolutionBindingsOptions) (result *VpcdnsResolutionBindingCollection, response *core.DetailedResponse, err error) {
 	result, response, err = vpc.ListVPCDnsResolutionBindingsWithContext(context.Background(), listVPCDnsResolutionBindingsOptions)
 	err = core.RepurposeSDKProblem(err, "")
@@ -30325,17 +30316,15 @@ func (vpc *VpcV1) ListVPCDnsResolutionBindingsWithContext(ctx context.Context, l
 //   - The VPC specified by the identifier in the URL must have `dns.enable_hub` set to
 //     `false`
 //   - The updated DNS sharing connected topology must not contain more than one endpoint
-//     gateway with `allow_dns_resolution_binding` set to `true` and
-//     `allow_resource_binding` set to `false` targeting the same service.
+//     gateway with `dns_resolution_binding_mode` set to `primary` targeting the same service.
 //
 // Additionally, if the VPC specified by the identifier in the URL has endpoint gateways that have
-// `allow_dns_resolution_binding` set to `true`, then those endpoint gateways will participate in [DNS
+// `dns_resolution_binding_mode` set to `per_resource_binding`, then those endpoint gateways will participate in [DNS
 // sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) with all VPCs in the connected topology. If this VPC contains an
 // endpoint gateway targeting a service that has resource binding enabled, then for this request to succeed:
 //   - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
 //     gateway with the same `target` as the endpoint gateway in this VPC, and with
-//     `allow_dns_resolution_binding` set to `true` and `allow_resource_binding` set to
-//     `false`.
+//     `dns_resolution_binding_mode` set to `primary`.
 //   - No other VPC in the topology can have an endpoint gateway with a resource binding
 //     using the same `service_endpoint` as a resource binding for the endpoint gateway in
 //     this VPC.
@@ -35684,7 +35673,7 @@ func (vpc *VpcV1) UpdateVPNServerRouteWithContext(ctx context.Context, updateVPN
 	return
 }
 func getServiceComponentInfo() *core.ProblemComponent {
-	return core.NewProblemComponent(DefaultServiceName, "2025-11-17")
+	return core.NewProblemComponent(DefaultServiceName, "2025-12-16")
 }
 
 // AccountIdentity : Identifies an account by a unique property.
@@ -45936,17 +45925,18 @@ type CreateEndpointGatewayOptions struct {
 	// - Must not have a service endpoint that overlaps with any `service_endpoints` of
 	//   another endpoint gateway in the VPC.
 	//
-	// If `allow_dns_resolution_binding` is `true`, then there must not be another endpoint
-	// gateway with `allow_dns_resolution_binding` set to `true` in the [DNS
-	// sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) connected topology that:
+	// If `dns_resolution_binding_mode` is set to `primary`, then there must not be
+	// another endpoint gateway in the [DNS sharing](/docs/vpc?topic=vpc-vpe-dns-sharing)
+	// connected topology that:
 	// - Has the same `target` as this endpoint gateway
 	// - Has `service_endpoints` that overlap with the `service_endpoints` for this endpoint
 	//   gateway.
 	//
-	// If `allow_dns_resolution_binding` is `true`, and `allow_resource_binding` is `true`,
-	// then:
+	// If `dns_resolution_binding_mode` is set to `per_resource_binding`, then:
 	// - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
 	//   gateway with the same `target` as this endpoint gateway.
+	// - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
+	//   gateway with `dns_resolution_binding_mode` set to `primary`.
 	// - No other VPC in the topology can have an endpoint gateway with a resource binding
 	//   using the same `service_endpoint` as a resource binding for this endpoint gateway.
 	Target EndpointGatewayTargetPrototypeIntf `json:"target" validate:"required"`
@@ -45954,30 +45944,30 @@ type CreateEndpointGatewayOptions struct {
 	// The VPC this endpoint gateway will reside in.
 	VPC VPCIdentityIntf `json:"vpc" validate:"required"`
 
-	// Indicates whether to allow DNS resolution for this endpoint gateway when the VPC this endpoint gateway resides in
-	// has a DNS resolution binding to a VPC with `dns.enable_hub` set to `true`.
+	// The DNS resolution binding mode to use for this endpoint gateway:
+	// - `disabled`: The endpoint gateway will not participate in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) with other VPCs in a connected
+	//    topology.
+	// - `primary`: The endpoint gateway will participate in [DNS sharing for VPE gateways]
+	//    (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+	//    has a DNS resolution binding to another VPC. If the VPC this endpoint gateway
+	//    resides in has a DNS resolution binding to another VPC, then no other VPC in the
+	//    topology can have an endpoint gateway with the same `target` as this endpoint
+	//    gateway.
+	// - `per_resource_binding`: The endpoint gateway will participate in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+	//    resides in has a DNS resolution binding to another VPC. Resource binding must be
+	//    enabled for the `target` service.
 	//
-	// If `true`, and `allow_resource_binding` is `false`, then there must not be another endpoint gateway with
-	// `allow_dns_resolution_binding` set to `true` in the [DNS sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) connected
-	// topology that:
-	// - Has the same `target` as this endpoint gateway
-	// - Has `service_endpoints` that overlap with the `service_endpoints` for this endpoint
-	//   gateway.
+	//    The VPC this endpoint gateway resides in must have `dns.enable_hub` set to
+	//    `false`.
 	//
-	// If `true`, and `allow_resource_binding` is `true`, then:
-	// - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
-	//   gateway with the same `target` as this endpoint gateway.
-	// - No other VPC in the topology can have an endpoint gateway with a resource binding
-	//   using the same `service_endpoint` as a resource binding for this endpoint gateway.
-	//
-	// Must be `true` if the VPC this endpoint gateway resides in has `dns.enable_hub` set to
-	// `true`.
-	AllowDnsResolutionBinding *bool `json:"allow_dns_resolution_binding,omitempty"`
-
-	// Indicates whether resource binding is allowed for this endpoint gateway when the VPC this endpoint gateway resides
-	// in has a DNS resolution binding to a VPC with `dns.enable_hub` set to `true`. Resource binding must be enabled for
-	// the `target` service.
-	AllowResourceBinding *bool `json:"allow_resource_binding,omitempty"`
+	//    If the VPC this endpoint gateway resides in has DNS resolution binding to another
+	//    VPC, the other VPC must:
+	//    - have `dns.enable_hub` set to `true`
+	//    - contain an endpoint gateway for the same `target` service with
+	//      `dns_resolution_binding_mode` set to `primary`.
+	DnsResolutionBindingMode *string `json:"dns_resolution_binding_mode,omitempty"`
 
 	// The reserved IPs to bind to this endpoint gateway. At most one reserved IP per zone is allowed.
 	Ips []EndpointGatewayReservedIPIntf `json:"ips,omitempty"`
@@ -45996,6 +45986,41 @@ type CreateEndpointGatewayOptions struct {
 	// Allows users to set headers on API requests.
 	Headers map[string]string
 }
+
+// Constants associated with the CreateEndpointGatewayOptions.DnsResolutionBindingMode property.
+// The DNS resolution binding mode to use for this endpoint gateway:
+//
+//   - `disabled`: The endpoint gateway will not participate in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) with other VPCs in a connected
+//     topology.
+//
+//   - `primary`: The endpoint gateway will participate in [DNS sharing for VPE gateways]
+//     (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+//     has a DNS resolution binding to another VPC. If the VPC this endpoint gateway
+//     resides in has a DNS resolution binding to another VPC, then no other VPC in the
+//     topology can have an endpoint gateway with the same `target` as this endpoint
+//     gateway.
+//
+//   - `per_resource_binding`: The endpoint gateway will participate in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+//     resides in has a DNS resolution binding to another VPC. Resource binding must be
+//     enabled for the `target` service.
+//
+//     The VPC this endpoint gateway resides in must have `dns.enable_hub` set to
+//     `false`.
+//
+//     If the VPC this endpoint gateway resides in has DNS resolution binding to another
+//     VPC, the other VPC must:
+//
+//   - have `dns.enable_hub` set to `true`
+//
+//   - contain an endpoint gateway for the same `target` service with
+//     `dns_resolution_binding_mode` set to `primary`.
+const (
+	CreateEndpointGatewayOptionsDnsResolutionBindingModeDisabledConst           = "disabled"
+	CreateEndpointGatewayOptionsDnsResolutionBindingModePerResourceBindingConst = "per_resource_binding"
+	CreateEndpointGatewayOptionsDnsResolutionBindingModePrimaryConst            = "primary"
+)
 
 // NewCreateEndpointGatewayOptions : Instantiate CreateEndpointGatewayOptions
 func (*VpcV1) NewCreateEndpointGatewayOptions(target EndpointGatewayTargetPrototypeIntf, vpc VPCIdentityIntf) *CreateEndpointGatewayOptions {
@@ -46017,15 +46042,9 @@ func (_options *CreateEndpointGatewayOptions) SetVPC(vpc VPCIdentityIntf) *Creat
 	return _options
 }
 
-// SetAllowDnsResolutionBinding : Allow user to set AllowDnsResolutionBinding
-func (_options *CreateEndpointGatewayOptions) SetAllowDnsResolutionBinding(allowDnsResolutionBinding bool) *CreateEndpointGatewayOptions {
-	_options.AllowDnsResolutionBinding = core.BoolPtr(allowDnsResolutionBinding)
-	return _options
-}
-
-// SetAllowResourceBinding : Allow user to set AllowResourceBinding
-func (_options *CreateEndpointGatewayOptions) SetAllowResourceBinding(allowResourceBinding bool) *CreateEndpointGatewayOptions {
-	_options.AllowResourceBinding = core.BoolPtr(allowResourceBinding)
+// SetDnsResolutionBindingMode : Allow user to set DnsResolutionBindingMode
+func (_options *CreateEndpointGatewayOptions) SetDnsResolutionBindingMode(dnsResolutionBindingMode string) *CreateEndpointGatewayOptions {
+	_options.DnsResolutionBindingMode = core.StringPtr(dnsResolutionBindingMode)
 	return _options
 }
 
@@ -46150,8 +46169,10 @@ type CreateFlowLogCollectorOptions struct {
 	// instance network attachments, virtual network interfaces or instance network interfaces
 	// within the target that are themselves the target of a more specific flow log collector.
 	//
-	// The target must not be a virtual network interface that is attached to a bare metal server
-	// network attachment or to a file share mount target.
+	// For this request to succeed, the target must:
+	// - not be a virtual network interface that is attached to a bare metal server network
+	//   attachment or to a file share mount target
+	// - not already be the target of another flow log collector.
 	Target FlowLogCollectorTargetPrototypeIntf `json:"target" validate:"required"`
 
 	// Indicates whether this collector will be active upon creation.
@@ -46230,7 +46251,7 @@ type CreateIkePolicyOptions struct {
 	// The key lifetime in seconds.
 	KeyLifetime *int64 `json:"key_lifetime,omitempty"`
 
-	// The name for this IKE policy. The name must not be used by another IKE policies in the region. If unspecified, the
+	// The name for this IKE policy. The name must not be used by another IKE policy in the region. If unspecified, the
 	// name will be a hyphenated list of randomly-selected words.
 	Name *string `json:"name,omitempty"`
 
@@ -47047,8 +47068,8 @@ type CreateIpsecPolicyOptions struct {
 	// The key lifetime in seconds.
 	KeyLifetime *int64 `json:"key_lifetime,omitempty"`
 
-	// The name for this IPsec policy. The name must not be used by another IPsec policies in the region. If unspecified,
-	// the name will be a hyphenated list of randomly-selected words.
+	// The name for this IPsec policy. The name must not be used by another IPsec policy in the region. If unspecified, the
+	// name will be a hyphenated list of randomly-selected words.
 	Name *string `json:"name,omitempty"`
 
 	// The resource group to use. If unspecified, the account's [default resource
@@ -52575,9 +52596,11 @@ type DefaultSecurityGroup struct {
 	ResourceGroup *ResourceGroupReference `json:"resource_group" validate:"required"`
 
 	// The rules for the default security group for a VPC. Created with:
-	// - A rule allowing inbound ICMP, TCP and UDP traffic from other interfaces in the
-	//   VPC's default security group
-	// - A rule allowing outbound ICMP, TCP and UDP traffic to any destination
+	// - A rule named `inbound-icmp-tcp-udp-from-this-security-group` allowing inbound
+	//   ICMP, TCP and UDP traffic from other interfaces in the VPC's default security
+	//   group
+	// - A rule named `outbound-icmp-tcp-udp` allowing outbound ICMP, TCP and UDP traffic
+	//   to any destination
 	//
 	// Rules for the default security group may be changed, added or removed.
 	Rules []SecurityGroupRuleIntf `json:"rules" validate:"required"`
@@ -55522,18 +55545,23 @@ func UnmarshalEncryptionKeyReference(m map[string]json.RawMessage, result interf
 
 // EndpointGateway : EndpointGateway struct
 type EndpointGateway struct {
-	// Indicates whether to allow DNS resolution for this endpoint gateway when the VPC this endpoint gateway resides in
-	// has a DNS resolution binding to a VPC with `dns.enable_hub` set to `true`.
-	AllowDnsResolutionBinding *bool `json:"allow_dns_resolution_binding" validate:"required"`
-
-	// Indicates whether resource binding is allowed for this endpoint gateway.
-	AllowResourceBinding *bool `json:"allow_resource_binding" validate:"required"`
-
 	// The date and time that the endpoint gateway was created.
 	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
 
 	// The CRN for this endpoint gateway.
 	CRN *string `json:"crn" validate:"required"`
+
+	// The DNS resolution binding mode used for this endpoint gateway:
+	// - `disabled`: The endpoint gateway is not participating in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing).
+	// - `primary`: The endpoint gateway is participating in [DNS sharing for VPE gateways]
+	//    (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+	//    has a DNS resolution binding to another VPC.
+	// - `per_resource_binding`: The endpoint gateway is participating in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+	//    resides in has a DNS resolution binding to another VPC, and resource binding is
+	//    enabled for the `target` service.
+	DnsResolutionBindingMode *string `json:"dns_resolution_binding_mode" validate:"required"`
 
 	// The health of this resource:
 	// - `ok`: No abnormal behavior detected
@@ -55585,6 +55613,23 @@ type EndpointGateway struct {
 	VPC *VPCReference `json:"vpc" validate:"required"`
 }
 
+// Constants associated with the EndpointGateway.DnsResolutionBindingMode property.
+// The DNS resolution binding mode used for this endpoint gateway:
+//   - `disabled`: The endpoint gateway is not participating in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing).
+//   - `primary`: The endpoint gateway is participating in [DNS sharing for VPE gateways]
+//     (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+//     has a DNS resolution binding to another VPC.
+//   - `per_resource_binding`: The endpoint gateway is participating in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+//     resides in has a DNS resolution binding to another VPC, and resource binding is
+//     enabled for the `target` service.
+const (
+	EndpointGatewayDnsResolutionBindingModeDisabledConst           = "disabled"
+	EndpointGatewayDnsResolutionBindingModePerResourceBindingConst = "per_resource_binding"
+	EndpointGatewayDnsResolutionBindingModePrimaryConst            = "primary"
+)
+
 // Constants associated with the EndpointGateway.HealthState property.
 // The health of this resource:
 //   - `ok`: No abnormal behavior detected
@@ -55621,16 +55666,6 @@ const (
 // UnmarshalEndpointGateway unmarshals an instance of EndpointGateway from the specified map of raw messages.
 func UnmarshalEndpointGateway(m map[string]json.RawMessage, result interface{}) (err error) {
 	obj := new(EndpointGateway)
-	err = core.UnmarshalPrimitive(m, "allow_dns_resolution_binding", &obj.AllowDnsResolutionBinding)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "allow_dns_resolution_binding-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "allow_resource_binding", &obj.AllowResourceBinding)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "allow_resource_binding-error", common.GetComponentInfo())
-		return
-	}
 	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
@@ -55639,6 +55674,11 @@ func UnmarshalEndpointGateway(m map[string]json.RawMessage, result interface{}) 
 	err = core.UnmarshalPrimitive(m, "crn", &obj.CRN)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "crn-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "dns_resolution_binding_mode", &obj.DnsResolutionBindingMode)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "dns_resolution_binding_mode-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "health_state", &obj.HealthState)
@@ -55848,46 +55888,76 @@ func UnmarshalEndpointGatewayLifecycleReason(m map[string]json.RawMessage, resul
 
 // EndpointGatewayPatch : EndpointGatewayPatch struct
 type EndpointGatewayPatch struct {
-	// Indicates whether to allow DNS resolution for this endpoint gateway when the VPC this endpoint gateway resides in
-	// has a DNS resolution binding to a VPC with `dns.enable_hub` set to `true`.
+	// The DNS resolution binding mode to use for this endpoint gateway:
+	// - `disabled`: The endpoint gateway will not participate in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) with other VPCs in a connected
+	//    topology.
+	// - `primary`: The endpoint gateway will participate in [DNS sharing for VPE gateways]
+	//    (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+	//    has a DNS resolution binding to another VPC. If the VPC this endpoint gateway
+	//    resides in has a DNS resolution binding to another VPC, then no other VPC in the
+	//    topology can have an endpoint gateway with the same `target` as this endpoint
+	//    gateway.
+	// - `per_resource_binding`: The endpoint gateway will participate in [DNS sharing for VPE
+	//    gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+	//    resides in has a DNS resolution binding to another VPC. Resource binding must be
+	//    enabled for the `target` service.
 	//
-	// If `true`, and `allow_resource_binding` is `false`, then there must not be another endpoint gateway with
-	// `allow_dns_resolution_binding` set to `true` in the [DNS sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) connected
-	// topology that:
-	// - Has the same `target` as this endpoint gateway
-	// - Has `service_endpoints` that overlap with the `service_endpoints` for this endpoint
-	//   gateway.
+	//    The VPC this endpoint gateway resides in must have `dns.enable_hub` set to
+	//    `false`.
 	//
-	// If `true`, and `allow_resource_binding` is `true`, then:
-	// - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
-	//   gateway with the same `target` as this endpoint gateway.
-	// - No other VPC in the topology can have an endpoint gateway with a resource binding
-	//   using the same `service_endpoint` as a resource binding for this endpoint gateway.
-	//
-	// Must be `true` if the VPC this endpoint gateway resides in has `dns.enable_hub` set to
-	// `true`.
-	AllowDnsResolutionBinding *bool `json:"allow_dns_resolution_binding,omitempty"`
-
-	// Indicates whether resource binding is allowed for this endpoint gateway when the VPC this endpoint gateway resides
-	// in has a DNS resolution binding to a VPC with `dns.enable_hub` set to `true`. Resource binding must be enabled for
-	// the `target` service.
-	AllowResourceBinding *bool `json:"allow_resource_binding,omitempty"`
+	//    If the VPC this endpoint gateway resides in has DNS resolution binding to another
+	//    VPC, the other VPC must:
+	//    - have `dns.enable_hub` set to `true`
+	//    - contain an endpoint gateway for the same `target` service with
+	//      `dns_resolution_binding_mode` set to `primary`.
+	DnsResolutionBindingMode *string `json:"dns_resolution_binding_mode,omitempty"`
 
 	// The name for this endpoint gateway. The name must not be used by another endpoint gateway in the VPC.
 	Name *string `json:"name,omitempty"`
 }
 
+// Constants associated with the EndpointGatewayPatch.DnsResolutionBindingMode property.
+// The DNS resolution binding mode to use for this endpoint gateway:
+//
+//   - `disabled`: The endpoint gateway will not participate in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) with other VPCs in a connected
+//     topology.
+//
+//   - `primary`: The endpoint gateway will participate in [DNS sharing for VPE gateways]
+//     (/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway resides in
+//     has a DNS resolution binding to another VPC. If the VPC this endpoint gateway
+//     resides in has a DNS resolution binding to another VPC, then no other VPC in the
+//     topology can have an endpoint gateway with the same `target` as this endpoint
+//     gateway.
+//
+//   - `per_resource_binding`: The endpoint gateway will participate in [DNS sharing for VPE
+//     gateways](/docs/vpc?topic=vpc-vpe-dns-sharing) if the VPC this endpoint gateway
+//     resides in has a DNS resolution binding to another VPC. Resource binding must be
+//     enabled for the `target` service.
+//
+//     The VPC this endpoint gateway resides in must have `dns.enable_hub` set to
+//     `false`.
+//
+//     If the VPC this endpoint gateway resides in has DNS resolution binding to another
+//     VPC, the other VPC must:
+//
+//   - have `dns.enable_hub` set to `true`
+//
+//   - contain an endpoint gateway for the same `target` service with
+//     `dns_resolution_binding_mode` set to `primary`.
+const (
+	EndpointGatewayPatchDnsResolutionBindingModeDisabledConst           = "disabled"
+	EndpointGatewayPatchDnsResolutionBindingModePerResourceBindingConst = "per_resource_binding"
+	EndpointGatewayPatchDnsResolutionBindingModePrimaryConst            = "primary"
+)
+
 // UnmarshalEndpointGatewayPatch unmarshals an instance of EndpointGatewayPatch from the specified map of raw messages.
 func UnmarshalEndpointGatewayPatch(m map[string]json.RawMessage, result interface{}) (err error) {
 	obj := new(EndpointGatewayPatch)
-	err = core.UnmarshalPrimitive(m, "allow_dns_resolution_binding", &obj.AllowDnsResolutionBinding)
+	err = core.UnmarshalPrimitive(m, "dns_resolution_binding_mode", &obj.DnsResolutionBindingMode)
 	if err != nil {
-		err = core.SDKErrorf(err, "", "allow_dns_resolution_binding-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "allow_resource_binding", &obj.AllowResourceBinding)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "allow_resource_binding-error", common.GetComponentInfo())
+		err = core.SDKErrorf(err, "", "dns_resolution_binding_mode-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
@@ -55902,11 +55972,8 @@ func UnmarshalEndpointGatewayPatch(m map[string]json.RawMessage, result interfac
 // AsPatch returns a generic map representation of the EndpointGatewayPatch
 func (endpointGatewayPatch *EndpointGatewayPatch) AsPatch() (_patch map[string]interface{}, err error) {
 	_patch = map[string]interface{}{}
-	if !core.IsNil(endpointGatewayPatch.AllowDnsResolutionBinding) {
-		_patch["allow_dns_resolution_binding"] = endpointGatewayPatch.AllowDnsResolutionBinding
-	}
-	if !core.IsNil(endpointGatewayPatch.AllowResourceBinding) {
-		_patch["allow_resource_binding"] = endpointGatewayPatch.AllowResourceBinding
+	if !core.IsNil(endpointGatewayPatch.DnsResolutionBindingMode) {
+		_patch["dns_resolution_binding_mode"] = endpointGatewayPatch.DnsResolutionBindingMode
 	}
 	if !core.IsNil(endpointGatewayPatch.Name) {
 		_patch["name"] = endpointGatewayPatch.Name
@@ -56502,16 +56569,17 @@ func UnmarshalEndpointGatewayTarget(m map[string]json.RawMessage, result interfa
 //   - Must not have a service endpoint that overlaps with any `service_endpoints` of
 //     another endpoint gateway in the VPC.
 //
-// If `allow_dns_resolution_binding` is `true`, then there must not be another endpoint gateway with
-// `allow_dns_resolution_binding` set to `true` in the [DNS sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) connected
-// topology that:
+// If `dns_resolution_binding_mode` is set to `primary`, then there must not be another endpoint gateway in the [DNS
+// sharing](/docs/vpc?topic=vpc-vpe-dns-sharing) connected topology that:
 //   - Has the same `target` as this endpoint gateway
 //   - Has `service_endpoints` that overlap with the `service_endpoints` for this endpoint
 //     gateway.
 //
-// If `allow_dns_resolution_binding` is `true`, and `allow_resource_binding` is `true`, then:
+// If `dns_resolution_binding_mode` is set to `per_resource_binding`, then:
 //   - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
 //     gateway with the same `target` as this endpoint gateway.
+//   - The VPC in the topology with `dns.enable_hub` set to `true` must have an endpoint
+//     gateway with `dns_resolution_binding_mode` set to `primary`.
 //   - No other VPC in the topology can have an endpoint gateway with a resource binding
 //     using the same `service_endpoint` as a resource binding for this endpoint gateway.
 //
@@ -57688,8 +57756,11 @@ func UnmarshalFlowLogCollectorTarget(m map[string]json.RawMessage, result interf
 // virtual network interfaces or instance network interfaces within the target that are themselves the target of a more
 // specific flow log collector.
 //
-// The target must not be a virtual network interface that is attached to a bare metal server network attachment or to a
-// file share mount target.
+// For this request to succeed, the target must:
+//   - not be a virtual network interface that is attached to a bare metal server network
+//     attachment or to a file share mount target
+//   - not already be the target of another flow log collector.
+//
 // Models which "extend" this model:
 // - FlowLogCollectorTargetPrototypeNetworkInterfaceIdentity
 // - FlowLogCollectorTargetPrototypeInstanceIdentity
@@ -68618,11 +68689,11 @@ type InstancePatch struct {
 	// region. Changing the name will not affect the system hostname.
 	Name *string `json:"name,omitempty"`
 
-	// The placement restrictions to use for the virtual server instance. For the
-	// placement restrictions to be changed, the instance `status` must be `stopping` or
-	// `stopped`.
+	// The placement restrictions to use for the virtual server instance.
 	//
-	// If set, `reservation_affinity.policy` must be `disabled`.
+	// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated
+	// host or dedicated host group, the `vcpu.percentage` must be `100` and the instance must
+	// have two or more vCPUs.
 	PlacementTarget InstancePlacementTargetPatchIntf `json:"placement_target,omitempty"`
 
 	// The profile to use for this virtual server instance. Any disks associated with the
@@ -68646,6 +68717,8 @@ type InstancePatch struct {
 	// this value will result in a corresponding decrease to
 	// `total_network_bandwidth`.
 	TotalVolumeBandwidth *int64 `json:"total_volume_bandwidth,omitempty"`
+
+	Vcpu *InstanceVcpuPatch `json:"vcpu,omitempty"`
 
 	// The volume bandwidth QoS mode to use for this virtual server instance. The specified value must be listed in the
 	// instance profile's `volume_bandwidth_qos_modes`.
@@ -68725,6 +68798,11 @@ func UnmarshalInstancePatch(m map[string]json.RawMessage, result interface{}) (e
 		err = core.SDKErrorf(err, "", "total_volume_bandwidth-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPatch)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalPrimitive(m, "volume_bandwidth_qos_mode", &obj.VolumeBandwidthQosMode)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_bandwidth_qos_mode-error", common.GetComponentInfo())
@@ -68763,6 +68841,9 @@ func (instancePatch *InstancePatch) AsPatch() (_patch map[string]interface{}, er
 	}
 	if !core.IsNil(instancePatch.TotalVolumeBandwidth) {
 		_patch["total_volume_bandwidth"] = instancePatch.TotalVolumeBandwidth
+	}
+	if !core.IsNil(instancePatch.Vcpu) {
+		_patch["vcpu"] = instancePatch.Vcpu.asPatch()
 	}
 	if !core.IsNil(instancePatch.VolumeBandwidthQosMode) {
 		_patch["volume_bandwidth_qos_mode"] = instancePatch.VolumeBandwidthQosMode
@@ -68911,11 +68992,10 @@ func UnmarshalInstancePlacementTarget(m map[string]json.RawMessage, result inter
 	return
 }
 
-// InstancePlacementTargetPatch : The placement restrictions to use for the virtual server instance. For the placement restrictions to be changed, the
-// instance `status` must be `stopping` or
-// `stopped`.
+// InstancePlacementTargetPatch : The placement restrictions to use for the virtual server instance.
 //
-// If set, `reservation_affinity.policy` must be `disabled`.
+// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated host or dedicated host
+// group, the `vcpu.percentage` must be `100` and the instance must have two or more vCPUs.
 // Models which "extend" this model:
 // - InstancePlacementTargetPatchDedicatedHostIdentity
 // - InstancePlacementTargetPatchDedicatedHostGroupIdentity
@@ -68979,7 +69059,8 @@ func (instancePlacementTargetPatch *InstancePlacementTargetPatch) asPatch() (_pa
 
 // InstancePlacementTargetPrototype : The placement restrictions to use for the virtual server instance.
 //
-// If specified, `reservation_affinity.policy` must be `disabled`.
+// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated host or dedicated host
+// group, the `vcpu.percentage` must be `100` and the instance must have two or more vCPUs.
 // Models which "extend" this model:
 // - InstancePlacementTargetPrototypeDedicatedHostIdentity
 // - InstancePlacementTargetPrototypeDedicatedHostGroupIdentity
@@ -69092,9 +69173,14 @@ type InstanceProfile struct {
 
 	VcpuArchitecture *InstanceProfileVcpuArchitecture `json:"vcpu_architecture" validate:"required"`
 
+	VcpuBurstLimit InstanceProfileVcpuBurstLimitIntf `json:"vcpu_burst_limit" validate:"required"`
+
 	VcpuCount InstanceProfileVcpuIntf `json:"vcpu_count" validate:"required"`
 
 	VcpuManufacturer InstanceProfileVcpuManufacturerIntf `json:"vcpu_manufacturer" validate:"required"`
+
+	// The permitted values for VCPU percentage for an instance with this profile.
+	VcpuPercentage *InstanceProfileVcpuPercentage `json:"vcpu_percentage" validate:"required"`
 
 	VolumeBandwidthQosModes InstanceProfileVolumeBandwidthQoSModesIntf `json:"volume_bandwidth_qos_modes" validate:"required"`
 }
@@ -69245,6 +69331,11 @@ func UnmarshalInstanceProfile(m map[string]json.RawMessage, result interface{}) 
 		err = core.SDKErrorf(err, "", "vcpu_architecture-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu_burst_limit", &obj.VcpuBurstLimit, UnmarshalInstanceProfileVcpuBurstLimit)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu_burst_limit-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "vcpu_count", &obj.VcpuCount, UnmarshalInstanceProfileVcpu)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "vcpu_count-error", common.GetComponentInfo())
@@ -69253,6 +69344,11 @@ func UnmarshalInstanceProfile(m map[string]json.RawMessage, result interface{}) 
 	err = core.UnmarshalModel(m, "vcpu_manufacturer", &obj.VcpuManufacturer, UnmarshalInstanceProfileVcpuManufacturer)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "vcpu_manufacturer-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "vcpu_percentage", &obj.VcpuPercentage, UnmarshalInstanceProfileVcpuPercentage)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu_percentage-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalModel(m, "volume_bandwidth_qos_modes", &obj.VolumeBandwidthQosModes, UnmarshalInstanceProfileVolumeBandwidthQoSModes)
@@ -70604,6 +70700,48 @@ func UnmarshalInstanceProfileVcpuArchitecture(m map[string]json.RawMessage, resu
 	return
 }
 
+// InstanceProfileVcpuBurstLimit : InstanceProfileVcpuBurstLimit struct
+// Models which "extend" this model:
+// - InstanceProfileVcpuBurstLimitFixed
+type InstanceProfileVcpuBurstLimit struct {
+	// The type for this profile field.
+	Type *string `json:"type,omitempty"`
+
+	// The value for this profile field.
+	Value *int64 `json:"value,omitempty"`
+}
+
+// Constants associated with the InstanceProfileVcpuBurstLimit.Type property.
+// The type for this profile field.
+const (
+	InstanceProfileVcpuBurstLimitTypeFixedConst = "fixed"
+)
+
+func (*InstanceProfileVcpuBurstLimit) isaInstanceProfileVcpuBurstLimit() bool {
+	return true
+}
+
+type InstanceProfileVcpuBurstLimitIntf interface {
+	isaInstanceProfileVcpuBurstLimit() bool
+}
+
+// UnmarshalInstanceProfileVcpuBurstLimit unmarshals an instance of InstanceProfileVcpuBurstLimit from the specified map of raw messages.
+func UnmarshalInstanceProfileVcpuBurstLimit(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceProfileVcpuBurstLimit)
+	err = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "value", &obj.Value)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "value-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // InstanceProfileVcpuManufacturer : InstanceProfileVcpuManufacturer struct
 // Models which "extend" this model:
 // - InstanceProfileVcpuManufacturerFixed
@@ -70649,6 +70787,46 @@ func UnmarshalInstanceProfileVcpuManufacturer(m map[string]json.RawMessage, resu
 	err = core.UnmarshalPrimitive(m, "value", &obj.Value)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "value-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// InstanceProfileVcpuPercentage : The permitted values for VCPU percentage for an instance with this profile.
+type InstanceProfileVcpuPercentage struct {
+	// The default value for this profile field.
+	Default *int64 `json:"default" validate:"required"`
+
+	// The type for this profile field.
+	Type *string `json:"type" validate:"required"`
+
+	// The permitted values for this profile field.
+	Values []int64 `json:"values" validate:"required"`
+}
+
+// Constants associated with the InstanceProfileVcpuPercentage.Type property.
+// The type for this profile field.
+const (
+	InstanceProfileVcpuPercentageTypeEnumConst = "enum"
+)
+
+// UnmarshalInstanceProfileVcpuPercentage unmarshals an instance of InstanceProfileVcpuPercentage from the specified map of raw messages.
+func UnmarshalInstanceProfileVcpuPercentage(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceProfileVcpuPercentage)
+	err = core.UnmarshalPrimitive(m, "default", &obj.Default)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "default-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "values", &obj.Values)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "values-error", common.GetComponentInfo())
 		return
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
@@ -70869,7 +71047,9 @@ type InstancePrototype struct {
 
 	// The placement restrictions to use for the virtual server instance.
 	//
-	// If specified, `reservation_affinity.policy` must be `disabled`.
+	// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated
+	// host or dedicated host group, the `vcpu.percentage` must be `100` and the instance must
+	// have two or more vCPUs.
 	PlacementTarget InstancePlacementTargetPrototypeIntf `json:"placement_target,omitempty"`
 
 	// The [profile](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles) to use for this
@@ -70879,7 +71059,8 @@ type InstancePrototype struct {
 	// in the future without changing the API version.
 	Profile InstanceProfileIdentityIntf `json:"profile,omitempty"`
 
-	// The reservation affinity settings for this virtual server instance.
+	// The reservation affinity settings for this virtual server instance. If specified,
+	// the instance must have two or more vCPUs, and `vcpu.percentage` must be `100`.
 	ReservationAffinity *InstanceReservationAffinityPrototype `json:"reservation_affinity,omitempty"`
 
 	// The resource group to use. If unspecified, the account's [default resource
@@ -70894,6 +71075,8 @@ type InstancePrototype struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -71043,6 +71226,11 @@ func UnmarshalInstancePrototype(m map[string]json.RawMessage, result interface{}
 	err = core.UnmarshalPrimitive(m, "user_data", &obj.UserData)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
@@ -71278,7 +71466,8 @@ func (instanceReservationAffinityPatch *InstanceReservationAffinityPatch) asPatc
 	return
 }
 
-// InstanceReservationAffinityPrototype : The reservation affinity settings for this virtual server instance.
+// InstanceReservationAffinityPrototype : The reservation affinity settings for this virtual server instance. If specified, the instance must have two or more
+// vCPUs, and `vcpu.percentage` must be `100`.
 type InstanceReservationAffinityPrototype struct {
 	// The reservation affinity policy to use for this virtual server instance:
 	// - `disabled`: Reservations will not be used
@@ -71287,7 +71476,8 @@ type InstanceReservationAffinityPrototype struct {
 	//   `profile` and `zone` as this virtual server instance will be available for use.
 	//
 	// The policy will default to `manual` if `pool` is not empty. The policy will default to
-	// `disabled` if a `placement_target` is set. The policy will default to `automatic` in all other cases.
+	// `disabled` if a `placement_target` is set. The policy will default to `disabled` if the provided instance
+	// configuration is restricted from enabling reservations. The policy will default to `automatic` in all other cases.
 	//
 	// The policy must be `disabled` if `placement_target` is specified.
 	Policy *string `json:"policy,omitempty"`
@@ -71311,7 +71501,8 @@ type InstanceReservationAffinityPrototype struct {
 //     `profile` and `zone` as this virtual server instance will be available for use.
 //
 // The policy will default to `manual` if `pool` is not empty. The policy will default to
-// `disabled` if a `placement_target` is set. The policy will default to `automatic` in all other cases.
+// `disabled` if a `placement_target` is set. The policy will default to `disabled` if the provided instance
+// configuration is restricted from enabling reservations. The policy will default to `automatic` in all other cases.
 //
 // The policy must be `disabled` if `placement_target` is specified.
 const (
@@ -71460,7 +71651,9 @@ type InstanceTemplate struct {
 
 	// The placement restrictions to use for the virtual server instance.
 	//
-	// If specified, `reservation_affinity.policy` must be `disabled`.
+	// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated
+	// host or dedicated host group, the `vcpu.percentage` must be `100` and the instance must
+	// have two or more vCPUs.
 	PlacementTarget InstancePlacementTargetPrototypeIntf `json:"placement_target,omitempty"`
 
 	// The [profile](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles) to use for this
@@ -71470,7 +71663,8 @@ type InstanceTemplate struct {
 	// in the future without changing the API version.
 	Profile InstanceProfileIdentityIntf `json:"profile,omitempty"`
 
-	// The reservation affinity settings for this virtual server instance.
+	// The reservation affinity settings for this virtual server instance. If specified,
+	// the instance must have two or more vCPUs, and `vcpu.percentage` must be `100`.
 	ReservationAffinity *InstanceReservationAffinityPrototype `json:"reservation_affinity,omitempty"`
 
 	// The resource group for this instance template.
@@ -71484,6 +71678,8 @@ type InstanceTemplate struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -71561,6 +71757,7 @@ type InstanceTemplateIntf interface {
 
 // UnmarshalInstanceTemplate unmarshals an instance of InstanceTemplate from the specified map of raw messages.
 func UnmarshalInstanceTemplate(m map[string]json.RawMessage, result interface{}) (err error) {
+
 	// Check for source_snapshot presence to determine object type
 	var isSourceSnapshot bool
 	if bootVolumeRaw, exists := m["boot_volume_attachment"]; exists && len(bootVolumeRaw) > 0 && string(bootVolumeRaw) != "null" {
@@ -71672,6 +71869,11 @@ func UnmarshalInstanceTemplate(m map[string]json.RawMessage, result interface{})
 		err = core.UnmarshalPrimitive(m, "user_data", &obj.UserData)
 		if err != nil {
 			err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
+			return
+		}
+		err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
 			return
 		}
 		err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
@@ -71932,7 +72134,9 @@ type InstanceTemplatePrototype struct {
 
 	// The placement restrictions to use for the virtual server instance.
 	//
-	// If specified, `reservation_affinity.policy` must be `disabled`.
+	// If specified, `reservation_affinity.policy` must be `disabled`. If specifying a dedicated
+	// host or dedicated host group, the `vcpu.percentage` must be `100` and the instance must
+	// have two or more vCPUs.
 	PlacementTarget InstancePlacementTargetPrototypeIntf `json:"placement_target,omitempty"`
 
 	// The [profile](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles) to use for this
@@ -71942,7 +72146,8 @@ type InstanceTemplatePrototype struct {
 	// in the future without changing the API version.
 	Profile InstanceProfileIdentityIntf `json:"profile,omitempty"`
 
-	// The reservation affinity settings for this virtual server instance.
+	// The reservation affinity settings for this virtual server instance. If specified,
+	// the instance must have two or more vCPUs, and `vcpu.percentage` must be `100`.
 	ReservationAffinity *InstanceReservationAffinityPrototype `json:"reservation_affinity,omitempty"`
 
 	// The resource group to use. If unspecified, the account's [default resource
@@ -71957,6 +72162,8 @@ type InstanceTemplatePrototype struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -72110,6 +72317,11 @@ func UnmarshalInstanceTemplatePrototype(m map[string]json.RawMessage, result int
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -72233,6 +72445,8 @@ type InstanceVcpu struct {
 	// [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
 	Architecture *string `json:"architecture" validate:"required"`
 
+	Burst *InstanceVcpuBurst `json:"burst,omitempty"`
+
 	// The number of VCPUs assigned.
 	Count *int64 `json:"count" validate:"required"`
 
@@ -72242,6 +72456,14 @@ type InstanceVcpu struct {
 	// The enumerated values for this property may
 	// [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
 	Manufacturer *string `json:"manufacturer" validate:"required"`
+
+	// The percentage of VCPU time allocated to the virtual server instance.
+	//
+	// The virtual server instance `vcpu.percentage` will be `100` when:
+	// - The virtual server instance `placement_target` is a dedicated host or dedicated
+	//   host group.
+	// - The virtual server instance `reservation_affinity.policy` is `disabled`.
+	Percentage *int64 `json:"percentage" validate:"required"`
 }
 
 // Constants associated with the InstanceVcpu.Architecture property.
@@ -72275,6 +72497,11 @@ func UnmarshalInstanceVcpu(m map[string]json.RawMessage, result interface{}) (er
 		err = core.SDKErrorf(err, "", "architecture-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "burst", &obj.Burst, UnmarshalInstanceVcpuBurst)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "burst-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalPrimitive(m, "count", &obj.Count)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "count-error", common.GetComponentInfo())
@@ -72283,6 +72510,106 @@ func UnmarshalInstanceVcpu(m map[string]json.RawMessage, result interface{}) (er
 	err = core.UnmarshalPrimitive(m, "manufacturer", &obj.Manufacturer)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "manufacturer-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "percentage", &obj.Percentage)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "percentage-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// InstanceVcpuBurst : InstanceVcpuBurst struct
+type InstanceVcpuBurst struct {
+	// The maximum percentage of the base VCPU capacity the virtual server may exceed. For example, if `vcpu.count` is 1,
+	// `vcpu.percentage` is 50 and `vcpu.burst.limit` is 200, the instance may burst to using one full VCPU.
+	//
+	// The maximum value for this property may
+	// [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
+	Limit *int64 `json:"limit" validate:"required"`
+}
+
+// UnmarshalInstanceVcpuBurst unmarshals an instance of InstanceVcpuBurst from the specified map of raw messages.
+func UnmarshalInstanceVcpuBurst(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceVcpuBurst)
+	err = core.UnmarshalPrimitive(m, "limit", &obj.Limit)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "limit-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// InstanceVcpuPatch : InstanceVcpuPatch struct
+type InstanceVcpuPatch struct {
+	// The percentage of VCPU time allocated to the virtual server instance.
+	//
+	// The virtual server instance `vcpu.percentage` must be `100` when:
+	// - The virtual server instance `placement_target` is a dedicated host or dedicated
+	//   host group.
+	// - The virtual server instance `reservation_affinity.policy` is not `disabled`.
+	//
+	// For this property to be changed, the virtual server instance `status` must be
+	// `stopping` or `stopped`.
+	Percentage *int64 `json:"percentage" validate:"required"`
+}
+
+// NewInstanceVcpuPatch : Instantiate InstanceVcpuPatch (Generic Model Constructor)
+func (*VpcV1) NewInstanceVcpuPatch(percentage int64) (_model *InstanceVcpuPatch, err error) {
+	_model = &InstanceVcpuPatch{
+		Percentage: core.Int64Ptr(percentage),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+// UnmarshalInstanceVcpuPatch unmarshals an instance of InstanceVcpuPatch from the specified map of raw messages.
+func UnmarshalInstanceVcpuPatch(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceVcpuPatch)
+	err = core.UnmarshalPrimitive(m, "percentage", &obj.Percentage)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "percentage-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// asPatch returns a generic map representation of the InstanceVcpuPatch
+func (instanceVcpuPatch *InstanceVcpuPatch) asPatch() (_patch map[string]interface{}) {
+	_patch = map[string]interface{}{}
+	if !core.IsNil(instanceVcpuPatch.Percentage) {
+		_patch["percentage"] = instanceVcpuPatch.Percentage
+	}
+
+	return
+}
+
+// InstanceVcpuPrototype : InstanceVcpuPrototype struct
+type InstanceVcpuPrototype struct {
+	// The percentage of VCPU clock cycles allocated to the instance.
+	//
+	// The virtual server instance `vcpu.percentage` must be `100` when:
+	// - The virtual server instance `placement_target` is a dedicated host or dedicated
+	//   host group.
+	// - The virtual server instance `reservation_affinity.policy` is not `disabled`.
+	//
+	// If unspecified, the default for `vcpu_percentage` from the profile will be used.
+	Percentage *int64 `json:"percentage,omitempty"`
+}
+
+// UnmarshalInstanceVcpuPrototype unmarshals an instance of InstanceVcpuPrototype from the specified map of raw messages.
+func UnmarshalInstanceVcpuPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceVcpuPrototype)
+	err = core.UnmarshalPrimitive(m, "percentage", &obj.Percentage)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "percentage-error", common.GetComponentInfo())
 		return
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
@@ -73900,9 +74227,6 @@ func (options *ListEndpointGatewayResourceBindingsOptions) SetHeaders(param map[
 
 // ListEndpointGatewaysOptions : The ListEndpointGateways options.
 type ListEndpointGatewaysOptions struct {
-	// Filters the collection to endpoint gateways with an `allow_resource_binding` property matching the specified value.
-	AllowResourceBinding *bool `json:"allow_resource_binding,omitempty"`
-
 	// Filters the collection to resources with a `name` property matching the exact specified name.
 	Name *string `json:"name,omitempty"`
 
@@ -73928,9 +74252,9 @@ type ListEndpointGatewaysOptions struct {
 	// Filters the collection to resources with a `vpc.name` property matching the exact specified name.
 	VPCName *string `json:"vpc.name,omitempty"`
 
-	// Filters the collection to endpoint gateways with an `allow_dns_resolution_binding` property matching the specified
-	// value.
-	AllowDnsResolutionBinding *bool `json:"allow_dns_resolution_binding,omitempty"`
+	// Filters the collection to endpoint gateways with a `dns_resolution_binding_mode` property matching one of the
+	// specified comma-separated values.
+	DnsResolutionBindingMode []string `json:"dns_resolution_binding_mode,omitempty"`
 
 	// Allows users to set headers on API requests.
 	Headers map[string]string
@@ -73947,15 +74271,16 @@ const (
 	ListEndpointGatewaysOptionsLifecycleStateWaitingConst   = "waiting"
 )
 
+// Constants associated with the ListEndpointGatewaysOptions.DnsResolutionBindingMode property.
+const (
+	ListEndpointGatewaysOptionsDnsResolutionBindingModeDisabledConst           = "disabled"
+	ListEndpointGatewaysOptionsDnsResolutionBindingModePerResourceBindingConst = "per_resource_binding"
+	ListEndpointGatewaysOptionsDnsResolutionBindingModePrimaryConst            = "primary"
+)
+
 // NewListEndpointGatewaysOptions : Instantiate ListEndpointGatewaysOptions
 func (*VpcV1) NewListEndpointGatewaysOptions() *ListEndpointGatewaysOptions {
 	return &ListEndpointGatewaysOptions{}
-}
-
-// SetAllowResourceBinding : Allow user to set AllowResourceBinding
-func (_options *ListEndpointGatewaysOptions) SetAllowResourceBinding(allowResourceBinding bool) *ListEndpointGatewaysOptions {
-	_options.AllowResourceBinding = core.BoolPtr(allowResourceBinding)
-	return _options
 }
 
 // SetName : Allow user to set Name
@@ -74006,9 +74331,9 @@ func (_options *ListEndpointGatewaysOptions) SetVPCName(vpcName string) *ListEnd
 	return _options
 }
 
-// SetAllowDnsResolutionBinding : Allow user to set AllowDnsResolutionBinding
-func (_options *ListEndpointGatewaysOptions) SetAllowDnsResolutionBinding(allowDnsResolutionBinding bool) *ListEndpointGatewaysOptions {
-	_options.AllowDnsResolutionBinding = core.BoolPtr(allowDnsResolutionBinding)
+// SetDnsResolutionBindingMode : Allow user to set DnsResolutionBindingMode
+func (_options *ListEndpointGatewaysOptions) SetDnsResolutionBindingMode(dnsResolutionBindingMode []string) *ListEndpointGatewaysOptions {
+	_options.DnsResolutionBindingMode = dnsResolutionBindingMode
 	return _options
 }
 
@@ -84356,9 +84681,11 @@ func UnmarshalNetworkACLReference(m map[string]json.RawMessage, result interface
 
 // NetworkACLRule : NetworkACLRule struct
 // Models which "extend" this model:
-// - NetworkACLRuleNetworkACLRuleProtocolAll
+// - NetworkACLRuleNetworkACLRuleProtocolAny
+// - NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp
 // - NetworkACLRuleNetworkACLRuleProtocolIcmp
 // - NetworkACLRuleNetworkACLRuleProtocolTcpudp
+// - NetworkACLRuleNetworkACLRuleProtocolIndividual
 type NetworkACLRule struct {
 	// The action to perform for a packet matching the rule.
 	Action *string `json:"action" validate:"required"`
@@ -84445,10 +84772,264 @@ const (
 // The enumerated values for this property may
 // [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
 const (
-	NetworkACLRuleProtocolAllConst  = "all"
-	NetworkACLRuleProtocolIcmpConst = "icmp"
-	NetworkACLRuleProtocolTCPConst  = "tcp"
-	NetworkACLRuleProtocolUDPConst  = "udp"
+	NetworkACLRuleProtocolAhConst         = "ah"
+	NetworkACLRuleProtocolAnyConst        = "any"
+	NetworkACLRuleProtocolEspConst        = "esp"
+	NetworkACLRuleProtocolGreConst        = "gre"
+	NetworkACLRuleProtocolIPInIPConst     = "ip_in_ip"
+	NetworkACLRuleProtocolIcmpConst       = "icmp"
+	NetworkACLRuleProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	NetworkACLRuleProtocolL2tpConst       = "l2tp"
+	NetworkACLRuleProtocolNumber0Const    = "number_0"
+	NetworkACLRuleProtocolNumber10Const   = "number_10"
+	NetworkACLRuleProtocolNumber100Const  = "number_100"
+	NetworkACLRuleProtocolNumber101Const  = "number_101"
+	NetworkACLRuleProtocolNumber102Const  = "number_102"
+	NetworkACLRuleProtocolNumber103Const  = "number_103"
+	NetworkACLRuleProtocolNumber104Const  = "number_104"
+	NetworkACLRuleProtocolNumber105Const  = "number_105"
+	NetworkACLRuleProtocolNumber106Const  = "number_106"
+	NetworkACLRuleProtocolNumber107Const  = "number_107"
+	NetworkACLRuleProtocolNumber108Const  = "number_108"
+	NetworkACLRuleProtocolNumber109Const  = "number_109"
+	NetworkACLRuleProtocolNumber11Const   = "number_11"
+	NetworkACLRuleProtocolNumber110Const  = "number_110"
+	NetworkACLRuleProtocolNumber111Const  = "number_111"
+	NetworkACLRuleProtocolNumber113Const  = "number_113"
+	NetworkACLRuleProtocolNumber114Const  = "number_114"
+	NetworkACLRuleProtocolNumber116Const  = "number_116"
+	NetworkACLRuleProtocolNumber117Const  = "number_117"
+	NetworkACLRuleProtocolNumber118Const  = "number_118"
+	NetworkACLRuleProtocolNumber119Const  = "number_119"
+	NetworkACLRuleProtocolNumber12Const   = "number_12"
+	NetworkACLRuleProtocolNumber120Const  = "number_120"
+	NetworkACLRuleProtocolNumber121Const  = "number_121"
+	NetworkACLRuleProtocolNumber122Const  = "number_122"
+	NetworkACLRuleProtocolNumber123Const  = "number_123"
+	NetworkACLRuleProtocolNumber124Const  = "number_124"
+	NetworkACLRuleProtocolNumber125Const  = "number_125"
+	NetworkACLRuleProtocolNumber126Const  = "number_126"
+	NetworkACLRuleProtocolNumber127Const  = "number_127"
+	NetworkACLRuleProtocolNumber128Const  = "number_128"
+	NetworkACLRuleProtocolNumber129Const  = "number_129"
+	NetworkACLRuleProtocolNumber13Const   = "number_13"
+	NetworkACLRuleProtocolNumber130Const  = "number_130"
+	NetworkACLRuleProtocolNumber131Const  = "number_131"
+	NetworkACLRuleProtocolNumber133Const  = "number_133"
+	NetworkACLRuleProtocolNumber134Const  = "number_134"
+	NetworkACLRuleProtocolNumber135Const  = "number_135"
+	NetworkACLRuleProtocolNumber136Const  = "number_136"
+	NetworkACLRuleProtocolNumber137Const  = "number_137"
+	NetworkACLRuleProtocolNumber138Const  = "number_138"
+	NetworkACLRuleProtocolNumber139Const  = "number_139"
+	NetworkACLRuleProtocolNumber14Const   = "number_14"
+	NetworkACLRuleProtocolNumber140Const  = "number_140"
+	NetworkACLRuleProtocolNumber141Const  = "number_141"
+	NetworkACLRuleProtocolNumber142Const  = "number_142"
+	NetworkACLRuleProtocolNumber143Const  = "number_143"
+	NetworkACLRuleProtocolNumber144Const  = "number_144"
+	NetworkACLRuleProtocolNumber145Const  = "number_145"
+	NetworkACLRuleProtocolNumber146Const  = "number_146"
+	NetworkACLRuleProtocolNumber147Const  = "number_147"
+	NetworkACLRuleProtocolNumber148Const  = "number_148"
+	NetworkACLRuleProtocolNumber149Const  = "number_149"
+	NetworkACLRuleProtocolNumber15Const   = "number_15"
+	NetworkACLRuleProtocolNumber150Const  = "number_150"
+	NetworkACLRuleProtocolNumber151Const  = "number_151"
+	NetworkACLRuleProtocolNumber152Const  = "number_152"
+	NetworkACLRuleProtocolNumber153Const  = "number_153"
+	NetworkACLRuleProtocolNumber154Const  = "number_154"
+	NetworkACLRuleProtocolNumber155Const  = "number_155"
+	NetworkACLRuleProtocolNumber156Const  = "number_156"
+	NetworkACLRuleProtocolNumber157Const  = "number_157"
+	NetworkACLRuleProtocolNumber158Const  = "number_158"
+	NetworkACLRuleProtocolNumber159Const  = "number_159"
+	NetworkACLRuleProtocolNumber16Const   = "number_16"
+	NetworkACLRuleProtocolNumber160Const  = "number_160"
+	NetworkACLRuleProtocolNumber161Const  = "number_161"
+	NetworkACLRuleProtocolNumber162Const  = "number_162"
+	NetworkACLRuleProtocolNumber163Const  = "number_163"
+	NetworkACLRuleProtocolNumber164Const  = "number_164"
+	NetworkACLRuleProtocolNumber165Const  = "number_165"
+	NetworkACLRuleProtocolNumber166Const  = "number_166"
+	NetworkACLRuleProtocolNumber167Const  = "number_167"
+	NetworkACLRuleProtocolNumber168Const  = "number_168"
+	NetworkACLRuleProtocolNumber169Const  = "number_169"
+	NetworkACLRuleProtocolNumber170Const  = "number_170"
+	NetworkACLRuleProtocolNumber171Const  = "number_171"
+	NetworkACLRuleProtocolNumber172Const  = "number_172"
+	NetworkACLRuleProtocolNumber173Const  = "number_173"
+	NetworkACLRuleProtocolNumber174Const  = "number_174"
+	NetworkACLRuleProtocolNumber175Const  = "number_175"
+	NetworkACLRuleProtocolNumber176Const  = "number_176"
+	NetworkACLRuleProtocolNumber177Const  = "number_177"
+	NetworkACLRuleProtocolNumber178Const  = "number_178"
+	NetworkACLRuleProtocolNumber179Const  = "number_179"
+	NetworkACLRuleProtocolNumber18Const   = "number_18"
+	NetworkACLRuleProtocolNumber180Const  = "number_180"
+	NetworkACLRuleProtocolNumber181Const  = "number_181"
+	NetworkACLRuleProtocolNumber182Const  = "number_182"
+	NetworkACLRuleProtocolNumber183Const  = "number_183"
+	NetworkACLRuleProtocolNumber184Const  = "number_184"
+	NetworkACLRuleProtocolNumber185Const  = "number_185"
+	NetworkACLRuleProtocolNumber186Const  = "number_186"
+	NetworkACLRuleProtocolNumber187Const  = "number_187"
+	NetworkACLRuleProtocolNumber188Const  = "number_188"
+	NetworkACLRuleProtocolNumber189Const  = "number_189"
+	NetworkACLRuleProtocolNumber19Const   = "number_19"
+	NetworkACLRuleProtocolNumber190Const  = "number_190"
+	NetworkACLRuleProtocolNumber191Const  = "number_191"
+	NetworkACLRuleProtocolNumber192Const  = "number_192"
+	NetworkACLRuleProtocolNumber193Const  = "number_193"
+	NetworkACLRuleProtocolNumber194Const  = "number_194"
+	NetworkACLRuleProtocolNumber195Const  = "number_195"
+	NetworkACLRuleProtocolNumber196Const  = "number_196"
+	NetworkACLRuleProtocolNumber197Const  = "number_197"
+	NetworkACLRuleProtocolNumber198Const  = "number_198"
+	NetworkACLRuleProtocolNumber199Const  = "number_199"
+	NetworkACLRuleProtocolNumber2Const    = "number_2"
+	NetworkACLRuleProtocolNumber20Const   = "number_20"
+	NetworkACLRuleProtocolNumber200Const  = "number_200"
+	NetworkACLRuleProtocolNumber201Const  = "number_201"
+	NetworkACLRuleProtocolNumber202Const  = "number_202"
+	NetworkACLRuleProtocolNumber203Const  = "number_203"
+	NetworkACLRuleProtocolNumber204Const  = "number_204"
+	NetworkACLRuleProtocolNumber205Const  = "number_205"
+	NetworkACLRuleProtocolNumber206Const  = "number_206"
+	NetworkACLRuleProtocolNumber207Const  = "number_207"
+	NetworkACLRuleProtocolNumber208Const  = "number_208"
+	NetworkACLRuleProtocolNumber209Const  = "number_209"
+	NetworkACLRuleProtocolNumber21Const   = "number_21"
+	NetworkACLRuleProtocolNumber210Const  = "number_210"
+	NetworkACLRuleProtocolNumber211Const  = "number_211"
+	NetworkACLRuleProtocolNumber212Const  = "number_212"
+	NetworkACLRuleProtocolNumber213Const  = "number_213"
+	NetworkACLRuleProtocolNumber214Const  = "number_214"
+	NetworkACLRuleProtocolNumber215Const  = "number_215"
+	NetworkACLRuleProtocolNumber216Const  = "number_216"
+	NetworkACLRuleProtocolNumber217Const  = "number_217"
+	NetworkACLRuleProtocolNumber218Const  = "number_218"
+	NetworkACLRuleProtocolNumber219Const  = "number_219"
+	NetworkACLRuleProtocolNumber22Const   = "number_22"
+	NetworkACLRuleProtocolNumber220Const  = "number_220"
+	NetworkACLRuleProtocolNumber221Const  = "number_221"
+	NetworkACLRuleProtocolNumber222Const  = "number_222"
+	NetworkACLRuleProtocolNumber223Const  = "number_223"
+	NetworkACLRuleProtocolNumber224Const  = "number_224"
+	NetworkACLRuleProtocolNumber225Const  = "number_225"
+	NetworkACLRuleProtocolNumber226Const  = "number_226"
+	NetworkACLRuleProtocolNumber227Const  = "number_227"
+	NetworkACLRuleProtocolNumber228Const  = "number_228"
+	NetworkACLRuleProtocolNumber229Const  = "number_229"
+	NetworkACLRuleProtocolNumber23Const   = "number_23"
+	NetworkACLRuleProtocolNumber230Const  = "number_230"
+	NetworkACLRuleProtocolNumber231Const  = "number_231"
+	NetworkACLRuleProtocolNumber232Const  = "number_232"
+	NetworkACLRuleProtocolNumber233Const  = "number_233"
+	NetworkACLRuleProtocolNumber234Const  = "number_234"
+	NetworkACLRuleProtocolNumber235Const  = "number_235"
+	NetworkACLRuleProtocolNumber236Const  = "number_236"
+	NetworkACLRuleProtocolNumber237Const  = "number_237"
+	NetworkACLRuleProtocolNumber238Const  = "number_238"
+	NetworkACLRuleProtocolNumber239Const  = "number_239"
+	NetworkACLRuleProtocolNumber24Const   = "number_24"
+	NetworkACLRuleProtocolNumber240Const  = "number_240"
+	NetworkACLRuleProtocolNumber241Const  = "number_241"
+	NetworkACLRuleProtocolNumber242Const  = "number_242"
+	NetworkACLRuleProtocolNumber243Const  = "number_243"
+	NetworkACLRuleProtocolNumber244Const  = "number_244"
+	NetworkACLRuleProtocolNumber245Const  = "number_245"
+	NetworkACLRuleProtocolNumber246Const  = "number_246"
+	NetworkACLRuleProtocolNumber247Const  = "number_247"
+	NetworkACLRuleProtocolNumber248Const  = "number_248"
+	NetworkACLRuleProtocolNumber249Const  = "number_249"
+	NetworkACLRuleProtocolNumber25Const   = "number_25"
+	NetworkACLRuleProtocolNumber250Const  = "number_250"
+	NetworkACLRuleProtocolNumber251Const  = "number_251"
+	NetworkACLRuleProtocolNumber252Const  = "number_252"
+	NetworkACLRuleProtocolNumber253Const  = "number_253"
+	NetworkACLRuleProtocolNumber254Const  = "number_254"
+	NetworkACLRuleProtocolNumber255Const  = "number_255"
+	NetworkACLRuleProtocolNumber26Const   = "number_26"
+	NetworkACLRuleProtocolNumber27Const   = "number_27"
+	NetworkACLRuleProtocolNumber28Const   = "number_28"
+	NetworkACLRuleProtocolNumber29Const   = "number_29"
+	NetworkACLRuleProtocolNumber3Const    = "number_3"
+	NetworkACLRuleProtocolNumber30Const   = "number_30"
+	NetworkACLRuleProtocolNumber31Const   = "number_31"
+	NetworkACLRuleProtocolNumber32Const   = "number_32"
+	NetworkACLRuleProtocolNumber33Const   = "number_33"
+	NetworkACLRuleProtocolNumber34Const   = "number_34"
+	NetworkACLRuleProtocolNumber35Const   = "number_35"
+	NetworkACLRuleProtocolNumber36Const   = "number_36"
+	NetworkACLRuleProtocolNumber37Const   = "number_37"
+	NetworkACLRuleProtocolNumber38Const   = "number_38"
+	NetworkACLRuleProtocolNumber39Const   = "number_39"
+	NetworkACLRuleProtocolNumber40Const   = "number_40"
+	NetworkACLRuleProtocolNumber41Const   = "number_41"
+	NetworkACLRuleProtocolNumber42Const   = "number_42"
+	NetworkACLRuleProtocolNumber43Const   = "number_43"
+	NetworkACLRuleProtocolNumber44Const   = "number_44"
+	NetworkACLRuleProtocolNumber45Const   = "number_45"
+	NetworkACLRuleProtocolNumber48Const   = "number_48"
+	NetworkACLRuleProtocolNumber49Const   = "number_49"
+	NetworkACLRuleProtocolNumber5Const    = "number_5"
+	NetworkACLRuleProtocolNumber52Const   = "number_52"
+	NetworkACLRuleProtocolNumber53Const   = "number_53"
+	NetworkACLRuleProtocolNumber54Const   = "number_54"
+	NetworkACLRuleProtocolNumber55Const   = "number_55"
+	NetworkACLRuleProtocolNumber56Const   = "number_56"
+	NetworkACLRuleProtocolNumber57Const   = "number_57"
+	NetworkACLRuleProtocolNumber58Const   = "number_58"
+	NetworkACLRuleProtocolNumber59Const   = "number_59"
+	NetworkACLRuleProtocolNumber60Const   = "number_60"
+	NetworkACLRuleProtocolNumber61Const   = "number_61"
+	NetworkACLRuleProtocolNumber62Const   = "number_62"
+	NetworkACLRuleProtocolNumber63Const   = "number_63"
+	NetworkACLRuleProtocolNumber64Const   = "number_64"
+	NetworkACLRuleProtocolNumber65Const   = "number_65"
+	NetworkACLRuleProtocolNumber66Const   = "number_66"
+	NetworkACLRuleProtocolNumber67Const   = "number_67"
+	NetworkACLRuleProtocolNumber68Const   = "number_68"
+	NetworkACLRuleProtocolNumber69Const   = "number_69"
+	NetworkACLRuleProtocolNumber7Const    = "number_7"
+	NetworkACLRuleProtocolNumber70Const   = "number_70"
+	NetworkACLRuleProtocolNumber71Const   = "number_71"
+	NetworkACLRuleProtocolNumber72Const   = "number_72"
+	NetworkACLRuleProtocolNumber73Const   = "number_73"
+	NetworkACLRuleProtocolNumber74Const   = "number_74"
+	NetworkACLRuleProtocolNumber75Const   = "number_75"
+	NetworkACLRuleProtocolNumber76Const   = "number_76"
+	NetworkACLRuleProtocolNumber77Const   = "number_77"
+	NetworkACLRuleProtocolNumber78Const   = "number_78"
+	NetworkACLRuleProtocolNumber79Const   = "number_79"
+	NetworkACLRuleProtocolNumber8Const    = "number_8"
+	NetworkACLRuleProtocolNumber80Const   = "number_80"
+	NetworkACLRuleProtocolNumber81Const   = "number_81"
+	NetworkACLRuleProtocolNumber82Const   = "number_82"
+	NetworkACLRuleProtocolNumber83Const   = "number_83"
+	NetworkACLRuleProtocolNumber84Const   = "number_84"
+	NetworkACLRuleProtocolNumber85Const   = "number_85"
+	NetworkACLRuleProtocolNumber86Const   = "number_86"
+	NetworkACLRuleProtocolNumber87Const   = "number_87"
+	NetworkACLRuleProtocolNumber88Const   = "number_88"
+	NetworkACLRuleProtocolNumber89Const   = "number_89"
+	NetworkACLRuleProtocolNumber9Const    = "number_9"
+	NetworkACLRuleProtocolNumber90Const   = "number_90"
+	NetworkACLRuleProtocolNumber91Const   = "number_91"
+	NetworkACLRuleProtocolNumber92Const   = "number_92"
+	NetworkACLRuleProtocolNumber93Const   = "number_93"
+	NetworkACLRuleProtocolNumber94Const   = "number_94"
+	NetworkACLRuleProtocolNumber95Const   = "number_95"
+	NetworkACLRuleProtocolNumber96Const   = "number_96"
+	NetworkACLRuleProtocolNumber97Const   = "number_97"
+	NetworkACLRuleProtocolNumber98Const   = "number_98"
+	NetworkACLRuleProtocolNumber99Const   = "number_99"
+	NetworkACLRuleProtocolRsvpConst       = "rsvp"
+	NetworkACLRuleProtocolSctpConst       = "sctp"
+	NetworkACLRuleProtocolTCPConst        = "tcp"
+	NetworkACLRuleProtocolUDPConst        = "udp"
+	NetworkACLRuleProtocolVrrpConst       = "vrrp"
 )
 
 func (*NetworkACLRule) isaNetworkACLRule() bool {
@@ -84473,15 +85054,1280 @@ func UnmarshalNetworkACLRule(m map[string]json.RawMessage, result interface{}) (
 		err = core.SDKErrorf(err, "required discriminator property 'protocol' not found in JSON object", "missing-discriminator", common.GetComponentInfo())
 		return
 	}
-	if discValue == "all" {
-		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolAll)
+	if discValue == "ah" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
 		if err != nil {
-			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolAll-error", common.GetComponentInfo())
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "any" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolAny)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolAny-error", common.GetComponentInfo())
+		}
+	} else if discValue == "esp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "gre" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "icmp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIcmp)
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIcmp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "icmp_tcp_udp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIcmptcpudp)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "ip_in_ip" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "l2tp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_0" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_10" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_100" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_101" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_102" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_103" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_104" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_105" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_106" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_107" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_108" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_109" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_11" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_110" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_111" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_113" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_114" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_116" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_117" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_118" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_119" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_12" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_120" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_121" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_122" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_123" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_124" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_125" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_126" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_127" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_128" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_129" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_13" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_130" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_131" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_133" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_134" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_135" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_136" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_137" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_138" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_139" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_14" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_140" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_141" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_142" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_143" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_144" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_145" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_146" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_147" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_148" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_149" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_15" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_150" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_151" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_152" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_153" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_154" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_155" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_156" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_157" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_158" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_159" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_16" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_160" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_161" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_162" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_163" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_164" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_165" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_166" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_167" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_168" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_169" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_170" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_171" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_172" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_173" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_174" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_175" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_176" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_177" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_178" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_179" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_18" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_180" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_181" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_182" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_183" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_184" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_185" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_186" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_187" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_188" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_189" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_19" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_190" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_191" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_192" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_193" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_194" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_195" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_196" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_197" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_198" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_199" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_2" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_20" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_200" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_201" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_202" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_203" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_204" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_205" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_206" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_207" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_208" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_209" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_21" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_210" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_211" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_212" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_213" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_214" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_215" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_216" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_217" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_218" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_219" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_22" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_220" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_221" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_222" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_223" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_224" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_225" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_226" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_227" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_228" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_229" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_23" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_230" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_231" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_232" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_233" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_234" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_235" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_236" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_237" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_238" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_239" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_24" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_240" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_241" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_242" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_243" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_244" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_245" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_246" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_247" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_248" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_249" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_25" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_250" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_251" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_252" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_253" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_254" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_255" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_26" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_27" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_28" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_29" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_3" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_30" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_31" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_32" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_33" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_34" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_35" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_36" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_37" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_38" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_39" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_40" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_41" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_42" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_43" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_44" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_45" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_48" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_49" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_5" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_52" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_53" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_54" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_55" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_56" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_57" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_58" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_59" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_60" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_61" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_62" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_63" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_64" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_65" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_66" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_67" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_68" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_69" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_7" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_70" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_71" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_72" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_73" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_74" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_75" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_76" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_77" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_78" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_79" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_8" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_80" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_81" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_82" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_83" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_84" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_85" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_86" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_87" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_88" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_89" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_9" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_90" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_91" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_92" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_93" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_94" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_95" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_96" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_97" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_98" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_99" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "rsvp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "sctp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "tcp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolTcpudp)
@@ -84493,9 +86339,19 @@ func UnmarshalNetworkACLRule(m map[string]json.RawMessage, result interface{}) (
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolTcpudp-error", common.GetComponentInfo())
 		}
+	} else if discValue == "vrrp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
 	} else {
-		errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
-		err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
+		// err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// Fallback to base NetworkACLRule for unknown protocols
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleGeneric)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemGeneric-error", common.GetComponentInfo())
+		}
 	}
 	return
 }
@@ -84660,9 +86516,11 @@ func (resp *NetworkACLRuleCollection) GetNextStart() (*string, error) {
 
 // NetworkACLRuleItem : NetworkACLRuleItem struct
 // Models which "extend" this model:
-// - NetworkACLRuleItemNetworkACLRuleProtocolAll
+// - NetworkACLRuleItemNetworkACLRuleProtocolAny
+// - NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp
 // - NetworkACLRuleItemNetworkACLRuleProtocolIcmp
 // - NetworkACLRuleItemNetworkACLRuleProtocolTcpudp
+// - NetworkACLRuleItemNetworkACLRuleProtocolIndividual
 type NetworkACLRuleItem struct {
 	// The action to perform for a packet matching the rule.
 	Action *string `json:"action" validate:"required"`
@@ -84750,10 +86608,264 @@ const (
 // The enumerated values for this property may
 // [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
 const (
-	NetworkACLRuleItemProtocolAllConst  = "all"
-	NetworkACLRuleItemProtocolIcmpConst = "icmp"
-	NetworkACLRuleItemProtocolTCPConst  = "tcp"
-	NetworkACLRuleItemProtocolUDPConst  = "udp"
+	NetworkACLRuleItemProtocolAhConst         = "ah"
+	NetworkACLRuleItemProtocolAnyConst        = "any"
+	NetworkACLRuleItemProtocolEspConst        = "esp"
+	NetworkACLRuleItemProtocolGreConst        = "gre"
+	NetworkACLRuleItemProtocolIPInIPConst     = "ip_in_ip"
+	NetworkACLRuleItemProtocolIcmpConst       = "icmp"
+	NetworkACLRuleItemProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	NetworkACLRuleItemProtocolL2tpConst       = "l2tp"
+	NetworkACLRuleItemProtocolNumber0Const    = "number_0"
+	NetworkACLRuleItemProtocolNumber10Const   = "number_10"
+	NetworkACLRuleItemProtocolNumber100Const  = "number_100"
+	NetworkACLRuleItemProtocolNumber101Const  = "number_101"
+	NetworkACLRuleItemProtocolNumber102Const  = "number_102"
+	NetworkACLRuleItemProtocolNumber103Const  = "number_103"
+	NetworkACLRuleItemProtocolNumber104Const  = "number_104"
+	NetworkACLRuleItemProtocolNumber105Const  = "number_105"
+	NetworkACLRuleItemProtocolNumber106Const  = "number_106"
+	NetworkACLRuleItemProtocolNumber107Const  = "number_107"
+	NetworkACLRuleItemProtocolNumber108Const  = "number_108"
+	NetworkACLRuleItemProtocolNumber109Const  = "number_109"
+	NetworkACLRuleItemProtocolNumber11Const   = "number_11"
+	NetworkACLRuleItemProtocolNumber110Const  = "number_110"
+	NetworkACLRuleItemProtocolNumber111Const  = "number_111"
+	NetworkACLRuleItemProtocolNumber113Const  = "number_113"
+	NetworkACLRuleItemProtocolNumber114Const  = "number_114"
+	NetworkACLRuleItemProtocolNumber116Const  = "number_116"
+	NetworkACLRuleItemProtocolNumber117Const  = "number_117"
+	NetworkACLRuleItemProtocolNumber118Const  = "number_118"
+	NetworkACLRuleItemProtocolNumber119Const  = "number_119"
+	NetworkACLRuleItemProtocolNumber12Const   = "number_12"
+	NetworkACLRuleItemProtocolNumber120Const  = "number_120"
+	NetworkACLRuleItemProtocolNumber121Const  = "number_121"
+	NetworkACLRuleItemProtocolNumber122Const  = "number_122"
+	NetworkACLRuleItemProtocolNumber123Const  = "number_123"
+	NetworkACLRuleItemProtocolNumber124Const  = "number_124"
+	NetworkACLRuleItemProtocolNumber125Const  = "number_125"
+	NetworkACLRuleItemProtocolNumber126Const  = "number_126"
+	NetworkACLRuleItemProtocolNumber127Const  = "number_127"
+	NetworkACLRuleItemProtocolNumber128Const  = "number_128"
+	NetworkACLRuleItemProtocolNumber129Const  = "number_129"
+	NetworkACLRuleItemProtocolNumber13Const   = "number_13"
+	NetworkACLRuleItemProtocolNumber130Const  = "number_130"
+	NetworkACLRuleItemProtocolNumber131Const  = "number_131"
+	NetworkACLRuleItemProtocolNumber133Const  = "number_133"
+	NetworkACLRuleItemProtocolNumber134Const  = "number_134"
+	NetworkACLRuleItemProtocolNumber135Const  = "number_135"
+	NetworkACLRuleItemProtocolNumber136Const  = "number_136"
+	NetworkACLRuleItemProtocolNumber137Const  = "number_137"
+	NetworkACLRuleItemProtocolNumber138Const  = "number_138"
+	NetworkACLRuleItemProtocolNumber139Const  = "number_139"
+	NetworkACLRuleItemProtocolNumber14Const   = "number_14"
+	NetworkACLRuleItemProtocolNumber140Const  = "number_140"
+	NetworkACLRuleItemProtocolNumber141Const  = "number_141"
+	NetworkACLRuleItemProtocolNumber142Const  = "number_142"
+	NetworkACLRuleItemProtocolNumber143Const  = "number_143"
+	NetworkACLRuleItemProtocolNumber144Const  = "number_144"
+	NetworkACLRuleItemProtocolNumber145Const  = "number_145"
+	NetworkACLRuleItemProtocolNumber146Const  = "number_146"
+	NetworkACLRuleItemProtocolNumber147Const  = "number_147"
+	NetworkACLRuleItemProtocolNumber148Const  = "number_148"
+	NetworkACLRuleItemProtocolNumber149Const  = "number_149"
+	NetworkACLRuleItemProtocolNumber15Const   = "number_15"
+	NetworkACLRuleItemProtocolNumber150Const  = "number_150"
+	NetworkACLRuleItemProtocolNumber151Const  = "number_151"
+	NetworkACLRuleItemProtocolNumber152Const  = "number_152"
+	NetworkACLRuleItemProtocolNumber153Const  = "number_153"
+	NetworkACLRuleItemProtocolNumber154Const  = "number_154"
+	NetworkACLRuleItemProtocolNumber155Const  = "number_155"
+	NetworkACLRuleItemProtocolNumber156Const  = "number_156"
+	NetworkACLRuleItemProtocolNumber157Const  = "number_157"
+	NetworkACLRuleItemProtocolNumber158Const  = "number_158"
+	NetworkACLRuleItemProtocolNumber159Const  = "number_159"
+	NetworkACLRuleItemProtocolNumber16Const   = "number_16"
+	NetworkACLRuleItemProtocolNumber160Const  = "number_160"
+	NetworkACLRuleItemProtocolNumber161Const  = "number_161"
+	NetworkACLRuleItemProtocolNumber162Const  = "number_162"
+	NetworkACLRuleItemProtocolNumber163Const  = "number_163"
+	NetworkACLRuleItemProtocolNumber164Const  = "number_164"
+	NetworkACLRuleItemProtocolNumber165Const  = "number_165"
+	NetworkACLRuleItemProtocolNumber166Const  = "number_166"
+	NetworkACLRuleItemProtocolNumber167Const  = "number_167"
+	NetworkACLRuleItemProtocolNumber168Const  = "number_168"
+	NetworkACLRuleItemProtocolNumber169Const  = "number_169"
+	NetworkACLRuleItemProtocolNumber170Const  = "number_170"
+	NetworkACLRuleItemProtocolNumber171Const  = "number_171"
+	NetworkACLRuleItemProtocolNumber172Const  = "number_172"
+	NetworkACLRuleItemProtocolNumber173Const  = "number_173"
+	NetworkACLRuleItemProtocolNumber174Const  = "number_174"
+	NetworkACLRuleItemProtocolNumber175Const  = "number_175"
+	NetworkACLRuleItemProtocolNumber176Const  = "number_176"
+	NetworkACLRuleItemProtocolNumber177Const  = "number_177"
+	NetworkACLRuleItemProtocolNumber178Const  = "number_178"
+	NetworkACLRuleItemProtocolNumber179Const  = "number_179"
+	NetworkACLRuleItemProtocolNumber18Const   = "number_18"
+	NetworkACLRuleItemProtocolNumber180Const  = "number_180"
+	NetworkACLRuleItemProtocolNumber181Const  = "number_181"
+	NetworkACLRuleItemProtocolNumber182Const  = "number_182"
+	NetworkACLRuleItemProtocolNumber183Const  = "number_183"
+	NetworkACLRuleItemProtocolNumber184Const  = "number_184"
+	NetworkACLRuleItemProtocolNumber185Const  = "number_185"
+	NetworkACLRuleItemProtocolNumber186Const  = "number_186"
+	NetworkACLRuleItemProtocolNumber187Const  = "number_187"
+	NetworkACLRuleItemProtocolNumber188Const  = "number_188"
+	NetworkACLRuleItemProtocolNumber189Const  = "number_189"
+	NetworkACLRuleItemProtocolNumber19Const   = "number_19"
+	NetworkACLRuleItemProtocolNumber190Const  = "number_190"
+	NetworkACLRuleItemProtocolNumber191Const  = "number_191"
+	NetworkACLRuleItemProtocolNumber192Const  = "number_192"
+	NetworkACLRuleItemProtocolNumber193Const  = "number_193"
+	NetworkACLRuleItemProtocolNumber194Const  = "number_194"
+	NetworkACLRuleItemProtocolNumber195Const  = "number_195"
+	NetworkACLRuleItemProtocolNumber196Const  = "number_196"
+	NetworkACLRuleItemProtocolNumber197Const  = "number_197"
+	NetworkACLRuleItemProtocolNumber198Const  = "number_198"
+	NetworkACLRuleItemProtocolNumber199Const  = "number_199"
+	NetworkACLRuleItemProtocolNumber2Const    = "number_2"
+	NetworkACLRuleItemProtocolNumber20Const   = "number_20"
+	NetworkACLRuleItemProtocolNumber200Const  = "number_200"
+	NetworkACLRuleItemProtocolNumber201Const  = "number_201"
+	NetworkACLRuleItemProtocolNumber202Const  = "number_202"
+	NetworkACLRuleItemProtocolNumber203Const  = "number_203"
+	NetworkACLRuleItemProtocolNumber204Const  = "number_204"
+	NetworkACLRuleItemProtocolNumber205Const  = "number_205"
+	NetworkACLRuleItemProtocolNumber206Const  = "number_206"
+	NetworkACLRuleItemProtocolNumber207Const  = "number_207"
+	NetworkACLRuleItemProtocolNumber208Const  = "number_208"
+	NetworkACLRuleItemProtocolNumber209Const  = "number_209"
+	NetworkACLRuleItemProtocolNumber21Const   = "number_21"
+	NetworkACLRuleItemProtocolNumber210Const  = "number_210"
+	NetworkACLRuleItemProtocolNumber211Const  = "number_211"
+	NetworkACLRuleItemProtocolNumber212Const  = "number_212"
+	NetworkACLRuleItemProtocolNumber213Const  = "number_213"
+	NetworkACLRuleItemProtocolNumber214Const  = "number_214"
+	NetworkACLRuleItemProtocolNumber215Const  = "number_215"
+	NetworkACLRuleItemProtocolNumber216Const  = "number_216"
+	NetworkACLRuleItemProtocolNumber217Const  = "number_217"
+	NetworkACLRuleItemProtocolNumber218Const  = "number_218"
+	NetworkACLRuleItemProtocolNumber219Const  = "number_219"
+	NetworkACLRuleItemProtocolNumber22Const   = "number_22"
+	NetworkACLRuleItemProtocolNumber220Const  = "number_220"
+	NetworkACLRuleItemProtocolNumber221Const  = "number_221"
+	NetworkACLRuleItemProtocolNumber222Const  = "number_222"
+	NetworkACLRuleItemProtocolNumber223Const  = "number_223"
+	NetworkACLRuleItemProtocolNumber224Const  = "number_224"
+	NetworkACLRuleItemProtocolNumber225Const  = "number_225"
+	NetworkACLRuleItemProtocolNumber226Const  = "number_226"
+	NetworkACLRuleItemProtocolNumber227Const  = "number_227"
+	NetworkACLRuleItemProtocolNumber228Const  = "number_228"
+	NetworkACLRuleItemProtocolNumber229Const  = "number_229"
+	NetworkACLRuleItemProtocolNumber23Const   = "number_23"
+	NetworkACLRuleItemProtocolNumber230Const  = "number_230"
+	NetworkACLRuleItemProtocolNumber231Const  = "number_231"
+	NetworkACLRuleItemProtocolNumber232Const  = "number_232"
+	NetworkACLRuleItemProtocolNumber233Const  = "number_233"
+	NetworkACLRuleItemProtocolNumber234Const  = "number_234"
+	NetworkACLRuleItemProtocolNumber235Const  = "number_235"
+	NetworkACLRuleItemProtocolNumber236Const  = "number_236"
+	NetworkACLRuleItemProtocolNumber237Const  = "number_237"
+	NetworkACLRuleItemProtocolNumber238Const  = "number_238"
+	NetworkACLRuleItemProtocolNumber239Const  = "number_239"
+	NetworkACLRuleItemProtocolNumber24Const   = "number_24"
+	NetworkACLRuleItemProtocolNumber240Const  = "number_240"
+	NetworkACLRuleItemProtocolNumber241Const  = "number_241"
+	NetworkACLRuleItemProtocolNumber242Const  = "number_242"
+	NetworkACLRuleItemProtocolNumber243Const  = "number_243"
+	NetworkACLRuleItemProtocolNumber244Const  = "number_244"
+	NetworkACLRuleItemProtocolNumber245Const  = "number_245"
+	NetworkACLRuleItemProtocolNumber246Const  = "number_246"
+	NetworkACLRuleItemProtocolNumber247Const  = "number_247"
+	NetworkACLRuleItemProtocolNumber248Const  = "number_248"
+	NetworkACLRuleItemProtocolNumber249Const  = "number_249"
+	NetworkACLRuleItemProtocolNumber25Const   = "number_25"
+	NetworkACLRuleItemProtocolNumber250Const  = "number_250"
+	NetworkACLRuleItemProtocolNumber251Const  = "number_251"
+	NetworkACLRuleItemProtocolNumber252Const  = "number_252"
+	NetworkACLRuleItemProtocolNumber253Const  = "number_253"
+	NetworkACLRuleItemProtocolNumber254Const  = "number_254"
+	NetworkACLRuleItemProtocolNumber255Const  = "number_255"
+	NetworkACLRuleItemProtocolNumber26Const   = "number_26"
+	NetworkACLRuleItemProtocolNumber27Const   = "number_27"
+	NetworkACLRuleItemProtocolNumber28Const   = "number_28"
+	NetworkACLRuleItemProtocolNumber29Const   = "number_29"
+	NetworkACLRuleItemProtocolNumber3Const    = "number_3"
+	NetworkACLRuleItemProtocolNumber30Const   = "number_30"
+	NetworkACLRuleItemProtocolNumber31Const   = "number_31"
+	NetworkACLRuleItemProtocolNumber32Const   = "number_32"
+	NetworkACLRuleItemProtocolNumber33Const   = "number_33"
+	NetworkACLRuleItemProtocolNumber34Const   = "number_34"
+	NetworkACLRuleItemProtocolNumber35Const   = "number_35"
+	NetworkACLRuleItemProtocolNumber36Const   = "number_36"
+	NetworkACLRuleItemProtocolNumber37Const   = "number_37"
+	NetworkACLRuleItemProtocolNumber38Const   = "number_38"
+	NetworkACLRuleItemProtocolNumber39Const   = "number_39"
+	NetworkACLRuleItemProtocolNumber40Const   = "number_40"
+	NetworkACLRuleItemProtocolNumber41Const   = "number_41"
+	NetworkACLRuleItemProtocolNumber42Const   = "number_42"
+	NetworkACLRuleItemProtocolNumber43Const   = "number_43"
+	NetworkACLRuleItemProtocolNumber44Const   = "number_44"
+	NetworkACLRuleItemProtocolNumber45Const   = "number_45"
+	NetworkACLRuleItemProtocolNumber48Const   = "number_48"
+	NetworkACLRuleItemProtocolNumber49Const   = "number_49"
+	NetworkACLRuleItemProtocolNumber5Const    = "number_5"
+	NetworkACLRuleItemProtocolNumber52Const   = "number_52"
+	NetworkACLRuleItemProtocolNumber53Const   = "number_53"
+	NetworkACLRuleItemProtocolNumber54Const   = "number_54"
+	NetworkACLRuleItemProtocolNumber55Const   = "number_55"
+	NetworkACLRuleItemProtocolNumber56Const   = "number_56"
+	NetworkACLRuleItemProtocolNumber57Const   = "number_57"
+	NetworkACLRuleItemProtocolNumber58Const   = "number_58"
+	NetworkACLRuleItemProtocolNumber59Const   = "number_59"
+	NetworkACLRuleItemProtocolNumber60Const   = "number_60"
+	NetworkACLRuleItemProtocolNumber61Const   = "number_61"
+	NetworkACLRuleItemProtocolNumber62Const   = "number_62"
+	NetworkACLRuleItemProtocolNumber63Const   = "number_63"
+	NetworkACLRuleItemProtocolNumber64Const   = "number_64"
+	NetworkACLRuleItemProtocolNumber65Const   = "number_65"
+	NetworkACLRuleItemProtocolNumber66Const   = "number_66"
+	NetworkACLRuleItemProtocolNumber67Const   = "number_67"
+	NetworkACLRuleItemProtocolNumber68Const   = "number_68"
+	NetworkACLRuleItemProtocolNumber69Const   = "number_69"
+	NetworkACLRuleItemProtocolNumber7Const    = "number_7"
+	NetworkACLRuleItemProtocolNumber70Const   = "number_70"
+	NetworkACLRuleItemProtocolNumber71Const   = "number_71"
+	NetworkACLRuleItemProtocolNumber72Const   = "number_72"
+	NetworkACLRuleItemProtocolNumber73Const   = "number_73"
+	NetworkACLRuleItemProtocolNumber74Const   = "number_74"
+	NetworkACLRuleItemProtocolNumber75Const   = "number_75"
+	NetworkACLRuleItemProtocolNumber76Const   = "number_76"
+	NetworkACLRuleItemProtocolNumber77Const   = "number_77"
+	NetworkACLRuleItemProtocolNumber78Const   = "number_78"
+	NetworkACLRuleItemProtocolNumber79Const   = "number_79"
+	NetworkACLRuleItemProtocolNumber8Const    = "number_8"
+	NetworkACLRuleItemProtocolNumber80Const   = "number_80"
+	NetworkACLRuleItemProtocolNumber81Const   = "number_81"
+	NetworkACLRuleItemProtocolNumber82Const   = "number_82"
+	NetworkACLRuleItemProtocolNumber83Const   = "number_83"
+	NetworkACLRuleItemProtocolNumber84Const   = "number_84"
+	NetworkACLRuleItemProtocolNumber85Const   = "number_85"
+	NetworkACLRuleItemProtocolNumber86Const   = "number_86"
+	NetworkACLRuleItemProtocolNumber87Const   = "number_87"
+	NetworkACLRuleItemProtocolNumber88Const   = "number_88"
+	NetworkACLRuleItemProtocolNumber89Const   = "number_89"
+	NetworkACLRuleItemProtocolNumber9Const    = "number_9"
+	NetworkACLRuleItemProtocolNumber90Const   = "number_90"
+	NetworkACLRuleItemProtocolNumber91Const   = "number_91"
+	NetworkACLRuleItemProtocolNumber92Const   = "number_92"
+	NetworkACLRuleItemProtocolNumber93Const   = "number_93"
+	NetworkACLRuleItemProtocolNumber94Const   = "number_94"
+	NetworkACLRuleItemProtocolNumber95Const   = "number_95"
+	NetworkACLRuleItemProtocolNumber96Const   = "number_96"
+	NetworkACLRuleItemProtocolNumber97Const   = "number_97"
+	NetworkACLRuleItemProtocolNumber98Const   = "number_98"
+	NetworkACLRuleItemProtocolNumber99Const   = "number_99"
+	NetworkACLRuleItemProtocolRsvpConst       = "rsvp"
+	NetworkACLRuleItemProtocolSctpConst       = "sctp"
+	NetworkACLRuleItemProtocolTCPConst        = "tcp"
+	NetworkACLRuleItemProtocolUDPConst        = "udp"
+	NetworkACLRuleItemProtocolVrrpConst       = "vrrp"
 )
 
 func (*NetworkACLRuleItem) isaNetworkACLRuleItem() bool {
@@ -84778,15 +86890,1280 @@ func UnmarshalNetworkACLRuleItem(m map[string]json.RawMessage, result interface{
 		err = core.SDKErrorf(err, "required discriminator property 'protocol' not found in JSON object", "missing-discriminator", common.GetComponentInfo())
 		return
 	}
-	if discValue == "all" {
-		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAll)
+	if discValue == "ah" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
 		if err != nil {
-			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolAll-error", common.GetComponentInfo())
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "any" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAny)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolAny-error", common.GetComponentInfo())
+		}
+	} else if discValue == "esp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "gre" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "icmp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIcmp)
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIcmp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "icmp_tcp_udp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "ip_in_ip" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "l2tp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_0" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_10" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_100" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_101" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_102" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_103" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_104" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_105" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_106" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_107" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_108" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_109" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_11" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_110" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_111" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_113" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_114" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_116" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_117" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_118" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_119" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_12" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_120" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_121" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_122" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_123" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_124" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_125" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_126" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_127" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_128" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_129" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_13" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_130" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_131" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_133" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_134" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_135" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_136" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_137" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_138" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_139" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_14" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_140" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_141" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_142" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_143" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_144" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_145" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_146" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_147" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_148" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_149" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_15" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_150" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_151" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_152" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_153" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_154" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_155" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_156" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_157" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_158" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_159" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_16" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_160" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_161" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_162" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_163" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_164" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_165" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_166" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_167" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_168" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_169" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_170" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_171" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_172" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_173" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_174" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_175" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_176" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_177" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_178" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_179" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_18" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_180" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_181" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_182" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_183" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_184" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_185" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_186" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_187" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_188" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_189" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_19" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_190" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_191" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_192" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_193" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_194" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_195" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_196" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_197" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_198" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_199" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_2" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_20" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_200" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_201" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_202" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_203" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_204" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_205" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_206" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_207" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_208" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_209" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_21" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_210" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_211" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_212" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_213" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_214" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_215" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_216" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_217" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_218" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_219" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_22" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_220" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_221" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_222" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_223" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_224" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_225" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_226" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_227" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_228" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_229" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_23" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_230" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_231" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_232" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_233" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_234" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_235" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_236" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_237" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_238" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_239" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_24" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_240" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_241" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_242" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_243" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_244" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_245" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_246" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_247" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_248" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_249" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_25" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_250" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_251" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_252" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_253" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_254" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_255" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_26" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_27" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_28" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_29" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_3" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_30" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_31" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_32" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_33" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_34" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_35" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_36" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_37" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_38" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_39" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_40" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_41" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_42" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_43" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_44" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_45" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_48" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_49" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_5" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_52" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_53" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_54" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_55" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_56" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_57" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_58" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_59" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_60" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_61" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_62" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_63" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_64" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_65" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_66" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_67" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_68" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_69" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_7" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_70" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_71" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_72" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_73" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_74" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_75" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_76" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_77" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_78" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_79" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_8" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_80" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_81" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_82" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_83" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_84" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_85" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_86" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_87" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_88" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_89" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_9" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_90" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_91" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_92" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_93" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_94" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_95" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_96" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_97" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_98" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_99" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "rsvp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "sctp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "tcp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolTcpudp)
@@ -84798,16 +88175,170 @@ func UnmarshalNetworkACLRuleItem(m map[string]json.RawMessage, result interface{
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolTcpudp-error", common.GetComponentInfo())
 		}
+	} else if discValue == "vrrp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemNetworkACLRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
 	} else {
-		errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
-		err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
+		// err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// Fallback to base NetworkACLRuleItem for unknown protocols
+		err = core.UnmarshalModel(m, "", result, UnmarshalNetworkACLRuleItemGeneric)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-NetworkACLRuleItemGeneric-error", common.GetComponentInfo())
+		}
 	}
+	return
+}
+
+// UnmarshalNetworkACLRuleItemGeneric unmarshals the base NetworkACLRuleItem fields for unknown protocol types
+func UnmarshalNetworkACLRuleItemGeneric(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleItem)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+
+	// Attempt to unmarshal optional protocol-specific fields - ignore errors as these may not be present
+	_ = core.UnmarshalPrimitive(m, "code", &obj.Code)
+	_ = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	_ = core.UnmarshalPrimitive(m, "destination_port_max", &obj.DestinationPortMax)
+	_ = core.UnmarshalPrimitive(m, "destination_port_min", &obj.DestinationPortMin)
+	_ = core.UnmarshalPrimitive(m, "source_port_max", &obj.SourcePortMax)
+	_ = core.UnmarshalPrimitive(m, "source_port_min", &obj.SourcePortMin)
+
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// UnmarshalNetworkACLRuleGeneric unmarshals the base NetworkACLRuleItem fields for unknown protocol types
+func UnmarshalNetworkACLRuleGeneric(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRule)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+
+	// Attempt to unmarshal optional protocol-specific fields - ignore errors as these may not be present
+	_ = core.UnmarshalPrimitive(m, "code", &obj.Code)
+	_ = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	_ = core.UnmarshalPrimitive(m, "destination_port_max", &obj.DestinationPortMax)
+	_ = core.UnmarshalPrimitive(m, "destination_port_min", &obj.DestinationPortMin)
+	_ = core.UnmarshalPrimitive(m, "source_port_max", &obj.SourcePortMax)
+	_ = core.UnmarshalPrimitive(m, "source_port_min", &obj.SourcePortMin)
+
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
 	return
 }
 
 // NetworkACLRulePatch : NetworkACLRulePatch struct
 type NetworkACLRulePatch struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action,omitempty"`
 
 	// The rule to move this rule immediately before.
@@ -84860,6 +88391,8 @@ type NetworkACLRulePatch struct {
 
 // Constants associated with the NetworkACLRulePatch.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePatchActionAllowConst = "allow"
 	NetworkACLRulePatchActionDenyConst  = "deny"
@@ -84984,11 +88517,15 @@ func (networkACLRulePatch *NetworkACLRulePatch) AsPatch() (_patch map[string]int
 
 // NetworkACLRulePrototype : NetworkACLRulePrototype struct
 // Models which "extend" this model:
-// - NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype
+// - NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype
+// - NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype
 // - NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototype
 // - NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype
+// - NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype
 type NetworkACLRulePrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	// The rule to insert this rule immediately before.
@@ -85052,6 +88589,8 @@ type NetworkACLRulePrototype struct {
 
 // Constants associated with the NetworkACLRulePrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeActionAllowConst = "allow"
 	NetworkACLRulePrototypeActionDenyConst  = "deny"
@@ -85073,10 +88612,264 @@ const (
 // Constants associated with the NetworkACLRulePrototype.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRulePrototypeProtocolAllConst  = "all"
-	NetworkACLRulePrototypeProtocolIcmpConst = "icmp"
-	NetworkACLRulePrototypeProtocolTCPConst  = "tcp"
-	NetworkACLRulePrototypeProtocolUDPConst  = "udp"
+	NetworkACLRulePrototypeProtocolAhConst         = "ah"
+	NetworkACLRulePrototypeProtocolAnyConst        = "any"
+	NetworkACLRulePrototypeProtocolEspConst        = "esp"
+	NetworkACLRulePrototypeProtocolGreConst        = "gre"
+	NetworkACLRulePrototypeProtocolIPInIPConst     = "ip_in_ip"
+	NetworkACLRulePrototypeProtocolIcmpConst       = "icmp"
+	NetworkACLRulePrototypeProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	NetworkACLRulePrototypeProtocolL2tpConst       = "l2tp"
+	NetworkACLRulePrototypeProtocolNumber0Const    = "number_0"
+	NetworkACLRulePrototypeProtocolNumber10Const   = "number_10"
+	NetworkACLRulePrototypeProtocolNumber100Const  = "number_100"
+	NetworkACLRulePrototypeProtocolNumber101Const  = "number_101"
+	NetworkACLRulePrototypeProtocolNumber102Const  = "number_102"
+	NetworkACLRulePrototypeProtocolNumber103Const  = "number_103"
+	NetworkACLRulePrototypeProtocolNumber104Const  = "number_104"
+	NetworkACLRulePrototypeProtocolNumber105Const  = "number_105"
+	NetworkACLRulePrototypeProtocolNumber106Const  = "number_106"
+	NetworkACLRulePrototypeProtocolNumber107Const  = "number_107"
+	NetworkACLRulePrototypeProtocolNumber108Const  = "number_108"
+	NetworkACLRulePrototypeProtocolNumber109Const  = "number_109"
+	NetworkACLRulePrototypeProtocolNumber11Const   = "number_11"
+	NetworkACLRulePrototypeProtocolNumber110Const  = "number_110"
+	NetworkACLRulePrototypeProtocolNumber111Const  = "number_111"
+	NetworkACLRulePrototypeProtocolNumber113Const  = "number_113"
+	NetworkACLRulePrototypeProtocolNumber114Const  = "number_114"
+	NetworkACLRulePrototypeProtocolNumber116Const  = "number_116"
+	NetworkACLRulePrototypeProtocolNumber117Const  = "number_117"
+	NetworkACLRulePrototypeProtocolNumber118Const  = "number_118"
+	NetworkACLRulePrototypeProtocolNumber119Const  = "number_119"
+	NetworkACLRulePrototypeProtocolNumber12Const   = "number_12"
+	NetworkACLRulePrototypeProtocolNumber120Const  = "number_120"
+	NetworkACLRulePrototypeProtocolNumber121Const  = "number_121"
+	NetworkACLRulePrototypeProtocolNumber122Const  = "number_122"
+	NetworkACLRulePrototypeProtocolNumber123Const  = "number_123"
+	NetworkACLRulePrototypeProtocolNumber124Const  = "number_124"
+	NetworkACLRulePrototypeProtocolNumber125Const  = "number_125"
+	NetworkACLRulePrototypeProtocolNumber126Const  = "number_126"
+	NetworkACLRulePrototypeProtocolNumber127Const  = "number_127"
+	NetworkACLRulePrototypeProtocolNumber128Const  = "number_128"
+	NetworkACLRulePrototypeProtocolNumber129Const  = "number_129"
+	NetworkACLRulePrototypeProtocolNumber13Const   = "number_13"
+	NetworkACLRulePrototypeProtocolNumber130Const  = "number_130"
+	NetworkACLRulePrototypeProtocolNumber131Const  = "number_131"
+	NetworkACLRulePrototypeProtocolNumber133Const  = "number_133"
+	NetworkACLRulePrototypeProtocolNumber134Const  = "number_134"
+	NetworkACLRulePrototypeProtocolNumber135Const  = "number_135"
+	NetworkACLRulePrototypeProtocolNumber136Const  = "number_136"
+	NetworkACLRulePrototypeProtocolNumber137Const  = "number_137"
+	NetworkACLRulePrototypeProtocolNumber138Const  = "number_138"
+	NetworkACLRulePrototypeProtocolNumber139Const  = "number_139"
+	NetworkACLRulePrototypeProtocolNumber14Const   = "number_14"
+	NetworkACLRulePrototypeProtocolNumber140Const  = "number_140"
+	NetworkACLRulePrototypeProtocolNumber141Const  = "number_141"
+	NetworkACLRulePrototypeProtocolNumber142Const  = "number_142"
+	NetworkACLRulePrototypeProtocolNumber143Const  = "number_143"
+	NetworkACLRulePrototypeProtocolNumber144Const  = "number_144"
+	NetworkACLRulePrototypeProtocolNumber145Const  = "number_145"
+	NetworkACLRulePrototypeProtocolNumber146Const  = "number_146"
+	NetworkACLRulePrototypeProtocolNumber147Const  = "number_147"
+	NetworkACLRulePrototypeProtocolNumber148Const  = "number_148"
+	NetworkACLRulePrototypeProtocolNumber149Const  = "number_149"
+	NetworkACLRulePrototypeProtocolNumber15Const   = "number_15"
+	NetworkACLRulePrototypeProtocolNumber150Const  = "number_150"
+	NetworkACLRulePrototypeProtocolNumber151Const  = "number_151"
+	NetworkACLRulePrototypeProtocolNumber152Const  = "number_152"
+	NetworkACLRulePrototypeProtocolNumber153Const  = "number_153"
+	NetworkACLRulePrototypeProtocolNumber154Const  = "number_154"
+	NetworkACLRulePrototypeProtocolNumber155Const  = "number_155"
+	NetworkACLRulePrototypeProtocolNumber156Const  = "number_156"
+	NetworkACLRulePrototypeProtocolNumber157Const  = "number_157"
+	NetworkACLRulePrototypeProtocolNumber158Const  = "number_158"
+	NetworkACLRulePrototypeProtocolNumber159Const  = "number_159"
+	NetworkACLRulePrototypeProtocolNumber16Const   = "number_16"
+	NetworkACLRulePrototypeProtocolNumber160Const  = "number_160"
+	NetworkACLRulePrototypeProtocolNumber161Const  = "number_161"
+	NetworkACLRulePrototypeProtocolNumber162Const  = "number_162"
+	NetworkACLRulePrototypeProtocolNumber163Const  = "number_163"
+	NetworkACLRulePrototypeProtocolNumber164Const  = "number_164"
+	NetworkACLRulePrototypeProtocolNumber165Const  = "number_165"
+	NetworkACLRulePrototypeProtocolNumber166Const  = "number_166"
+	NetworkACLRulePrototypeProtocolNumber167Const  = "number_167"
+	NetworkACLRulePrototypeProtocolNumber168Const  = "number_168"
+	NetworkACLRulePrototypeProtocolNumber169Const  = "number_169"
+	NetworkACLRulePrototypeProtocolNumber170Const  = "number_170"
+	NetworkACLRulePrototypeProtocolNumber171Const  = "number_171"
+	NetworkACLRulePrototypeProtocolNumber172Const  = "number_172"
+	NetworkACLRulePrototypeProtocolNumber173Const  = "number_173"
+	NetworkACLRulePrototypeProtocolNumber174Const  = "number_174"
+	NetworkACLRulePrototypeProtocolNumber175Const  = "number_175"
+	NetworkACLRulePrototypeProtocolNumber176Const  = "number_176"
+	NetworkACLRulePrototypeProtocolNumber177Const  = "number_177"
+	NetworkACLRulePrototypeProtocolNumber178Const  = "number_178"
+	NetworkACLRulePrototypeProtocolNumber179Const  = "number_179"
+	NetworkACLRulePrototypeProtocolNumber18Const   = "number_18"
+	NetworkACLRulePrototypeProtocolNumber180Const  = "number_180"
+	NetworkACLRulePrototypeProtocolNumber181Const  = "number_181"
+	NetworkACLRulePrototypeProtocolNumber182Const  = "number_182"
+	NetworkACLRulePrototypeProtocolNumber183Const  = "number_183"
+	NetworkACLRulePrototypeProtocolNumber184Const  = "number_184"
+	NetworkACLRulePrototypeProtocolNumber185Const  = "number_185"
+	NetworkACLRulePrototypeProtocolNumber186Const  = "number_186"
+	NetworkACLRulePrototypeProtocolNumber187Const  = "number_187"
+	NetworkACLRulePrototypeProtocolNumber188Const  = "number_188"
+	NetworkACLRulePrototypeProtocolNumber189Const  = "number_189"
+	NetworkACLRulePrototypeProtocolNumber19Const   = "number_19"
+	NetworkACLRulePrototypeProtocolNumber190Const  = "number_190"
+	NetworkACLRulePrototypeProtocolNumber191Const  = "number_191"
+	NetworkACLRulePrototypeProtocolNumber192Const  = "number_192"
+	NetworkACLRulePrototypeProtocolNumber193Const  = "number_193"
+	NetworkACLRulePrototypeProtocolNumber194Const  = "number_194"
+	NetworkACLRulePrototypeProtocolNumber195Const  = "number_195"
+	NetworkACLRulePrototypeProtocolNumber196Const  = "number_196"
+	NetworkACLRulePrototypeProtocolNumber197Const  = "number_197"
+	NetworkACLRulePrototypeProtocolNumber198Const  = "number_198"
+	NetworkACLRulePrototypeProtocolNumber199Const  = "number_199"
+	NetworkACLRulePrototypeProtocolNumber2Const    = "number_2"
+	NetworkACLRulePrototypeProtocolNumber20Const   = "number_20"
+	NetworkACLRulePrototypeProtocolNumber200Const  = "number_200"
+	NetworkACLRulePrototypeProtocolNumber201Const  = "number_201"
+	NetworkACLRulePrototypeProtocolNumber202Const  = "number_202"
+	NetworkACLRulePrototypeProtocolNumber203Const  = "number_203"
+	NetworkACLRulePrototypeProtocolNumber204Const  = "number_204"
+	NetworkACLRulePrototypeProtocolNumber205Const  = "number_205"
+	NetworkACLRulePrototypeProtocolNumber206Const  = "number_206"
+	NetworkACLRulePrototypeProtocolNumber207Const  = "number_207"
+	NetworkACLRulePrototypeProtocolNumber208Const  = "number_208"
+	NetworkACLRulePrototypeProtocolNumber209Const  = "number_209"
+	NetworkACLRulePrototypeProtocolNumber21Const   = "number_21"
+	NetworkACLRulePrototypeProtocolNumber210Const  = "number_210"
+	NetworkACLRulePrototypeProtocolNumber211Const  = "number_211"
+	NetworkACLRulePrototypeProtocolNumber212Const  = "number_212"
+	NetworkACLRulePrototypeProtocolNumber213Const  = "number_213"
+	NetworkACLRulePrototypeProtocolNumber214Const  = "number_214"
+	NetworkACLRulePrototypeProtocolNumber215Const  = "number_215"
+	NetworkACLRulePrototypeProtocolNumber216Const  = "number_216"
+	NetworkACLRulePrototypeProtocolNumber217Const  = "number_217"
+	NetworkACLRulePrototypeProtocolNumber218Const  = "number_218"
+	NetworkACLRulePrototypeProtocolNumber219Const  = "number_219"
+	NetworkACLRulePrototypeProtocolNumber22Const   = "number_22"
+	NetworkACLRulePrototypeProtocolNumber220Const  = "number_220"
+	NetworkACLRulePrototypeProtocolNumber221Const  = "number_221"
+	NetworkACLRulePrototypeProtocolNumber222Const  = "number_222"
+	NetworkACLRulePrototypeProtocolNumber223Const  = "number_223"
+	NetworkACLRulePrototypeProtocolNumber224Const  = "number_224"
+	NetworkACLRulePrototypeProtocolNumber225Const  = "number_225"
+	NetworkACLRulePrototypeProtocolNumber226Const  = "number_226"
+	NetworkACLRulePrototypeProtocolNumber227Const  = "number_227"
+	NetworkACLRulePrototypeProtocolNumber228Const  = "number_228"
+	NetworkACLRulePrototypeProtocolNumber229Const  = "number_229"
+	NetworkACLRulePrototypeProtocolNumber23Const   = "number_23"
+	NetworkACLRulePrototypeProtocolNumber230Const  = "number_230"
+	NetworkACLRulePrototypeProtocolNumber231Const  = "number_231"
+	NetworkACLRulePrototypeProtocolNumber232Const  = "number_232"
+	NetworkACLRulePrototypeProtocolNumber233Const  = "number_233"
+	NetworkACLRulePrototypeProtocolNumber234Const  = "number_234"
+	NetworkACLRulePrototypeProtocolNumber235Const  = "number_235"
+	NetworkACLRulePrototypeProtocolNumber236Const  = "number_236"
+	NetworkACLRulePrototypeProtocolNumber237Const  = "number_237"
+	NetworkACLRulePrototypeProtocolNumber238Const  = "number_238"
+	NetworkACLRulePrototypeProtocolNumber239Const  = "number_239"
+	NetworkACLRulePrototypeProtocolNumber24Const   = "number_24"
+	NetworkACLRulePrototypeProtocolNumber240Const  = "number_240"
+	NetworkACLRulePrototypeProtocolNumber241Const  = "number_241"
+	NetworkACLRulePrototypeProtocolNumber242Const  = "number_242"
+	NetworkACLRulePrototypeProtocolNumber243Const  = "number_243"
+	NetworkACLRulePrototypeProtocolNumber244Const  = "number_244"
+	NetworkACLRulePrototypeProtocolNumber245Const  = "number_245"
+	NetworkACLRulePrototypeProtocolNumber246Const  = "number_246"
+	NetworkACLRulePrototypeProtocolNumber247Const  = "number_247"
+	NetworkACLRulePrototypeProtocolNumber248Const  = "number_248"
+	NetworkACLRulePrototypeProtocolNumber249Const  = "number_249"
+	NetworkACLRulePrototypeProtocolNumber25Const   = "number_25"
+	NetworkACLRulePrototypeProtocolNumber250Const  = "number_250"
+	NetworkACLRulePrototypeProtocolNumber251Const  = "number_251"
+	NetworkACLRulePrototypeProtocolNumber252Const  = "number_252"
+	NetworkACLRulePrototypeProtocolNumber253Const  = "number_253"
+	NetworkACLRulePrototypeProtocolNumber254Const  = "number_254"
+	NetworkACLRulePrototypeProtocolNumber255Const  = "number_255"
+	NetworkACLRulePrototypeProtocolNumber26Const   = "number_26"
+	NetworkACLRulePrototypeProtocolNumber27Const   = "number_27"
+	NetworkACLRulePrototypeProtocolNumber28Const   = "number_28"
+	NetworkACLRulePrototypeProtocolNumber29Const   = "number_29"
+	NetworkACLRulePrototypeProtocolNumber3Const    = "number_3"
+	NetworkACLRulePrototypeProtocolNumber30Const   = "number_30"
+	NetworkACLRulePrototypeProtocolNumber31Const   = "number_31"
+	NetworkACLRulePrototypeProtocolNumber32Const   = "number_32"
+	NetworkACLRulePrototypeProtocolNumber33Const   = "number_33"
+	NetworkACLRulePrototypeProtocolNumber34Const   = "number_34"
+	NetworkACLRulePrototypeProtocolNumber35Const   = "number_35"
+	NetworkACLRulePrototypeProtocolNumber36Const   = "number_36"
+	NetworkACLRulePrototypeProtocolNumber37Const   = "number_37"
+	NetworkACLRulePrototypeProtocolNumber38Const   = "number_38"
+	NetworkACLRulePrototypeProtocolNumber39Const   = "number_39"
+	NetworkACLRulePrototypeProtocolNumber40Const   = "number_40"
+	NetworkACLRulePrototypeProtocolNumber41Const   = "number_41"
+	NetworkACLRulePrototypeProtocolNumber42Const   = "number_42"
+	NetworkACLRulePrototypeProtocolNumber43Const   = "number_43"
+	NetworkACLRulePrototypeProtocolNumber44Const   = "number_44"
+	NetworkACLRulePrototypeProtocolNumber45Const   = "number_45"
+	NetworkACLRulePrototypeProtocolNumber48Const   = "number_48"
+	NetworkACLRulePrototypeProtocolNumber49Const   = "number_49"
+	NetworkACLRulePrototypeProtocolNumber5Const    = "number_5"
+	NetworkACLRulePrototypeProtocolNumber52Const   = "number_52"
+	NetworkACLRulePrototypeProtocolNumber53Const   = "number_53"
+	NetworkACLRulePrototypeProtocolNumber54Const   = "number_54"
+	NetworkACLRulePrototypeProtocolNumber55Const   = "number_55"
+	NetworkACLRulePrototypeProtocolNumber56Const   = "number_56"
+	NetworkACLRulePrototypeProtocolNumber57Const   = "number_57"
+	NetworkACLRulePrototypeProtocolNumber58Const   = "number_58"
+	NetworkACLRulePrototypeProtocolNumber59Const   = "number_59"
+	NetworkACLRulePrototypeProtocolNumber60Const   = "number_60"
+	NetworkACLRulePrototypeProtocolNumber61Const   = "number_61"
+	NetworkACLRulePrototypeProtocolNumber62Const   = "number_62"
+	NetworkACLRulePrototypeProtocolNumber63Const   = "number_63"
+	NetworkACLRulePrototypeProtocolNumber64Const   = "number_64"
+	NetworkACLRulePrototypeProtocolNumber65Const   = "number_65"
+	NetworkACLRulePrototypeProtocolNumber66Const   = "number_66"
+	NetworkACLRulePrototypeProtocolNumber67Const   = "number_67"
+	NetworkACLRulePrototypeProtocolNumber68Const   = "number_68"
+	NetworkACLRulePrototypeProtocolNumber69Const   = "number_69"
+	NetworkACLRulePrototypeProtocolNumber7Const    = "number_7"
+	NetworkACLRulePrototypeProtocolNumber70Const   = "number_70"
+	NetworkACLRulePrototypeProtocolNumber71Const   = "number_71"
+	NetworkACLRulePrototypeProtocolNumber72Const   = "number_72"
+	NetworkACLRulePrototypeProtocolNumber73Const   = "number_73"
+	NetworkACLRulePrototypeProtocolNumber74Const   = "number_74"
+	NetworkACLRulePrototypeProtocolNumber75Const   = "number_75"
+	NetworkACLRulePrototypeProtocolNumber76Const   = "number_76"
+	NetworkACLRulePrototypeProtocolNumber77Const   = "number_77"
+	NetworkACLRulePrototypeProtocolNumber78Const   = "number_78"
+	NetworkACLRulePrototypeProtocolNumber79Const   = "number_79"
+	NetworkACLRulePrototypeProtocolNumber8Const    = "number_8"
+	NetworkACLRulePrototypeProtocolNumber80Const   = "number_80"
+	NetworkACLRulePrototypeProtocolNumber81Const   = "number_81"
+	NetworkACLRulePrototypeProtocolNumber82Const   = "number_82"
+	NetworkACLRulePrototypeProtocolNumber83Const   = "number_83"
+	NetworkACLRulePrototypeProtocolNumber84Const   = "number_84"
+	NetworkACLRulePrototypeProtocolNumber85Const   = "number_85"
+	NetworkACLRulePrototypeProtocolNumber86Const   = "number_86"
+	NetworkACLRulePrototypeProtocolNumber87Const   = "number_87"
+	NetworkACLRulePrototypeProtocolNumber88Const   = "number_88"
+	NetworkACLRulePrototypeProtocolNumber89Const   = "number_89"
+	NetworkACLRulePrototypeProtocolNumber9Const    = "number_9"
+	NetworkACLRulePrototypeProtocolNumber90Const   = "number_90"
+	NetworkACLRulePrototypeProtocolNumber91Const   = "number_91"
+	NetworkACLRulePrototypeProtocolNumber92Const   = "number_92"
+	NetworkACLRulePrototypeProtocolNumber93Const   = "number_93"
+	NetworkACLRulePrototypeProtocolNumber94Const   = "number_94"
+	NetworkACLRulePrototypeProtocolNumber95Const   = "number_95"
+	NetworkACLRulePrototypeProtocolNumber96Const   = "number_96"
+	NetworkACLRulePrototypeProtocolNumber97Const   = "number_97"
+	NetworkACLRulePrototypeProtocolNumber98Const   = "number_98"
+	NetworkACLRulePrototypeProtocolNumber99Const   = "number_99"
+	NetworkACLRulePrototypeProtocolRsvpConst       = "rsvp"
+	NetworkACLRulePrototypeProtocolSctpConst       = "sctp"
+	NetworkACLRulePrototypeProtocolTCPConst        = "tcp"
+	NetworkACLRulePrototypeProtocolUDPConst        = "udp"
+	NetworkACLRulePrototypeProtocolVrrpConst       = "vrrp"
 )
 
 func (*NetworkACLRulePrototype) isaNetworkACLRulePrototype() bool {
@@ -85166,11 +88959,15 @@ func UnmarshalNetworkACLRulePrototype(m map[string]json.RawMessage, result inter
 
 // NetworkACLRulePrototypeNetworkACLContext : NetworkACLRulePrototypeNetworkACLContext struct
 // Models which "extend" this model:
-// - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype
+// - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype
+// - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype
 // - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototype
 // - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototype
+// - NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype
 type NetworkACLRulePrototypeNetworkACLContext struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
@@ -85229,6 +89026,8 @@ type NetworkACLRulePrototypeNetworkACLContext struct {
 
 // Constants associated with the NetworkACLRulePrototypeNetworkACLContext.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeNetworkACLContextActionAllowConst = "allow"
 	NetworkACLRulePrototypeNetworkACLContextActionDenyConst  = "deny"
@@ -85250,10 +89049,264 @@ const (
 // Constants associated with the NetworkACLRulePrototypeNetworkACLContext.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRulePrototypeNetworkACLContextProtocolAllConst  = "all"
-	NetworkACLRulePrototypeNetworkACLContextProtocolIcmpConst = "icmp"
-	NetworkACLRulePrototypeNetworkACLContextProtocolTCPConst  = "tcp"
-	NetworkACLRulePrototypeNetworkACLContextProtocolUDPConst  = "udp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolAhConst         = "ah"
+	NetworkACLRulePrototypeNetworkACLContextProtocolAnyConst        = "any"
+	NetworkACLRulePrototypeNetworkACLContextProtocolEspConst        = "esp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolGreConst        = "gre"
+	NetworkACLRulePrototypeNetworkACLContextProtocolIPInIPConst     = "ip_in_ip"
+	NetworkACLRulePrototypeNetworkACLContextProtocolIcmpConst       = "icmp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolL2tpConst       = "l2tp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber0Const    = "number_0"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber10Const   = "number_10"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber100Const  = "number_100"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber101Const  = "number_101"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber102Const  = "number_102"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber103Const  = "number_103"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber104Const  = "number_104"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber105Const  = "number_105"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber106Const  = "number_106"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber107Const  = "number_107"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber108Const  = "number_108"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber109Const  = "number_109"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber11Const   = "number_11"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber110Const  = "number_110"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber111Const  = "number_111"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber113Const  = "number_113"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber114Const  = "number_114"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber116Const  = "number_116"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber117Const  = "number_117"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber118Const  = "number_118"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber119Const  = "number_119"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber12Const   = "number_12"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber120Const  = "number_120"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber121Const  = "number_121"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber122Const  = "number_122"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber123Const  = "number_123"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber124Const  = "number_124"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber125Const  = "number_125"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber126Const  = "number_126"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber127Const  = "number_127"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber128Const  = "number_128"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber129Const  = "number_129"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber13Const   = "number_13"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber130Const  = "number_130"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber131Const  = "number_131"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber133Const  = "number_133"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber134Const  = "number_134"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber135Const  = "number_135"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber136Const  = "number_136"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber137Const  = "number_137"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber138Const  = "number_138"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber139Const  = "number_139"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber14Const   = "number_14"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber140Const  = "number_140"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber141Const  = "number_141"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber142Const  = "number_142"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber143Const  = "number_143"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber144Const  = "number_144"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber145Const  = "number_145"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber146Const  = "number_146"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber147Const  = "number_147"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber148Const  = "number_148"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber149Const  = "number_149"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber15Const   = "number_15"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber150Const  = "number_150"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber151Const  = "number_151"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber152Const  = "number_152"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber153Const  = "number_153"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber154Const  = "number_154"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber155Const  = "number_155"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber156Const  = "number_156"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber157Const  = "number_157"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber158Const  = "number_158"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber159Const  = "number_159"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber16Const   = "number_16"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber160Const  = "number_160"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber161Const  = "number_161"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber162Const  = "number_162"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber163Const  = "number_163"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber164Const  = "number_164"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber165Const  = "number_165"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber166Const  = "number_166"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber167Const  = "number_167"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber168Const  = "number_168"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber169Const  = "number_169"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber170Const  = "number_170"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber171Const  = "number_171"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber172Const  = "number_172"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber173Const  = "number_173"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber174Const  = "number_174"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber175Const  = "number_175"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber176Const  = "number_176"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber177Const  = "number_177"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber178Const  = "number_178"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber179Const  = "number_179"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber18Const   = "number_18"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber180Const  = "number_180"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber181Const  = "number_181"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber182Const  = "number_182"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber183Const  = "number_183"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber184Const  = "number_184"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber185Const  = "number_185"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber186Const  = "number_186"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber187Const  = "number_187"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber188Const  = "number_188"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber189Const  = "number_189"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber19Const   = "number_19"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber190Const  = "number_190"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber191Const  = "number_191"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber192Const  = "number_192"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber193Const  = "number_193"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber194Const  = "number_194"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber195Const  = "number_195"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber196Const  = "number_196"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber197Const  = "number_197"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber198Const  = "number_198"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber199Const  = "number_199"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber2Const    = "number_2"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber20Const   = "number_20"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber200Const  = "number_200"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber201Const  = "number_201"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber202Const  = "number_202"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber203Const  = "number_203"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber204Const  = "number_204"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber205Const  = "number_205"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber206Const  = "number_206"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber207Const  = "number_207"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber208Const  = "number_208"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber209Const  = "number_209"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber21Const   = "number_21"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber210Const  = "number_210"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber211Const  = "number_211"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber212Const  = "number_212"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber213Const  = "number_213"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber214Const  = "number_214"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber215Const  = "number_215"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber216Const  = "number_216"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber217Const  = "number_217"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber218Const  = "number_218"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber219Const  = "number_219"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber22Const   = "number_22"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber220Const  = "number_220"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber221Const  = "number_221"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber222Const  = "number_222"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber223Const  = "number_223"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber224Const  = "number_224"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber225Const  = "number_225"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber226Const  = "number_226"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber227Const  = "number_227"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber228Const  = "number_228"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber229Const  = "number_229"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber23Const   = "number_23"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber230Const  = "number_230"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber231Const  = "number_231"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber232Const  = "number_232"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber233Const  = "number_233"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber234Const  = "number_234"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber235Const  = "number_235"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber236Const  = "number_236"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber237Const  = "number_237"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber238Const  = "number_238"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber239Const  = "number_239"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber24Const   = "number_24"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber240Const  = "number_240"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber241Const  = "number_241"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber242Const  = "number_242"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber243Const  = "number_243"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber244Const  = "number_244"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber245Const  = "number_245"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber246Const  = "number_246"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber247Const  = "number_247"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber248Const  = "number_248"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber249Const  = "number_249"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber25Const   = "number_25"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber250Const  = "number_250"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber251Const  = "number_251"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber252Const  = "number_252"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber253Const  = "number_253"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber254Const  = "number_254"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber255Const  = "number_255"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber26Const   = "number_26"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber27Const   = "number_27"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber28Const   = "number_28"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber29Const   = "number_29"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber3Const    = "number_3"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber30Const   = "number_30"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber31Const   = "number_31"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber32Const   = "number_32"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber33Const   = "number_33"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber34Const   = "number_34"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber35Const   = "number_35"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber36Const   = "number_36"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber37Const   = "number_37"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber38Const   = "number_38"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber39Const   = "number_39"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber40Const   = "number_40"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber41Const   = "number_41"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber42Const   = "number_42"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber43Const   = "number_43"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber44Const   = "number_44"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber45Const   = "number_45"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber48Const   = "number_48"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber49Const   = "number_49"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber5Const    = "number_5"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber52Const   = "number_52"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber53Const   = "number_53"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber54Const   = "number_54"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber55Const   = "number_55"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber56Const   = "number_56"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber57Const   = "number_57"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber58Const   = "number_58"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber59Const   = "number_59"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber60Const   = "number_60"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber61Const   = "number_61"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber62Const   = "number_62"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber63Const   = "number_63"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber64Const   = "number_64"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber65Const   = "number_65"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber66Const   = "number_66"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber67Const   = "number_67"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber68Const   = "number_68"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber69Const   = "number_69"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber7Const    = "number_7"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber70Const   = "number_70"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber71Const   = "number_71"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber72Const   = "number_72"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber73Const   = "number_73"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber74Const   = "number_74"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber75Const   = "number_75"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber76Const   = "number_76"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber77Const   = "number_77"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber78Const   = "number_78"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber79Const   = "number_79"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber8Const    = "number_8"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber80Const   = "number_80"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber81Const   = "number_81"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber82Const   = "number_82"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber83Const   = "number_83"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber84Const   = "number_84"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber85Const   = "number_85"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber86Const   = "number_86"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber87Const   = "number_87"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber88Const   = "number_88"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber89Const   = "number_89"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber9Const    = "number_9"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber90Const   = "number_90"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber91Const   = "number_91"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber92Const   = "number_92"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber93Const   = "number_93"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber94Const   = "number_94"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber95Const   = "number_95"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber96Const   = "number_96"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber97Const   = "number_97"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber98Const   = "number_98"
+	NetworkACLRulePrototypeNetworkACLContextProtocolNumber99Const   = "number_99"
+	NetworkACLRulePrototypeNetworkACLContextProtocolRsvpConst       = "rsvp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolSctpConst       = "sctp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolTCPConst        = "tcp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolUDPConst        = "udp"
+	NetworkACLRulePrototypeNetworkACLContextProtocolVrrpConst       = "vrrp"
 )
 
 func (*NetworkACLRulePrototypeNetworkACLContext) isaNetworkACLRulePrototypeNetworkACLContext() bool {
@@ -92302,9 +96355,11 @@ func UnmarshalSecurityGroupReference(m map[string]json.RawMessage, result interf
 
 // SecurityGroupRule : SecurityGroupRule struct
 // Models which "extend" this model:
-// - SecurityGroupRuleSecurityGroupRuleProtocolAll
+// - SecurityGroupRuleProtocolAny
+// - SecurityGroupRuleProtocolIcmptcpudp
 // - SecurityGroupRuleSecurityGroupRuleProtocolIcmp
 // - SecurityGroupRuleSecurityGroupRuleProtocolTcpudp
+// - SecurityGroupRuleProtocolIndividual
 type SecurityGroupRule struct {
 	// The direction of traffic to allow.
 	Direction *string `json:"direction" validate:"required"`
@@ -92327,6 +96382,9 @@ type SecurityGroupRule struct {
 	// to all local IP addresses (or from all local IP addresses, for outbound rules).
 	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
 
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
 	// The network protocol.
 	//
 	// The enumerated values for this property may
@@ -92337,6 +96395,9 @@ type SecurityGroupRule struct {
 	// which, for outbound rules). A CIDR block of `0.0.0.0/0` allows traffic from any source
 	// (or to any destination, for outbound rules).
 	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
 
 	// The ICMP traffic code to allow. If absent, all codes are allowed.
 	Code *int64 `json:"code,omitempty"`
@@ -92374,10 +96435,270 @@ const (
 // The enumerated values for this property may
 // [expand](https://cloud.ibm.com/apidocs/vpc#property-value-expansion) in the future.
 const (
-	SecurityGroupRuleProtocolAllConst  = "all"
-	SecurityGroupRuleProtocolIcmpConst = "icmp"
-	SecurityGroupRuleProtocolTCPConst  = "tcp"
-	SecurityGroupRuleProtocolUDPConst  = "udp"
+	SecurityGroupRuleProtocolAhConst         = "ah"
+	SecurityGroupRuleProtocolAnyConst        = "any"
+	SecurityGroupRuleProtocolEspConst        = "esp"
+	SecurityGroupRuleProtocolGreConst        = "gre"
+	SecurityGroupRuleProtocolIPInIPConst     = "ip_in_ip"
+	SecurityGroupRuleProtocolIcmpConst       = "icmp"
+	SecurityGroupRuleProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	SecurityGroupRuleProtocolL2tpConst       = "l2tp"
+	SecurityGroupRuleProtocolNumber0Const    = "number_0"
+	SecurityGroupRuleProtocolNumber10Const   = "number_10"
+	SecurityGroupRuleProtocolNumber100Const  = "number_100"
+	SecurityGroupRuleProtocolNumber101Const  = "number_101"
+	SecurityGroupRuleProtocolNumber102Const  = "number_102"
+	SecurityGroupRuleProtocolNumber103Const  = "number_103"
+	SecurityGroupRuleProtocolNumber104Const  = "number_104"
+	SecurityGroupRuleProtocolNumber105Const  = "number_105"
+	SecurityGroupRuleProtocolNumber106Const  = "number_106"
+	SecurityGroupRuleProtocolNumber107Const  = "number_107"
+	SecurityGroupRuleProtocolNumber108Const  = "number_108"
+	SecurityGroupRuleProtocolNumber109Const  = "number_109"
+	SecurityGroupRuleProtocolNumber11Const   = "number_11"
+	SecurityGroupRuleProtocolNumber110Const  = "number_110"
+	SecurityGroupRuleProtocolNumber111Const  = "number_111"
+	SecurityGroupRuleProtocolNumber113Const  = "number_113"
+	SecurityGroupRuleProtocolNumber114Const  = "number_114"
+	SecurityGroupRuleProtocolNumber116Const  = "number_116"
+	SecurityGroupRuleProtocolNumber117Const  = "number_117"
+	SecurityGroupRuleProtocolNumber118Const  = "number_118"
+	SecurityGroupRuleProtocolNumber119Const  = "number_119"
+	SecurityGroupRuleProtocolNumber12Const   = "number_12"
+	SecurityGroupRuleProtocolNumber120Const  = "number_120"
+	SecurityGroupRuleProtocolNumber121Const  = "number_121"
+	SecurityGroupRuleProtocolNumber122Const  = "number_122"
+	SecurityGroupRuleProtocolNumber123Const  = "number_123"
+	SecurityGroupRuleProtocolNumber124Const  = "number_124"
+	SecurityGroupRuleProtocolNumber125Const  = "number_125"
+	SecurityGroupRuleProtocolNumber126Const  = "number_126"
+	SecurityGroupRuleProtocolNumber127Const  = "number_127"
+	SecurityGroupRuleProtocolNumber128Const  = "number_128"
+	SecurityGroupRuleProtocolNumber129Const  = "number_129"
+	SecurityGroupRuleProtocolNumber13Const   = "number_13"
+	SecurityGroupRuleProtocolNumber130Const  = "number_130"
+	SecurityGroupRuleProtocolNumber131Const  = "number_131"
+	SecurityGroupRuleProtocolNumber133Const  = "number_133"
+	SecurityGroupRuleProtocolNumber134Const  = "number_134"
+	SecurityGroupRuleProtocolNumber135Const  = "number_135"
+	SecurityGroupRuleProtocolNumber136Const  = "number_136"
+	SecurityGroupRuleProtocolNumber137Const  = "number_137"
+	SecurityGroupRuleProtocolNumber138Const  = "number_138"
+	SecurityGroupRuleProtocolNumber139Const  = "number_139"
+	SecurityGroupRuleProtocolNumber14Const   = "number_14"
+	SecurityGroupRuleProtocolNumber140Const  = "number_140"
+	SecurityGroupRuleProtocolNumber141Const  = "number_141"
+	SecurityGroupRuleProtocolNumber142Const  = "number_142"
+	SecurityGroupRuleProtocolNumber143Const  = "number_143"
+	SecurityGroupRuleProtocolNumber144Const  = "number_144"
+	SecurityGroupRuleProtocolNumber145Const  = "number_145"
+	SecurityGroupRuleProtocolNumber146Const  = "number_146"
+	SecurityGroupRuleProtocolNumber147Const  = "number_147"
+	SecurityGroupRuleProtocolNumber148Const  = "number_148"
+	SecurityGroupRuleProtocolNumber149Const  = "number_149"
+	SecurityGroupRuleProtocolNumber15Const   = "number_15"
+	SecurityGroupRuleProtocolNumber150Const  = "number_150"
+	SecurityGroupRuleProtocolNumber151Const  = "number_151"
+	SecurityGroupRuleProtocolNumber152Const  = "number_152"
+	SecurityGroupRuleProtocolNumber153Const  = "number_153"
+	SecurityGroupRuleProtocolNumber154Const  = "number_154"
+	SecurityGroupRuleProtocolNumber155Const  = "number_155"
+	SecurityGroupRuleProtocolNumber156Const  = "number_156"
+	SecurityGroupRuleProtocolNumber157Const  = "number_157"
+	SecurityGroupRuleProtocolNumber158Const  = "number_158"
+	SecurityGroupRuleProtocolNumber159Const  = "number_159"
+	SecurityGroupRuleProtocolNumber16Const   = "number_16"
+	SecurityGroupRuleProtocolNumber160Const  = "number_160"
+	SecurityGroupRuleProtocolNumber161Const  = "number_161"
+	SecurityGroupRuleProtocolNumber162Const  = "number_162"
+	SecurityGroupRuleProtocolNumber163Const  = "number_163"
+	SecurityGroupRuleProtocolNumber164Const  = "number_164"
+	SecurityGroupRuleProtocolNumber165Const  = "number_165"
+	SecurityGroupRuleProtocolNumber166Const  = "number_166"
+	SecurityGroupRuleProtocolNumber167Const  = "number_167"
+	SecurityGroupRuleProtocolNumber168Const  = "number_168"
+	SecurityGroupRuleProtocolNumber169Const  = "number_169"
+	SecurityGroupRuleProtocolNumber170Const  = "number_170"
+	SecurityGroupRuleProtocolNumber171Const  = "number_171"
+	SecurityGroupRuleProtocolNumber172Const  = "number_172"
+	SecurityGroupRuleProtocolNumber173Const  = "number_173"
+	SecurityGroupRuleProtocolNumber174Const  = "number_174"
+	SecurityGroupRuleProtocolNumber175Const  = "number_175"
+	SecurityGroupRuleProtocolNumber176Const  = "number_176"
+	SecurityGroupRuleProtocolNumber177Const  = "number_177"
+	SecurityGroupRuleProtocolNumber178Const  = "number_178"
+	SecurityGroupRuleProtocolNumber179Const  = "number_179"
+	SecurityGroupRuleProtocolNumber18Const   = "number_18"
+	SecurityGroupRuleProtocolNumber180Const  = "number_180"
+	SecurityGroupRuleProtocolNumber181Const  = "number_181"
+	SecurityGroupRuleProtocolNumber182Const  = "number_182"
+	SecurityGroupRuleProtocolNumber183Const  = "number_183"
+	SecurityGroupRuleProtocolNumber184Const  = "number_184"
+	SecurityGroupRuleProtocolNumber185Const  = "number_185"
+	SecurityGroupRuleProtocolNumber186Const  = "number_186"
+	SecurityGroupRuleProtocolNumber187Const  = "number_187"
+	SecurityGroupRuleProtocolNumber188Const  = "number_188"
+	SecurityGroupRuleProtocolNumber189Const  = "number_189"
+	SecurityGroupRuleProtocolNumber19Const   = "number_19"
+	SecurityGroupRuleProtocolNumber190Const  = "number_190"
+	SecurityGroupRuleProtocolNumber191Const  = "number_191"
+	SecurityGroupRuleProtocolNumber192Const  = "number_192"
+	SecurityGroupRuleProtocolNumber193Const  = "number_193"
+	SecurityGroupRuleProtocolNumber194Const  = "number_194"
+	SecurityGroupRuleProtocolNumber195Const  = "number_195"
+	SecurityGroupRuleProtocolNumber196Const  = "number_196"
+	SecurityGroupRuleProtocolNumber197Const  = "number_197"
+	SecurityGroupRuleProtocolNumber198Const  = "number_198"
+	SecurityGroupRuleProtocolNumber199Const  = "number_199"
+	SecurityGroupRuleProtocolNumber2Const    = "number_2"
+	SecurityGroupRuleProtocolNumber20Const   = "number_20"
+	SecurityGroupRuleProtocolNumber200Const  = "number_200"
+	SecurityGroupRuleProtocolNumber201Const  = "number_201"
+	SecurityGroupRuleProtocolNumber202Const  = "number_202"
+	SecurityGroupRuleProtocolNumber203Const  = "number_203"
+	SecurityGroupRuleProtocolNumber204Const  = "number_204"
+	SecurityGroupRuleProtocolNumber205Const  = "number_205"
+	SecurityGroupRuleProtocolNumber206Const  = "number_206"
+	SecurityGroupRuleProtocolNumber207Const  = "number_207"
+	SecurityGroupRuleProtocolNumber208Const  = "number_208"
+	SecurityGroupRuleProtocolNumber209Const  = "number_209"
+	SecurityGroupRuleProtocolNumber21Const   = "number_21"
+	SecurityGroupRuleProtocolNumber210Const  = "number_210"
+	SecurityGroupRuleProtocolNumber211Const  = "number_211"
+	SecurityGroupRuleProtocolNumber212Const  = "number_212"
+	SecurityGroupRuleProtocolNumber213Const  = "number_213"
+	SecurityGroupRuleProtocolNumber214Const  = "number_214"
+	SecurityGroupRuleProtocolNumber215Const  = "number_215"
+	SecurityGroupRuleProtocolNumber216Const  = "number_216"
+	SecurityGroupRuleProtocolNumber217Const  = "number_217"
+	SecurityGroupRuleProtocolNumber218Const  = "number_218"
+	SecurityGroupRuleProtocolNumber219Const  = "number_219"
+	SecurityGroupRuleProtocolNumber22Const   = "number_22"
+	SecurityGroupRuleProtocolNumber220Const  = "number_220"
+	SecurityGroupRuleProtocolNumber221Const  = "number_221"
+	SecurityGroupRuleProtocolNumber222Const  = "number_222"
+	SecurityGroupRuleProtocolNumber223Const  = "number_223"
+	SecurityGroupRuleProtocolNumber224Const  = "number_224"
+	SecurityGroupRuleProtocolNumber225Const  = "number_225"
+	SecurityGroupRuleProtocolNumber226Const  = "number_226"
+	SecurityGroupRuleProtocolNumber227Const  = "number_227"
+	SecurityGroupRuleProtocolNumber228Const  = "number_228"
+	SecurityGroupRuleProtocolNumber229Const  = "number_229"
+	SecurityGroupRuleProtocolNumber23Const   = "number_23"
+	SecurityGroupRuleProtocolNumber230Const  = "number_230"
+	SecurityGroupRuleProtocolNumber231Const  = "number_231"
+	SecurityGroupRuleProtocolNumber232Const  = "number_232"
+	SecurityGroupRuleProtocolNumber233Const  = "number_233"
+	SecurityGroupRuleProtocolNumber234Const  = "number_234"
+	SecurityGroupRuleProtocolNumber235Const  = "number_235"
+	SecurityGroupRuleProtocolNumber236Const  = "number_236"
+	SecurityGroupRuleProtocolNumber237Const  = "number_237"
+	SecurityGroupRuleProtocolNumber238Const  = "number_238"
+	SecurityGroupRuleProtocolNumber239Const  = "number_239"
+	SecurityGroupRuleProtocolNumber24Const   = "number_24"
+	SecurityGroupRuleProtocolNumber240Const  = "number_240"
+	SecurityGroupRuleProtocolNumber241Const  = "number_241"
+	SecurityGroupRuleProtocolNumber242Const  = "number_242"
+	SecurityGroupRuleProtocolNumber243Const  = "number_243"
+	SecurityGroupRuleProtocolNumber244Const  = "number_244"
+	SecurityGroupRuleProtocolNumber245Const  = "number_245"
+	SecurityGroupRuleProtocolNumber246Const  = "number_246"
+	SecurityGroupRuleProtocolNumber247Const  = "number_247"
+	SecurityGroupRuleProtocolNumber248Const  = "number_248"
+	SecurityGroupRuleProtocolNumber249Const  = "number_249"
+	SecurityGroupRuleProtocolNumber25Const   = "number_25"
+	SecurityGroupRuleProtocolNumber250Const  = "number_250"
+	SecurityGroupRuleProtocolNumber251Const  = "number_251"
+	SecurityGroupRuleProtocolNumber252Const  = "number_252"
+	SecurityGroupRuleProtocolNumber253Const  = "number_253"
+	SecurityGroupRuleProtocolNumber254Const  = "number_254"
+	SecurityGroupRuleProtocolNumber255Const  = "number_255"
+	SecurityGroupRuleProtocolNumber26Const   = "number_26"
+	SecurityGroupRuleProtocolNumber27Const   = "number_27"
+	SecurityGroupRuleProtocolNumber28Const   = "number_28"
+	SecurityGroupRuleProtocolNumber29Const   = "number_29"
+	SecurityGroupRuleProtocolNumber3Const    = "number_3"
+	SecurityGroupRuleProtocolNumber30Const   = "number_30"
+	SecurityGroupRuleProtocolNumber31Const   = "number_31"
+	SecurityGroupRuleProtocolNumber32Const   = "number_32"
+	SecurityGroupRuleProtocolNumber33Const   = "number_33"
+	SecurityGroupRuleProtocolNumber34Const   = "number_34"
+	SecurityGroupRuleProtocolNumber35Const   = "number_35"
+	SecurityGroupRuleProtocolNumber36Const   = "number_36"
+	SecurityGroupRuleProtocolNumber37Const   = "number_37"
+	SecurityGroupRuleProtocolNumber38Const   = "number_38"
+	SecurityGroupRuleProtocolNumber39Const   = "number_39"
+	SecurityGroupRuleProtocolNumber40Const   = "number_40"
+	SecurityGroupRuleProtocolNumber41Const   = "number_41"
+	SecurityGroupRuleProtocolNumber42Const   = "number_42"
+	SecurityGroupRuleProtocolNumber43Const   = "number_43"
+	SecurityGroupRuleProtocolNumber44Const   = "number_44"
+	SecurityGroupRuleProtocolNumber45Const   = "number_45"
+	SecurityGroupRuleProtocolNumber48Const   = "number_48"
+	SecurityGroupRuleProtocolNumber49Const   = "number_49"
+	SecurityGroupRuleProtocolNumber5Const    = "number_5"
+	SecurityGroupRuleProtocolNumber52Const   = "number_52"
+	SecurityGroupRuleProtocolNumber53Const   = "number_53"
+	SecurityGroupRuleProtocolNumber54Const   = "number_54"
+	SecurityGroupRuleProtocolNumber55Const   = "number_55"
+	SecurityGroupRuleProtocolNumber56Const   = "number_56"
+	SecurityGroupRuleProtocolNumber57Const   = "number_57"
+	SecurityGroupRuleProtocolNumber58Const   = "number_58"
+	SecurityGroupRuleProtocolNumber59Const   = "number_59"
+	SecurityGroupRuleProtocolNumber60Const   = "number_60"
+	SecurityGroupRuleProtocolNumber61Const   = "number_61"
+	SecurityGroupRuleProtocolNumber62Const   = "number_62"
+	SecurityGroupRuleProtocolNumber63Const   = "number_63"
+	SecurityGroupRuleProtocolNumber64Const   = "number_64"
+	SecurityGroupRuleProtocolNumber65Const   = "number_65"
+	SecurityGroupRuleProtocolNumber66Const   = "number_66"
+	SecurityGroupRuleProtocolNumber67Const   = "number_67"
+	SecurityGroupRuleProtocolNumber68Const   = "number_68"
+	SecurityGroupRuleProtocolNumber69Const   = "number_69"
+	SecurityGroupRuleProtocolNumber7Const    = "number_7"
+	SecurityGroupRuleProtocolNumber70Const   = "number_70"
+	SecurityGroupRuleProtocolNumber71Const   = "number_71"
+	SecurityGroupRuleProtocolNumber72Const   = "number_72"
+	SecurityGroupRuleProtocolNumber73Const   = "number_73"
+	SecurityGroupRuleProtocolNumber74Const   = "number_74"
+	SecurityGroupRuleProtocolNumber75Const   = "number_75"
+	SecurityGroupRuleProtocolNumber76Const   = "number_76"
+	SecurityGroupRuleProtocolNumber77Const   = "number_77"
+	SecurityGroupRuleProtocolNumber78Const   = "number_78"
+	SecurityGroupRuleProtocolNumber79Const   = "number_79"
+	SecurityGroupRuleProtocolNumber8Const    = "number_8"
+	SecurityGroupRuleProtocolNumber80Const   = "number_80"
+	SecurityGroupRuleProtocolNumber81Const   = "number_81"
+	SecurityGroupRuleProtocolNumber82Const   = "number_82"
+	SecurityGroupRuleProtocolNumber83Const   = "number_83"
+	SecurityGroupRuleProtocolNumber84Const   = "number_84"
+	SecurityGroupRuleProtocolNumber85Const   = "number_85"
+	SecurityGroupRuleProtocolNumber86Const   = "number_86"
+	SecurityGroupRuleProtocolNumber87Const   = "number_87"
+	SecurityGroupRuleProtocolNumber88Const   = "number_88"
+	SecurityGroupRuleProtocolNumber89Const   = "number_89"
+	SecurityGroupRuleProtocolNumber9Const    = "number_9"
+	SecurityGroupRuleProtocolNumber90Const   = "number_90"
+	SecurityGroupRuleProtocolNumber91Const   = "number_91"
+	SecurityGroupRuleProtocolNumber92Const   = "number_92"
+	SecurityGroupRuleProtocolNumber93Const   = "number_93"
+	SecurityGroupRuleProtocolNumber94Const   = "number_94"
+	SecurityGroupRuleProtocolNumber95Const   = "number_95"
+	SecurityGroupRuleProtocolNumber96Const   = "number_96"
+	SecurityGroupRuleProtocolNumber97Const   = "number_97"
+	SecurityGroupRuleProtocolNumber98Const   = "number_98"
+	SecurityGroupRuleProtocolNumber99Const   = "number_99"
+	SecurityGroupRuleProtocolRsvpConst       = "rsvp"
+	SecurityGroupRuleProtocolSctpConst       = "sctp"
+	SecurityGroupRuleProtocolTCPConst        = "tcp"
+	SecurityGroupRuleProtocolUDPConst        = "udp"
+	SecurityGroupRuleProtocolVrrpConst       = "vrrp"
+)
+
+// Constants associated with the SecurityGroupRule.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleResourceTypeSecurityGroupRuleConst = "security_group_rule"
 )
 
 func (*SecurityGroupRule) isaSecurityGroupRule() bool {
@@ -92402,15 +96723,1280 @@ func UnmarshalSecurityGroupRule(m map[string]json.RawMessage, result interface{}
 		err = core.SDKErrorf(err, "required discriminator property 'protocol' not found in JSON object", "missing-discriminator", common.GetComponentInfo())
 		return
 	}
-	if discValue == "all" {
-		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolAll)
+	if discValue == "ah" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
 		if err != nil {
-			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleSecurityGroupRuleProtocolAll-error", common.GetComponentInfo())
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "any" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolAny)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolAny-error", common.GetComponentInfo())
+		}
+	} else if discValue == "esp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "gre" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "icmp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolIcmp)
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleSecurityGroupRuleProtocolIcmp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "icmp_tcp_udp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIcmptcpudp)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIcmptcpudp-error", common.GetComponentInfo())
+		}
+	} else if discValue == "ip_in_ip" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "l2tp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_0" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_10" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_100" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_101" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_102" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_103" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_104" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_105" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_106" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_107" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_108" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_109" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_11" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_110" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_111" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_113" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_114" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_116" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_117" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_118" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_119" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_12" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_120" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_121" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_122" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_123" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_124" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_125" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_126" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_127" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_128" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_129" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_13" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_130" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_131" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_133" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_134" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_135" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_136" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_137" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_138" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_139" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_14" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_140" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_141" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_142" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_143" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_144" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_145" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_146" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_147" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_148" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_149" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_15" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_150" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_151" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_152" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_153" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_154" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_155" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_156" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_157" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_158" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_159" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_16" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_160" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_161" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_162" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_163" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_164" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_165" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_166" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_167" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_168" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_169" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_170" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_171" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_172" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_173" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_174" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_175" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_176" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_177" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_178" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_179" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_18" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_180" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_181" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_182" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_183" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_184" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_185" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_186" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_187" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_188" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_189" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_19" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_190" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_191" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_192" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_193" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_194" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_195" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_196" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_197" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_198" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_199" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_2" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_20" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_200" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_201" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_202" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_203" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_204" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_205" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_206" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_207" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_208" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_209" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_21" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_210" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_211" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_212" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_213" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_214" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_215" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_216" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_217" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_218" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_219" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_22" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_220" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_221" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_222" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_223" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_224" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_225" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_226" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_227" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_228" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_229" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_23" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_230" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_231" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_232" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_233" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_234" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_235" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_236" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_237" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_238" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_239" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_24" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_240" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_241" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_242" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_243" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_244" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_245" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_246" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_247" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_248" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_249" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_25" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_250" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_251" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_252" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_253" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_254" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_255" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_26" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_27" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_28" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_29" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_3" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_30" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_31" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_32" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_33" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_34" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_35" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_36" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_37" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_38" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_39" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_40" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_41" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_42" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_43" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_44" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_45" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_48" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_49" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_5" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_52" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_53" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_54" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_55" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_56" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_57" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_58" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_59" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_60" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_61" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_62" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_63" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_64" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_65" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_66" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_67" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_68" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_69" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_7" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_70" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_71" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_72" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_73" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_74" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_75" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_76" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_77" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_78" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_79" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_8" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_80" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_81" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_82" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_83" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_84" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_85" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_86" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_87" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_88" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_89" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_9" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_90" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_91" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_92" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_93" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_94" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_95" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_96" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_97" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_98" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "number_99" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "rsvp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
+	} else if discValue == "sctp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
 		}
 	} else if discValue == "tcp" {
 		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolTcpudp)
@@ -92422,10 +98008,79 @@ func UnmarshalSecurityGroupRule(m map[string]json.RawMessage, result interface{}
 		if err != nil {
 			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleSecurityGroupRuleProtocolTcpudp-error", common.GetComponentInfo())
 		}
+	} else if discValue == "vrrp" {
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleProtocolIndividual)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleProtocolIndividual-error", common.GetComponentInfo())
+		}
 	} else {
-		errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
-		err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// errMsg := fmt.Sprintf("unrecognized value for discriminator property 'protocol': %s", discValue)
+		// err = core.SDKErrorf(err, errMsg, "invalid-discriminator", common.GetComponentInfo())
+		// Fallback to base SecurityGroupRule for unknown protocols
+		err = core.UnmarshalModel(m, "", result, UnmarshalSecurityGroupRuleGeneric)
+		if err != nil {
+			err = core.SDKErrorf(err, "", "unmarshal-SecurityGroupRuleGeneric-error", common.GetComponentInfo())
+		}
 	}
+	return
+}
+
+// UnmarshalSecurityGroupRuleGeneric unmarshals the base SecurityGroupRule fields for unknown protocol types
+func UnmarshalSecurityGroupRuleGeneric(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRule)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocal)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+
+	// Attempt to unmarshal optional fields - ignore errors as these may not be present
+	_ = core.UnmarshalPrimitive(m, "code", &obj.Code)
+	_ = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	_ = core.UnmarshalPrimitive(m, "port_max", &obj.PortMax)
+	_ = core.UnmarshalPrimitive(m, "port_min", &obj.PortMin)
+
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
 	return
 }
 
@@ -92625,6 +98280,9 @@ type SecurityGroupRulePatch struct {
 	// local IP addresses, for outbound rules).
 	Local SecurityGroupRuleLocalPatchIntf `json:"local,omitempty"`
 
+	// The name for this security group rule. The name must not be used by another rule in the security group.
+	Name *string `json:"name,omitempty"`
+
 	// The inclusive upper bound of the protocol destination port range. If set, `port_min` must also be set, and must not
 	// be larger.
 	//
@@ -92689,6 +98347,11 @@ func UnmarshalSecurityGroupRulePatch(m map[string]json.RawMessage, result interf
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalPrimitive(m, "port_max", &obj.PortMax)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "port_max-error", common.GetComponentInfo())
@@ -92728,6 +98391,9 @@ func (securityGroupRulePatch *SecurityGroupRulePatch) AsPatch() (_patch map[stri
 	if !core.IsNil(securityGroupRulePatch.Local) {
 		_patch["local"] = securityGroupRulePatch.Local.asPatch()
 	}
+	if !core.IsNil(securityGroupRulePatch.Name) {
+		_patch["name"] = securityGroupRulePatch.Name
+	}
 	if !core.IsNil(securityGroupRulePatch.PortMax) {
 		_patch["port_max"] = securityGroupRulePatch.PortMax
 	}
@@ -92746,9 +98412,11 @@ func (securityGroupRulePatch *SecurityGroupRulePatch) AsPatch() (_patch map[stri
 
 // SecurityGroupRulePrototype : SecurityGroupRulePrototype struct
 // Models which "extend" this model:
-// - SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll
+// - SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype
+// - SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype
 // - SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmp
 // - SecurityGroupRulePrototypeSecurityGroupRuleProtocolTcpudp
+// - SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype
 type SecurityGroupRulePrototype struct {
 	// The direction of traffic to allow.
 	Direction *string `json:"direction" validate:"required"`
@@ -92766,6 +98434,10 @@ type SecurityGroupRulePrototype struct {
 	// If unspecified, a CIDR block of `0.0.0.0/0` will be used to allow traffic to all local IP
 	// addresses (or from all local IP addresses, for outbound rules).
 	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
 
 	// The network protocol.
 	Protocol *string `json:"protocol" validate:"required"`
@@ -92821,10 +98493,264 @@ const (
 // Constants associated with the SecurityGroupRulePrototype.Protocol property.
 // The network protocol.
 const (
-	SecurityGroupRulePrototypeProtocolAllConst  = "all"
-	SecurityGroupRulePrototypeProtocolIcmpConst = "icmp"
-	SecurityGroupRulePrototypeProtocolTCPConst  = "tcp"
-	SecurityGroupRulePrototypeProtocolUDPConst  = "udp"
+	SecurityGroupRulePrototypeProtocolAhConst         = "ah"
+	SecurityGroupRulePrototypeProtocolAnyConst        = "any"
+	SecurityGroupRulePrototypeProtocolEspConst        = "esp"
+	SecurityGroupRulePrototypeProtocolGreConst        = "gre"
+	SecurityGroupRulePrototypeProtocolIPInIPConst     = "ip_in_ip"
+	SecurityGroupRulePrototypeProtocolIcmpConst       = "icmp"
+	SecurityGroupRulePrototypeProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+	SecurityGroupRulePrototypeProtocolL2tpConst       = "l2tp"
+	SecurityGroupRulePrototypeProtocolNumber0Const    = "number_0"
+	SecurityGroupRulePrototypeProtocolNumber10Const   = "number_10"
+	SecurityGroupRulePrototypeProtocolNumber100Const  = "number_100"
+	SecurityGroupRulePrototypeProtocolNumber101Const  = "number_101"
+	SecurityGroupRulePrototypeProtocolNumber102Const  = "number_102"
+	SecurityGroupRulePrototypeProtocolNumber103Const  = "number_103"
+	SecurityGroupRulePrototypeProtocolNumber104Const  = "number_104"
+	SecurityGroupRulePrototypeProtocolNumber105Const  = "number_105"
+	SecurityGroupRulePrototypeProtocolNumber106Const  = "number_106"
+	SecurityGroupRulePrototypeProtocolNumber107Const  = "number_107"
+	SecurityGroupRulePrototypeProtocolNumber108Const  = "number_108"
+	SecurityGroupRulePrototypeProtocolNumber109Const  = "number_109"
+	SecurityGroupRulePrototypeProtocolNumber11Const   = "number_11"
+	SecurityGroupRulePrototypeProtocolNumber110Const  = "number_110"
+	SecurityGroupRulePrototypeProtocolNumber111Const  = "number_111"
+	SecurityGroupRulePrototypeProtocolNumber113Const  = "number_113"
+	SecurityGroupRulePrototypeProtocolNumber114Const  = "number_114"
+	SecurityGroupRulePrototypeProtocolNumber116Const  = "number_116"
+	SecurityGroupRulePrototypeProtocolNumber117Const  = "number_117"
+	SecurityGroupRulePrototypeProtocolNumber118Const  = "number_118"
+	SecurityGroupRulePrototypeProtocolNumber119Const  = "number_119"
+	SecurityGroupRulePrototypeProtocolNumber12Const   = "number_12"
+	SecurityGroupRulePrototypeProtocolNumber120Const  = "number_120"
+	SecurityGroupRulePrototypeProtocolNumber121Const  = "number_121"
+	SecurityGroupRulePrototypeProtocolNumber122Const  = "number_122"
+	SecurityGroupRulePrototypeProtocolNumber123Const  = "number_123"
+	SecurityGroupRulePrototypeProtocolNumber124Const  = "number_124"
+	SecurityGroupRulePrototypeProtocolNumber125Const  = "number_125"
+	SecurityGroupRulePrototypeProtocolNumber126Const  = "number_126"
+	SecurityGroupRulePrototypeProtocolNumber127Const  = "number_127"
+	SecurityGroupRulePrototypeProtocolNumber128Const  = "number_128"
+	SecurityGroupRulePrototypeProtocolNumber129Const  = "number_129"
+	SecurityGroupRulePrototypeProtocolNumber13Const   = "number_13"
+	SecurityGroupRulePrototypeProtocolNumber130Const  = "number_130"
+	SecurityGroupRulePrototypeProtocolNumber131Const  = "number_131"
+	SecurityGroupRulePrototypeProtocolNumber133Const  = "number_133"
+	SecurityGroupRulePrototypeProtocolNumber134Const  = "number_134"
+	SecurityGroupRulePrototypeProtocolNumber135Const  = "number_135"
+	SecurityGroupRulePrototypeProtocolNumber136Const  = "number_136"
+	SecurityGroupRulePrototypeProtocolNumber137Const  = "number_137"
+	SecurityGroupRulePrototypeProtocolNumber138Const  = "number_138"
+	SecurityGroupRulePrototypeProtocolNumber139Const  = "number_139"
+	SecurityGroupRulePrototypeProtocolNumber14Const   = "number_14"
+	SecurityGroupRulePrototypeProtocolNumber140Const  = "number_140"
+	SecurityGroupRulePrototypeProtocolNumber141Const  = "number_141"
+	SecurityGroupRulePrototypeProtocolNumber142Const  = "number_142"
+	SecurityGroupRulePrototypeProtocolNumber143Const  = "number_143"
+	SecurityGroupRulePrototypeProtocolNumber144Const  = "number_144"
+	SecurityGroupRulePrototypeProtocolNumber145Const  = "number_145"
+	SecurityGroupRulePrototypeProtocolNumber146Const  = "number_146"
+	SecurityGroupRulePrototypeProtocolNumber147Const  = "number_147"
+	SecurityGroupRulePrototypeProtocolNumber148Const  = "number_148"
+	SecurityGroupRulePrototypeProtocolNumber149Const  = "number_149"
+	SecurityGroupRulePrototypeProtocolNumber15Const   = "number_15"
+	SecurityGroupRulePrototypeProtocolNumber150Const  = "number_150"
+	SecurityGroupRulePrototypeProtocolNumber151Const  = "number_151"
+	SecurityGroupRulePrototypeProtocolNumber152Const  = "number_152"
+	SecurityGroupRulePrototypeProtocolNumber153Const  = "number_153"
+	SecurityGroupRulePrototypeProtocolNumber154Const  = "number_154"
+	SecurityGroupRulePrototypeProtocolNumber155Const  = "number_155"
+	SecurityGroupRulePrototypeProtocolNumber156Const  = "number_156"
+	SecurityGroupRulePrototypeProtocolNumber157Const  = "number_157"
+	SecurityGroupRulePrototypeProtocolNumber158Const  = "number_158"
+	SecurityGroupRulePrototypeProtocolNumber159Const  = "number_159"
+	SecurityGroupRulePrototypeProtocolNumber16Const   = "number_16"
+	SecurityGroupRulePrototypeProtocolNumber160Const  = "number_160"
+	SecurityGroupRulePrototypeProtocolNumber161Const  = "number_161"
+	SecurityGroupRulePrototypeProtocolNumber162Const  = "number_162"
+	SecurityGroupRulePrototypeProtocolNumber163Const  = "number_163"
+	SecurityGroupRulePrototypeProtocolNumber164Const  = "number_164"
+	SecurityGroupRulePrototypeProtocolNumber165Const  = "number_165"
+	SecurityGroupRulePrototypeProtocolNumber166Const  = "number_166"
+	SecurityGroupRulePrototypeProtocolNumber167Const  = "number_167"
+	SecurityGroupRulePrototypeProtocolNumber168Const  = "number_168"
+	SecurityGroupRulePrototypeProtocolNumber169Const  = "number_169"
+	SecurityGroupRulePrototypeProtocolNumber170Const  = "number_170"
+	SecurityGroupRulePrototypeProtocolNumber171Const  = "number_171"
+	SecurityGroupRulePrototypeProtocolNumber172Const  = "number_172"
+	SecurityGroupRulePrototypeProtocolNumber173Const  = "number_173"
+	SecurityGroupRulePrototypeProtocolNumber174Const  = "number_174"
+	SecurityGroupRulePrototypeProtocolNumber175Const  = "number_175"
+	SecurityGroupRulePrototypeProtocolNumber176Const  = "number_176"
+	SecurityGroupRulePrototypeProtocolNumber177Const  = "number_177"
+	SecurityGroupRulePrototypeProtocolNumber178Const  = "number_178"
+	SecurityGroupRulePrototypeProtocolNumber179Const  = "number_179"
+	SecurityGroupRulePrototypeProtocolNumber18Const   = "number_18"
+	SecurityGroupRulePrototypeProtocolNumber180Const  = "number_180"
+	SecurityGroupRulePrototypeProtocolNumber181Const  = "number_181"
+	SecurityGroupRulePrototypeProtocolNumber182Const  = "number_182"
+	SecurityGroupRulePrototypeProtocolNumber183Const  = "number_183"
+	SecurityGroupRulePrototypeProtocolNumber184Const  = "number_184"
+	SecurityGroupRulePrototypeProtocolNumber185Const  = "number_185"
+	SecurityGroupRulePrototypeProtocolNumber186Const  = "number_186"
+	SecurityGroupRulePrototypeProtocolNumber187Const  = "number_187"
+	SecurityGroupRulePrototypeProtocolNumber188Const  = "number_188"
+	SecurityGroupRulePrototypeProtocolNumber189Const  = "number_189"
+	SecurityGroupRulePrototypeProtocolNumber19Const   = "number_19"
+	SecurityGroupRulePrototypeProtocolNumber190Const  = "number_190"
+	SecurityGroupRulePrototypeProtocolNumber191Const  = "number_191"
+	SecurityGroupRulePrototypeProtocolNumber192Const  = "number_192"
+	SecurityGroupRulePrototypeProtocolNumber193Const  = "number_193"
+	SecurityGroupRulePrototypeProtocolNumber194Const  = "number_194"
+	SecurityGroupRulePrototypeProtocolNumber195Const  = "number_195"
+	SecurityGroupRulePrototypeProtocolNumber196Const  = "number_196"
+	SecurityGroupRulePrototypeProtocolNumber197Const  = "number_197"
+	SecurityGroupRulePrototypeProtocolNumber198Const  = "number_198"
+	SecurityGroupRulePrototypeProtocolNumber199Const  = "number_199"
+	SecurityGroupRulePrototypeProtocolNumber2Const    = "number_2"
+	SecurityGroupRulePrototypeProtocolNumber20Const   = "number_20"
+	SecurityGroupRulePrototypeProtocolNumber200Const  = "number_200"
+	SecurityGroupRulePrototypeProtocolNumber201Const  = "number_201"
+	SecurityGroupRulePrototypeProtocolNumber202Const  = "number_202"
+	SecurityGroupRulePrototypeProtocolNumber203Const  = "number_203"
+	SecurityGroupRulePrototypeProtocolNumber204Const  = "number_204"
+	SecurityGroupRulePrototypeProtocolNumber205Const  = "number_205"
+	SecurityGroupRulePrototypeProtocolNumber206Const  = "number_206"
+	SecurityGroupRulePrototypeProtocolNumber207Const  = "number_207"
+	SecurityGroupRulePrototypeProtocolNumber208Const  = "number_208"
+	SecurityGroupRulePrototypeProtocolNumber209Const  = "number_209"
+	SecurityGroupRulePrototypeProtocolNumber21Const   = "number_21"
+	SecurityGroupRulePrototypeProtocolNumber210Const  = "number_210"
+	SecurityGroupRulePrototypeProtocolNumber211Const  = "number_211"
+	SecurityGroupRulePrototypeProtocolNumber212Const  = "number_212"
+	SecurityGroupRulePrototypeProtocolNumber213Const  = "number_213"
+	SecurityGroupRulePrototypeProtocolNumber214Const  = "number_214"
+	SecurityGroupRulePrototypeProtocolNumber215Const  = "number_215"
+	SecurityGroupRulePrototypeProtocolNumber216Const  = "number_216"
+	SecurityGroupRulePrototypeProtocolNumber217Const  = "number_217"
+	SecurityGroupRulePrototypeProtocolNumber218Const  = "number_218"
+	SecurityGroupRulePrototypeProtocolNumber219Const  = "number_219"
+	SecurityGroupRulePrototypeProtocolNumber22Const   = "number_22"
+	SecurityGroupRulePrototypeProtocolNumber220Const  = "number_220"
+	SecurityGroupRulePrototypeProtocolNumber221Const  = "number_221"
+	SecurityGroupRulePrototypeProtocolNumber222Const  = "number_222"
+	SecurityGroupRulePrototypeProtocolNumber223Const  = "number_223"
+	SecurityGroupRulePrototypeProtocolNumber224Const  = "number_224"
+	SecurityGroupRulePrototypeProtocolNumber225Const  = "number_225"
+	SecurityGroupRulePrototypeProtocolNumber226Const  = "number_226"
+	SecurityGroupRulePrototypeProtocolNumber227Const  = "number_227"
+	SecurityGroupRulePrototypeProtocolNumber228Const  = "number_228"
+	SecurityGroupRulePrototypeProtocolNumber229Const  = "number_229"
+	SecurityGroupRulePrototypeProtocolNumber23Const   = "number_23"
+	SecurityGroupRulePrototypeProtocolNumber230Const  = "number_230"
+	SecurityGroupRulePrototypeProtocolNumber231Const  = "number_231"
+	SecurityGroupRulePrototypeProtocolNumber232Const  = "number_232"
+	SecurityGroupRulePrototypeProtocolNumber233Const  = "number_233"
+	SecurityGroupRulePrototypeProtocolNumber234Const  = "number_234"
+	SecurityGroupRulePrototypeProtocolNumber235Const  = "number_235"
+	SecurityGroupRulePrototypeProtocolNumber236Const  = "number_236"
+	SecurityGroupRulePrototypeProtocolNumber237Const  = "number_237"
+	SecurityGroupRulePrototypeProtocolNumber238Const  = "number_238"
+	SecurityGroupRulePrototypeProtocolNumber239Const  = "number_239"
+	SecurityGroupRulePrototypeProtocolNumber24Const   = "number_24"
+	SecurityGroupRulePrototypeProtocolNumber240Const  = "number_240"
+	SecurityGroupRulePrototypeProtocolNumber241Const  = "number_241"
+	SecurityGroupRulePrototypeProtocolNumber242Const  = "number_242"
+	SecurityGroupRulePrototypeProtocolNumber243Const  = "number_243"
+	SecurityGroupRulePrototypeProtocolNumber244Const  = "number_244"
+	SecurityGroupRulePrototypeProtocolNumber245Const  = "number_245"
+	SecurityGroupRulePrototypeProtocolNumber246Const  = "number_246"
+	SecurityGroupRulePrototypeProtocolNumber247Const  = "number_247"
+	SecurityGroupRulePrototypeProtocolNumber248Const  = "number_248"
+	SecurityGroupRulePrototypeProtocolNumber249Const  = "number_249"
+	SecurityGroupRulePrototypeProtocolNumber25Const   = "number_25"
+	SecurityGroupRulePrototypeProtocolNumber250Const  = "number_250"
+	SecurityGroupRulePrototypeProtocolNumber251Const  = "number_251"
+	SecurityGroupRulePrototypeProtocolNumber252Const  = "number_252"
+	SecurityGroupRulePrototypeProtocolNumber253Const  = "number_253"
+	SecurityGroupRulePrototypeProtocolNumber254Const  = "number_254"
+	SecurityGroupRulePrototypeProtocolNumber255Const  = "number_255"
+	SecurityGroupRulePrototypeProtocolNumber26Const   = "number_26"
+	SecurityGroupRulePrototypeProtocolNumber27Const   = "number_27"
+	SecurityGroupRulePrototypeProtocolNumber28Const   = "number_28"
+	SecurityGroupRulePrototypeProtocolNumber29Const   = "number_29"
+	SecurityGroupRulePrototypeProtocolNumber3Const    = "number_3"
+	SecurityGroupRulePrototypeProtocolNumber30Const   = "number_30"
+	SecurityGroupRulePrototypeProtocolNumber31Const   = "number_31"
+	SecurityGroupRulePrototypeProtocolNumber32Const   = "number_32"
+	SecurityGroupRulePrototypeProtocolNumber33Const   = "number_33"
+	SecurityGroupRulePrototypeProtocolNumber34Const   = "number_34"
+	SecurityGroupRulePrototypeProtocolNumber35Const   = "number_35"
+	SecurityGroupRulePrototypeProtocolNumber36Const   = "number_36"
+	SecurityGroupRulePrototypeProtocolNumber37Const   = "number_37"
+	SecurityGroupRulePrototypeProtocolNumber38Const   = "number_38"
+	SecurityGroupRulePrototypeProtocolNumber39Const   = "number_39"
+	SecurityGroupRulePrototypeProtocolNumber40Const   = "number_40"
+	SecurityGroupRulePrototypeProtocolNumber41Const   = "number_41"
+	SecurityGroupRulePrototypeProtocolNumber42Const   = "number_42"
+	SecurityGroupRulePrototypeProtocolNumber43Const   = "number_43"
+	SecurityGroupRulePrototypeProtocolNumber44Const   = "number_44"
+	SecurityGroupRulePrototypeProtocolNumber45Const   = "number_45"
+	SecurityGroupRulePrototypeProtocolNumber48Const   = "number_48"
+	SecurityGroupRulePrototypeProtocolNumber49Const   = "number_49"
+	SecurityGroupRulePrototypeProtocolNumber5Const    = "number_5"
+	SecurityGroupRulePrototypeProtocolNumber52Const   = "number_52"
+	SecurityGroupRulePrototypeProtocolNumber53Const   = "number_53"
+	SecurityGroupRulePrototypeProtocolNumber54Const   = "number_54"
+	SecurityGroupRulePrototypeProtocolNumber55Const   = "number_55"
+	SecurityGroupRulePrototypeProtocolNumber56Const   = "number_56"
+	SecurityGroupRulePrototypeProtocolNumber57Const   = "number_57"
+	SecurityGroupRulePrototypeProtocolNumber58Const   = "number_58"
+	SecurityGroupRulePrototypeProtocolNumber59Const   = "number_59"
+	SecurityGroupRulePrototypeProtocolNumber60Const   = "number_60"
+	SecurityGroupRulePrototypeProtocolNumber61Const   = "number_61"
+	SecurityGroupRulePrototypeProtocolNumber62Const   = "number_62"
+	SecurityGroupRulePrototypeProtocolNumber63Const   = "number_63"
+	SecurityGroupRulePrototypeProtocolNumber64Const   = "number_64"
+	SecurityGroupRulePrototypeProtocolNumber65Const   = "number_65"
+	SecurityGroupRulePrototypeProtocolNumber66Const   = "number_66"
+	SecurityGroupRulePrototypeProtocolNumber67Const   = "number_67"
+	SecurityGroupRulePrototypeProtocolNumber68Const   = "number_68"
+	SecurityGroupRulePrototypeProtocolNumber69Const   = "number_69"
+	SecurityGroupRulePrototypeProtocolNumber7Const    = "number_7"
+	SecurityGroupRulePrototypeProtocolNumber70Const   = "number_70"
+	SecurityGroupRulePrototypeProtocolNumber71Const   = "number_71"
+	SecurityGroupRulePrototypeProtocolNumber72Const   = "number_72"
+	SecurityGroupRulePrototypeProtocolNumber73Const   = "number_73"
+	SecurityGroupRulePrototypeProtocolNumber74Const   = "number_74"
+	SecurityGroupRulePrototypeProtocolNumber75Const   = "number_75"
+	SecurityGroupRulePrototypeProtocolNumber76Const   = "number_76"
+	SecurityGroupRulePrototypeProtocolNumber77Const   = "number_77"
+	SecurityGroupRulePrototypeProtocolNumber78Const   = "number_78"
+	SecurityGroupRulePrototypeProtocolNumber79Const   = "number_79"
+	SecurityGroupRulePrototypeProtocolNumber8Const    = "number_8"
+	SecurityGroupRulePrototypeProtocolNumber80Const   = "number_80"
+	SecurityGroupRulePrototypeProtocolNumber81Const   = "number_81"
+	SecurityGroupRulePrototypeProtocolNumber82Const   = "number_82"
+	SecurityGroupRulePrototypeProtocolNumber83Const   = "number_83"
+	SecurityGroupRulePrototypeProtocolNumber84Const   = "number_84"
+	SecurityGroupRulePrototypeProtocolNumber85Const   = "number_85"
+	SecurityGroupRulePrototypeProtocolNumber86Const   = "number_86"
+	SecurityGroupRulePrototypeProtocolNumber87Const   = "number_87"
+	SecurityGroupRulePrototypeProtocolNumber88Const   = "number_88"
+	SecurityGroupRulePrototypeProtocolNumber89Const   = "number_89"
+	SecurityGroupRulePrototypeProtocolNumber9Const    = "number_9"
+	SecurityGroupRulePrototypeProtocolNumber90Const   = "number_90"
+	SecurityGroupRulePrototypeProtocolNumber91Const   = "number_91"
+	SecurityGroupRulePrototypeProtocolNumber92Const   = "number_92"
+	SecurityGroupRulePrototypeProtocolNumber93Const   = "number_93"
+	SecurityGroupRulePrototypeProtocolNumber94Const   = "number_94"
+	SecurityGroupRulePrototypeProtocolNumber95Const   = "number_95"
+	SecurityGroupRulePrototypeProtocolNumber96Const   = "number_96"
+	SecurityGroupRulePrototypeProtocolNumber97Const   = "number_97"
+	SecurityGroupRulePrototypeProtocolNumber98Const   = "number_98"
+	SecurityGroupRulePrototypeProtocolNumber99Const   = "number_99"
+	SecurityGroupRulePrototypeProtocolRsvpConst       = "rsvp"
+	SecurityGroupRulePrototypeProtocolSctpConst       = "sctp"
+	SecurityGroupRulePrototypeProtocolTCPConst        = "tcp"
+	SecurityGroupRulePrototypeProtocolUDPConst        = "udp"
+	SecurityGroupRulePrototypeProtocolVrrpConst       = "vrrp"
 )
 
 func (*SecurityGroupRulePrototype) isaSecurityGroupRulePrototype() bool {
@@ -92851,6 +98777,11 @@ func UnmarshalSecurityGroupRulePrototype(m map[string]json.RawMessage, result in
 	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocalPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
@@ -103283,8 +109214,8 @@ func UnmarshalVpcdns(m map[string]json.RawMessage, result interface{}) (err erro
 type VpcdnsPatch struct {
 	// Indicates whether this VPC is enabled as a DNS name resolution hub.
 	//
-	// Updating the value to `true` requires `allow_dns_resolution_binding` to be `true` for all endpoint gateways residing
-	// in this VPC.
+	// Updating the value to `true` requires `dns_resolution_binding_mode` be set to `primary` for all endpoint gateways
+	// residing in this VPC.
 	//
 	// Changing the value requires `dns.resolution_binding_count` to be zero.
 	EnableHub *bool `json:"enable_hub,omitempty"`
@@ -103355,8 +109286,9 @@ type VpcdnsResolutionBinding struct {
 	// The date and time that the DNS resolution binding was created.
 	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
 
-	// The endpoint gateways that have `allow_dns_resolution_binding` set to `true` and reside in the VPC that has
-	// `dns.enable_hub` set to `false`.
+	// The endpoint gateways that have `dns_resolution_binding_mode` set to either `primary` or `per_resource_binding` and
+	// reside in the VPC that has `dns.enable_hub` set to
+	// `false`.
 	//
 	// The endpoint gateways may be remote and therefore may not be directly retrievable.
 	EndpointGateways []EndpointGatewayReferenceRemote `json:"endpoint_gateways" validate:"required"`
@@ -124995,6 +130927,43 @@ func UnmarshalInstanceProfilePortSpeedFixed(m map[string]json.RawMessage, result
 	return
 }
 
+// InstanceProfileVcpuBurstLimitFixed : The permitted value for VCPU burst limit percentage for an instance with this profile.
+// This model "extends" InstanceProfileVcpuBurstLimit
+type InstanceProfileVcpuBurstLimitFixed struct {
+	// The type for this profile field.
+	Type *string `json:"type" validate:"required"`
+
+	// The value for this profile field.
+	Value *int64 `json:"value" validate:"required"`
+}
+
+// Constants associated with the InstanceProfileVcpuBurstLimitFixed.Type property.
+// The type for this profile field.
+const (
+	InstanceProfileVcpuBurstLimitFixedTypeFixedConst = "fixed"
+)
+
+func (*InstanceProfileVcpuBurstLimitFixed) isaInstanceProfileVcpuBurstLimit() bool {
+	return true
+}
+
+// UnmarshalInstanceProfileVcpuBurstLimitFixed unmarshals an instance of InstanceProfileVcpuBurstLimitFixed from the specified map of raw messages.
+func UnmarshalInstanceProfileVcpuBurstLimitFixed(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(InstanceProfileVcpuBurstLimitFixed)
+	err = core.UnmarshalPrimitive(m, "type", &obj.Type)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "value", &obj.Value)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "value-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // InstanceProfileVcpuDependent : The VCPU count for an instance with this profile depends on its configuration.
 // This model "extends" InstanceProfileVcpu
 type InstanceProfileVcpuDependent struct {
@@ -125582,6 +131551,8 @@ type InstancePrototypeInstanceByCatalogOffering struct {
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
 
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
+
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
 
@@ -125731,6 +131702,11 @@ func UnmarshalInstancePrototypeInstanceByCatalogOffering(m map[string]json.RawMe
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -125859,6 +131835,8 @@ type InstancePrototypeInstanceByImage struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -126003,6 +131981,11 @@ func UnmarshalInstancePrototypeInstanceByImage(m map[string]json.RawMessage, res
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -126129,6 +132112,8 @@ type InstancePrototypeInstanceBySourceSnapshot struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -126270,6 +132255,11 @@ func UnmarshalInstancePrototypeInstanceBySourceSnapshot(m map[string]json.RawMes
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -126394,6 +132384,8 @@ type InstancePrototypeInstanceBySourceTemplate struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -126555,6 +132547,11 @@ func UnmarshalInstancePrototypeInstanceBySourceTemplate(m map[string]json.RawMes
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -126691,6 +132688,8 @@ type InstancePrototypeInstanceByVolume struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -126830,6 +132829,11 @@ func UnmarshalInstancePrototypeInstanceByVolume(m map[string]json.RawMessage, re
 	err = core.UnmarshalPrimitive(m, "user_data", &obj.UserData)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
@@ -127087,6 +133091,8 @@ type InstanceTemplatePrototypeInstanceTemplateByCatalogOffering struct {
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
 
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
+
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
 
@@ -127236,6 +133242,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByCatalogOffering(m map[s
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -127362,6 +133373,8 @@ type InstanceTemplatePrototypeInstanceTemplateByImage struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -127506,6 +133519,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByImage(m map[string]json
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -127630,6 +133648,8 @@ type InstanceTemplatePrototypeInstanceTemplateBySourceSnapshot struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -127771,6 +133791,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateBySourceSnapshot(m map[st
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -127893,6 +133918,8 @@ type InstanceTemplatePrototypeInstanceTemplateBySourceTemplate struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -128054,6 +134081,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateBySourceTemplate(m map[st
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -128200,6 +134232,8 @@ type InstanceTemplateInstanceByCatalogOfferingInstanceTemplateContext struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -128370,6 +134404,11 @@ func UnmarshalInstanceTemplateInstanceByCatalogOfferingInstanceTemplateContext(m
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -128506,6 +134545,8 @@ type InstanceTemplateInstanceByImageInstanceTemplateContext struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -128670,6 +134711,11 @@ func UnmarshalInstanceTemplateInstanceByImageInstanceTemplateContext(m map[strin
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -128806,6 +134852,8 @@ type InstanceTemplateInstanceBySourceSnapshotInstanceTemplateContext struct {
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -128965,6 +135013,11 @@ func UnmarshalInstanceTemplateInstanceBySourceSnapshotInstanceTemplateContext(m 
 	err = core.UnmarshalPrimitive(m, "user_data", &obj.UserData)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
@@ -132065,9 +138118,9 @@ func UnmarshalNetworkACLRuleBeforePrototypeNetworkACLRuleIdentityByID(m map[stri
 	return
 }
 
-// NetworkACLRuleItemNetworkACLRuleProtocolAll : A rule for ICMP, TCP and UDP traffic.
+// NetworkACLRuleItemNetworkACLRuleProtocolAny : NetworkACLRuleItemNetworkACLRuleProtocolAny struct
 // This model "extends" NetworkACLRuleItem
-type NetworkACLRuleItemNetworkACLRuleProtocolAll struct {
+type NetworkACLRuleItemNetworkACLRuleProtocolAny struct {
 	// The action to perform for a packet matching the rule.
 	Action *string `json:"action" validate:"required"`
 
@@ -132103,39 +138156,39 @@ type NetworkACLRuleItemNetworkACLRuleProtocolAll struct {
 	Protocol *string `json:"protocol" validate:"required"`
 }
 
-// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAll.Action property.
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAny.Action property.
 // The action to perform for a packet matching the rule.
 const (
-	NetworkACLRuleItemNetworkACLRuleProtocolAllActionAllowConst = "allow"
-	NetworkACLRuleItemNetworkACLRuleProtocolAllActionDenyConst  = "deny"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyActionAllowConst = "allow"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyActionDenyConst  = "deny"
 )
 
-// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAll.Direction property.
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAny.Direction property.
 // The direction of traffic to match.
 const (
-	NetworkACLRuleItemNetworkACLRuleProtocolAllDirectionInboundConst  = "inbound"
-	NetworkACLRuleItemNetworkACLRuleProtocolAllDirectionOutboundConst = "outbound"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyDirectionInboundConst  = "inbound"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyDirectionOutboundConst = "outbound"
 )
 
-// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAll.IPVersion property.
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAny.IPVersion property.
 // The IP version for this rule.
 const (
-	NetworkACLRuleItemNetworkACLRuleProtocolAllIPVersionIpv4Const = "ipv4"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyIPVersionIpv4Const = "ipv4"
 )
 
-// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAll.Protocol property.
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolAny.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRuleItemNetworkACLRuleProtocolAllProtocolAllConst = "all"
+	NetworkACLRuleItemNetworkACLRuleProtocolAnyProtocolAnyConst = "any"
 )
 
-func (*NetworkACLRuleItemNetworkACLRuleProtocolAll) isaNetworkACLRuleItem() bool {
+func (*NetworkACLRuleItemNetworkACLRuleProtocolAny) isaNetworkACLRuleItem() bool {
 	return true
 }
 
-// UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAll unmarshals an instance of NetworkACLRuleItemNetworkACLRuleProtocolAll from the specified map of raw messages.
-func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAll(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(NetworkACLRuleItemNetworkACLRuleProtocolAll)
+// UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAny unmarshals an instance of NetworkACLRuleItemNetworkACLRuleProtocolAny from the specified map of raw messages.
+func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolAny(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleItemNetworkACLRuleProtocolAny)
 	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
@@ -132345,6 +138398,544 @@ func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIcmp(m map[string]json.Raw
 	return
 }
 
+// NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp : NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp struct
+// This model "extends" NetworkACLRuleItem
+type NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp struct {
+	// The action to perform for a packet matching the rule.
+	Action *string `json:"action" validate:"required"`
+
+	// The rule that this rule is immediately before. In a rule collection, this always refers to the next item in the
+	// collection. If absent, this is the last rule.
+	Before *NetworkACLRuleReference `json:"before,omitempty"`
+
+	// The date and time that the rule was created.
+	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this network ACL rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this network ACL rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	// The name for this network ACL rule. The name is unique across all rules for the network ACL.
+	Name *string `json:"name" validate:"required"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp.Action property.
+// The action to perform for a packet matching the rule.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpActionAllowConst = "allow"
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpDirectionInboundConst  = "inbound"
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp.Protocol property.
+// The network protocol.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudpProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+func (*NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp) isaNetworkACLRuleItem() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp unmarshals an instance of NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp from the specified map of raw messages.
+func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleItemNetworkACLRuleProtocolIcmptcpudp)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// NetworkACLRuleItemNetworkACLRuleProtocolIndividual : NetworkACLRuleItemNetworkACLRuleProtocolIndividual struct
+// This model "extends" NetworkACLRuleItem
+type NetworkACLRuleItemNetworkACLRuleProtocolIndividual struct {
+	// The action to perform for a packet matching the rule.
+	Action *string `json:"action" validate:"required"`
+
+	// The rule that this rule is immediately before. In a rule collection, this always refers to the next item in the
+	// collection. If absent, this is the last rule.
+	Before *NetworkACLRuleReference `json:"before,omitempty"`
+
+	// The date and time that the rule was created.
+	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this network ACL rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this network ACL rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	// The name for this network ACL rule. The name is unique across all rules for the network ACL.
+	Name *string `json:"name" validate:"required"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIndividual.Action property.
+// The action to perform for a packet matching the rule.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualActionAllowConst = "allow"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIndividual.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualDirectionInboundConst  = "inbound"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIndividual.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRuleItemNetworkACLRuleProtocolIndividual.Protocol property.
+// The network protocol.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolAhConst        = "ah"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolEspConst       = "esp"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolGreConst       = "gre"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolIPInIPConst    = "ip_in_ip"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolL2tpConst      = "l2tp"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber0Const   = "number_0"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber10Const  = "number_10"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber100Const = "number_100"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber101Const = "number_101"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber102Const = "number_102"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber103Const = "number_103"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber104Const = "number_104"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber105Const = "number_105"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber106Const = "number_106"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber107Const = "number_107"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber108Const = "number_108"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber109Const = "number_109"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber11Const  = "number_11"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber110Const = "number_110"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber111Const = "number_111"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber113Const = "number_113"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber114Const = "number_114"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber116Const = "number_116"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber117Const = "number_117"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber118Const = "number_118"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber119Const = "number_119"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber12Const  = "number_12"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber120Const = "number_120"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber121Const = "number_121"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber122Const = "number_122"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber123Const = "number_123"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber124Const = "number_124"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber125Const = "number_125"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber126Const = "number_126"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber127Const = "number_127"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber128Const = "number_128"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber129Const = "number_129"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber13Const  = "number_13"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber130Const = "number_130"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber131Const = "number_131"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber133Const = "number_133"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber134Const = "number_134"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber135Const = "number_135"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber136Const = "number_136"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber137Const = "number_137"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber138Const = "number_138"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber139Const = "number_139"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber14Const  = "number_14"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber140Const = "number_140"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber141Const = "number_141"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber142Const = "number_142"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber143Const = "number_143"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber144Const = "number_144"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber145Const = "number_145"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber146Const = "number_146"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber147Const = "number_147"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber148Const = "number_148"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber149Const = "number_149"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber15Const  = "number_15"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber150Const = "number_150"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber151Const = "number_151"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber152Const = "number_152"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber153Const = "number_153"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber154Const = "number_154"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber155Const = "number_155"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber156Const = "number_156"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber157Const = "number_157"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber158Const = "number_158"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber159Const = "number_159"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber16Const  = "number_16"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber160Const = "number_160"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber161Const = "number_161"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber162Const = "number_162"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber163Const = "number_163"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber164Const = "number_164"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber165Const = "number_165"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber166Const = "number_166"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber167Const = "number_167"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber168Const = "number_168"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber169Const = "number_169"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber170Const = "number_170"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber171Const = "number_171"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber172Const = "number_172"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber173Const = "number_173"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber174Const = "number_174"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber175Const = "number_175"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber176Const = "number_176"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber177Const = "number_177"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber178Const = "number_178"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber179Const = "number_179"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber18Const  = "number_18"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber180Const = "number_180"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber181Const = "number_181"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber182Const = "number_182"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber183Const = "number_183"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber184Const = "number_184"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber185Const = "number_185"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber186Const = "number_186"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber187Const = "number_187"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber188Const = "number_188"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber189Const = "number_189"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber19Const  = "number_19"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber190Const = "number_190"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber191Const = "number_191"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber192Const = "number_192"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber193Const = "number_193"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber194Const = "number_194"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber195Const = "number_195"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber196Const = "number_196"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber197Const = "number_197"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber198Const = "number_198"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber199Const = "number_199"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber2Const   = "number_2"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber20Const  = "number_20"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber200Const = "number_200"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber201Const = "number_201"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber202Const = "number_202"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber203Const = "number_203"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber204Const = "number_204"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber205Const = "number_205"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber206Const = "number_206"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber207Const = "number_207"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber208Const = "number_208"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber209Const = "number_209"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber21Const  = "number_21"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber210Const = "number_210"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber211Const = "number_211"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber212Const = "number_212"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber213Const = "number_213"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber214Const = "number_214"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber215Const = "number_215"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber216Const = "number_216"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber217Const = "number_217"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber218Const = "number_218"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber219Const = "number_219"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber22Const  = "number_22"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber220Const = "number_220"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber221Const = "number_221"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber222Const = "number_222"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber223Const = "number_223"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber224Const = "number_224"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber225Const = "number_225"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber226Const = "number_226"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber227Const = "number_227"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber228Const = "number_228"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber229Const = "number_229"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber23Const  = "number_23"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber230Const = "number_230"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber231Const = "number_231"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber232Const = "number_232"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber233Const = "number_233"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber234Const = "number_234"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber235Const = "number_235"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber236Const = "number_236"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber237Const = "number_237"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber238Const = "number_238"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber239Const = "number_239"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber24Const  = "number_24"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber240Const = "number_240"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber241Const = "number_241"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber242Const = "number_242"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber243Const = "number_243"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber244Const = "number_244"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber245Const = "number_245"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber246Const = "number_246"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber247Const = "number_247"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber248Const = "number_248"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber249Const = "number_249"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber25Const  = "number_25"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber250Const = "number_250"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber251Const = "number_251"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber252Const = "number_252"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber253Const = "number_253"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber254Const = "number_254"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber255Const = "number_255"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber26Const  = "number_26"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber27Const  = "number_27"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber28Const  = "number_28"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber29Const  = "number_29"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber3Const   = "number_3"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber30Const  = "number_30"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber31Const  = "number_31"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber32Const  = "number_32"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber33Const  = "number_33"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber34Const  = "number_34"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber35Const  = "number_35"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber36Const  = "number_36"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber37Const  = "number_37"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber38Const  = "number_38"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber39Const  = "number_39"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber40Const  = "number_40"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber41Const  = "number_41"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber42Const  = "number_42"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber43Const  = "number_43"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber44Const  = "number_44"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber45Const  = "number_45"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber48Const  = "number_48"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber49Const  = "number_49"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber5Const   = "number_5"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber52Const  = "number_52"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber53Const  = "number_53"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber54Const  = "number_54"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber55Const  = "number_55"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber56Const  = "number_56"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber57Const  = "number_57"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber58Const  = "number_58"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber59Const  = "number_59"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber60Const  = "number_60"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber61Const  = "number_61"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber62Const  = "number_62"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber63Const  = "number_63"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber64Const  = "number_64"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber65Const  = "number_65"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber66Const  = "number_66"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber67Const  = "number_67"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber68Const  = "number_68"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber69Const  = "number_69"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber7Const   = "number_7"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber70Const  = "number_70"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber71Const  = "number_71"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber72Const  = "number_72"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber73Const  = "number_73"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber74Const  = "number_74"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber75Const  = "number_75"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber76Const  = "number_76"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber77Const  = "number_77"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber78Const  = "number_78"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber79Const  = "number_79"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber8Const   = "number_8"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber80Const  = "number_80"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber81Const  = "number_81"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber82Const  = "number_82"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber83Const  = "number_83"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber84Const  = "number_84"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber85Const  = "number_85"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber86Const  = "number_86"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber87Const  = "number_87"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber88Const  = "number_88"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber89Const  = "number_89"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber9Const   = "number_9"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber90Const  = "number_90"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber91Const  = "number_91"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber92Const  = "number_92"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber93Const  = "number_93"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber94Const  = "number_94"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber95Const  = "number_95"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber96Const  = "number_96"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber97Const  = "number_97"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber98Const  = "number_98"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolNumber99Const  = "number_99"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolRsvpConst      = "rsvp"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolSctpConst      = "sctp"
+	NetworkACLRuleItemNetworkACLRuleProtocolIndividualProtocolVrrpConst      = "vrrp"
+)
+
+func (*NetworkACLRuleItemNetworkACLRuleProtocolIndividual) isaNetworkACLRuleItem() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual unmarshals an instance of NetworkACLRuleItemNetworkACLRuleProtocolIndividual from the specified map of raw messages.
+func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolIndividual(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleItemNetworkACLRuleProtocolIndividual)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // NetworkACLRuleItemNetworkACLRuleProtocolTcpudp : A rule for TCP or UDP traffic.
 // This model "extends" NetworkACLRuleItem
 type NetworkACLRuleItemNetworkACLRuleProtocolTcpudp struct {
@@ -132508,10 +139099,12 @@ func UnmarshalNetworkACLRuleItemNetworkACLRuleProtocolTcpudp(m map[string]json.R
 	return
 }
 
-// NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype : A rule for ICMP, TCP and UDP traffic.
+// NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype : NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype struct
 // This model "extends" NetworkACLRulePrototypeNetworkACLContext
-type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype struct {
+type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
@@ -132534,35 +139127,37 @@ type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype 
 	Protocol *string `json:"protocol" validate:"required"`
 }
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype.Action property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeActionAllowConst = "allow"
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeActionDenyConst  = "deny"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeActionDenyConst  = "deny"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype.Direction property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype.Direction property.
 // The direction of traffic to match.
 const (
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeDirectionInboundConst  = "inbound"
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeDirectionOutboundConst = "outbound"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeDirectionOutboundConst = "outbound"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype.IPVersion property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype.IPVersion property.
 // The IP version for this rule.
 const (
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeIPVersionIpv4Const = "ipv4"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeIPVersionIpv4Const = "ipv4"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype.Protocol property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototypeProtocolAllConst = "all"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototypeProtocolAnyConst = "any"
 )
 
-// NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype : Instantiate NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype (Generic Model Constructor)
-func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype, err error) {
-	_model = &NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype{
+// NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype : Instantiate NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype{
 		Action:      core.StringPtr(action),
 		Destination: core.StringPtr(destination),
 		Direction:   core.StringPtr(direction),
@@ -132576,13 +139171,13 @@ func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolA
 	return
 }
 
-func (*NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype) isaNetworkACLRulePrototypeNetworkACLContext() bool {
+func (*NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype) isaNetworkACLRulePrototypeNetworkACLContext() bool {
 	return true
 }
 
-// UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype from the specified map of raw messages.
-func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllPrototype)
+// UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAnyPrototype)
 	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
@@ -132626,6 +139221,8 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolAllP
 // This model "extends" NetworkACLRulePrototypeNetworkACLContext
 type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
@@ -132660,6 +139257,8 @@ type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototype
 
 // Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototypeActionAllowConst = "allow"
 	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmpPrototypeActionDenyConst  = "deny"
@@ -132756,10 +139355,526 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmp
 	return
 }
 
+// NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype : NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype struct
+// This model "extends" NetworkACLRulePrototypeNetworkACLContext
+type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype struct {
+	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+	Action *string `json:"action" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	// The name for this network ACL rule. The name must not be used by another rule for the network ACL. If unspecified,
+	// the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype.Action property.
+// The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype.Protocol property.
+// The network protocol.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototypeProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+// NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype : Instantiate NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype{
+		Action:      core.StringPtr(action),
+		Destination: core.StringPtr(destination),
+		Direction:   core.StringPtr(direction),
+		Source:      core.StringPtr(source),
+		Protocol:    core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype) isaNetworkACLRulePrototypeNetworkACLContext() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIcmptcpudpPrototype)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype : NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype struct
+// This model "extends" NetworkACLRulePrototypeNetworkACLContext
+type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype struct {
+	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+	Action *string `json:"action" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	// The name for this network ACL rule. The name must not be used by another rule for the network ACL. If unspecified,
+	// the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype.Action property.
+// The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype.Protocol property.
+// The network protocol.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolAhConst        = "ah"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolEspConst       = "esp"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolGreConst       = "gre"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolIPInIPConst    = "ip_in_ip"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolL2tpConst      = "l2tp"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber0Const   = "number_0"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber10Const  = "number_10"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber100Const = "number_100"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber101Const = "number_101"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber102Const = "number_102"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber103Const = "number_103"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber104Const = "number_104"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber105Const = "number_105"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber106Const = "number_106"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber107Const = "number_107"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber108Const = "number_108"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber109Const = "number_109"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber11Const  = "number_11"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber110Const = "number_110"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber111Const = "number_111"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber113Const = "number_113"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber114Const = "number_114"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber116Const = "number_116"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber117Const = "number_117"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber118Const = "number_118"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber119Const = "number_119"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber12Const  = "number_12"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber120Const = "number_120"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber121Const = "number_121"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber122Const = "number_122"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber123Const = "number_123"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber124Const = "number_124"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber125Const = "number_125"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber126Const = "number_126"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber127Const = "number_127"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber128Const = "number_128"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber129Const = "number_129"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber13Const  = "number_13"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber130Const = "number_130"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber131Const = "number_131"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber133Const = "number_133"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber134Const = "number_134"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber135Const = "number_135"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber136Const = "number_136"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber137Const = "number_137"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber138Const = "number_138"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber139Const = "number_139"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber14Const  = "number_14"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber140Const = "number_140"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber141Const = "number_141"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber142Const = "number_142"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber143Const = "number_143"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber144Const = "number_144"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber145Const = "number_145"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber146Const = "number_146"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber147Const = "number_147"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber148Const = "number_148"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber149Const = "number_149"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber15Const  = "number_15"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber150Const = "number_150"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber151Const = "number_151"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber152Const = "number_152"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber153Const = "number_153"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber154Const = "number_154"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber155Const = "number_155"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber156Const = "number_156"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber157Const = "number_157"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber158Const = "number_158"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber159Const = "number_159"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber16Const  = "number_16"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber160Const = "number_160"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber161Const = "number_161"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber162Const = "number_162"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber163Const = "number_163"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber164Const = "number_164"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber165Const = "number_165"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber166Const = "number_166"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber167Const = "number_167"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber168Const = "number_168"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber169Const = "number_169"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber170Const = "number_170"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber171Const = "number_171"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber172Const = "number_172"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber173Const = "number_173"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber174Const = "number_174"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber175Const = "number_175"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber176Const = "number_176"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber177Const = "number_177"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber178Const = "number_178"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber179Const = "number_179"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber18Const  = "number_18"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber180Const = "number_180"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber181Const = "number_181"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber182Const = "number_182"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber183Const = "number_183"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber184Const = "number_184"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber185Const = "number_185"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber186Const = "number_186"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber187Const = "number_187"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber188Const = "number_188"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber189Const = "number_189"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber19Const  = "number_19"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber190Const = "number_190"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber191Const = "number_191"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber192Const = "number_192"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber193Const = "number_193"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber194Const = "number_194"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber195Const = "number_195"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber196Const = "number_196"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber197Const = "number_197"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber198Const = "number_198"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber199Const = "number_199"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber2Const   = "number_2"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber20Const  = "number_20"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber200Const = "number_200"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber201Const = "number_201"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber202Const = "number_202"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber203Const = "number_203"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber204Const = "number_204"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber205Const = "number_205"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber206Const = "number_206"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber207Const = "number_207"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber208Const = "number_208"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber209Const = "number_209"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber21Const  = "number_21"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber210Const = "number_210"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber211Const = "number_211"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber212Const = "number_212"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber213Const = "number_213"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber214Const = "number_214"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber215Const = "number_215"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber216Const = "number_216"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber217Const = "number_217"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber218Const = "number_218"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber219Const = "number_219"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber22Const  = "number_22"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber220Const = "number_220"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber221Const = "number_221"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber222Const = "number_222"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber223Const = "number_223"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber224Const = "number_224"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber225Const = "number_225"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber226Const = "number_226"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber227Const = "number_227"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber228Const = "number_228"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber229Const = "number_229"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber23Const  = "number_23"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber230Const = "number_230"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber231Const = "number_231"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber232Const = "number_232"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber233Const = "number_233"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber234Const = "number_234"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber235Const = "number_235"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber236Const = "number_236"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber237Const = "number_237"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber238Const = "number_238"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber239Const = "number_239"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber24Const  = "number_24"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber240Const = "number_240"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber241Const = "number_241"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber242Const = "number_242"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber243Const = "number_243"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber244Const = "number_244"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber245Const = "number_245"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber246Const = "number_246"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber247Const = "number_247"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber248Const = "number_248"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber249Const = "number_249"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber25Const  = "number_25"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber250Const = "number_250"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber251Const = "number_251"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber252Const = "number_252"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber253Const = "number_253"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber254Const = "number_254"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber255Const = "number_255"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber26Const  = "number_26"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber27Const  = "number_27"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber28Const  = "number_28"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber29Const  = "number_29"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber3Const   = "number_3"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber30Const  = "number_30"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber31Const  = "number_31"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber32Const  = "number_32"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber33Const  = "number_33"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber34Const  = "number_34"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber35Const  = "number_35"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber36Const  = "number_36"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber37Const  = "number_37"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber38Const  = "number_38"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber39Const  = "number_39"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber40Const  = "number_40"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber41Const  = "number_41"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber42Const  = "number_42"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber43Const  = "number_43"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber44Const  = "number_44"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber45Const  = "number_45"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber48Const  = "number_48"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber49Const  = "number_49"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber5Const   = "number_5"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber52Const  = "number_52"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber53Const  = "number_53"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber54Const  = "number_54"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber55Const  = "number_55"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber56Const  = "number_56"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber57Const  = "number_57"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber58Const  = "number_58"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber59Const  = "number_59"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber60Const  = "number_60"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber61Const  = "number_61"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber62Const  = "number_62"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber63Const  = "number_63"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber64Const  = "number_64"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber65Const  = "number_65"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber66Const  = "number_66"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber67Const  = "number_67"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber68Const  = "number_68"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber69Const  = "number_69"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber7Const   = "number_7"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber70Const  = "number_70"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber71Const  = "number_71"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber72Const  = "number_72"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber73Const  = "number_73"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber74Const  = "number_74"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber75Const  = "number_75"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber76Const  = "number_76"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber77Const  = "number_77"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber78Const  = "number_78"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber79Const  = "number_79"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber8Const   = "number_8"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber80Const  = "number_80"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber81Const  = "number_81"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber82Const  = "number_82"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber83Const  = "number_83"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber84Const  = "number_84"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber85Const  = "number_85"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber86Const  = "number_86"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber87Const  = "number_87"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber88Const  = "number_88"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber89Const  = "number_89"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber9Const   = "number_9"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber90Const  = "number_90"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber91Const  = "number_91"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber92Const  = "number_92"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber93Const  = "number_93"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber94Const  = "number_94"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber95Const  = "number_95"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber96Const  = "number_96"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber97Const  = "number_97"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber98Const  = "number_98"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolNumber99Const  = "number_99"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolRsvpConst      = "rsvp"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolSctpConst      = "sctp"
+	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototypeProtocolVrrpConst      = "vrrp"
+)
+
+// NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype : Instantiate NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype{
+		Action:      core.StringPtr(action),
+		Destination: core.StringPtr(destination),
+		Direction:   core.StringPtr(direction),
+		Source:      core.StringPtr(source),
+		Protocol:    core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype) isaNetworkACLRulePrototypeNetworkACLContext() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolIndividualPrototype)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototype : A rule for TCP or UDP traffic.
 // This model "extends" NetworkACLRulePrototypeNetworkACLContext
 type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
@@ -132808,6 +139923,8 @@ type NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototy
 
 // Constants associated with the NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototypeActionAllowConst = "allow"
 	NetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpudpPrototypeActionDenyConst  = "deny"
@@ -132915,10 +140032,12 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLContextNetworkACLRuleProtocolTcpu
 	return
 }
 
-// NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype : A rule for ICMP, TCP and UDP traffic.
+// NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype : NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype struct
 // This model "extends" NetworkACLRulePrototype
-type NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype struct {
+type NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	Before NetworkACLRuleBeforePrototypeIntf `json:"before,omitempty"`
@@ -132943,35 +140062,37 @@ type NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype struct {
 	Protocol *string `json:"protocol" validate:"required"`
 }
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype.Action property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeActionAllowConst = "allow"
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeActionDenyConst  = "deny"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeActionDenyConst  = "deny"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype.Direction property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype.Direction property.
 // The direction of traffic to match.
 const (
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeDirectionInboundConst  = "inbound"
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeDirectionOutboundConst = "outbound"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeDirectionOutboundConst = "outbound"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype.IPVersion property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype.IPVersion property.
 // The IP version for this rule.
 const (
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeIPVersionIpv4Const = "ipv4"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeIPVersionIpv4Const = "ipv4"
 )
 
-// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype.Protocol property.
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototypeProtocolAllConst = "all"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototypeProtocolAnyConst = "any"
 )
 
-// NewNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype : Instantiate NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype (Generic Model Constructor)
-func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype, err error) {
-	_model = &NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype{
+// NewNetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype : Instantiate NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype{
 		Action:      core.StringPtr(action),
 		Destination: core.StringPtr(destination),
 		Direction:   core.StringPtr(direction),
@@ -132985,13 +140106,13 @@ func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype(actio
 	return
 }
 
-func (*NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype) isaNetworkACLRulePrototype() bool {
+func (*NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype) isaNetworkACLRulePrototype() bool {
 	return true
 }
 
-// UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype from the specified map of raw messages.
-func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(NetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype)
+// UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLRuleProtocolAnyPrototype)
 	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
@@ -133040,6 +140161,8 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolAllPrototype(m map[st
 // This model "extends" NetworkACLRulePrototype
 type NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	Before NetworkACLRuleBeforePrototypeIntf `json:"before,omitempty"`
@@ -133076,6 +140199,8 @@ type NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototype struct {
 
 // Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototypeActionAllowConst = "allow"
 	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototypeActionDenyConst  = "deny"
@@ -133177,10 +140302,540 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolIcmpPrototype(m map[s
 	return
 }
 
+// NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype : NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype struct
+// This model "extends" NetworkACLRulePrototype
+type NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype struct {
+	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+	Action *string `json:"action" validate:"required"`
+
+	Before NetworkACLRuleBeforePrototypeIntf `json:"before,omitempty"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	// The name for this network ACL rule. The name must not be used by another rule for the network ACL. If unspecified,
+	// the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype.Action property.
+// The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype.Protocol property.
+// The network protocol.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototypeProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+// NewNetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype : Instantiate NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype{
+		Action:      core.StringPtr(action),
+		Destination: core.StringPtr(destination),
+		Direction:   core.StringPtr(direction),
+		Source:      core.StringPtr(source),
+		Protocol:    core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype) isaNetworkACLRulePrototype() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLRuleProtocolIcmptcpudpPrototype)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleBeforePrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype : NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype struct
+// This model "extends" NetworkACLRulePrototype
+type NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype struct {
+	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+	Action *string `json:"action" validate:"required"`
+
+	Before NetworkACLRuleBeforePrototypeIntf `json:"before,omitempty"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	// The name for this network ACL rule. The name must not be used by another rule for the network ACL. If unspecified,
+	// the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype.Action property.
+// The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeActionAllowConst = "allow"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeDirectionInboundConst  = "inbound"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype.Protocol property.
+// The network protocol.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolAhConst        = "ah"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolEspConst       = "esp"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolGreConst       = "gre"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolIPInIPConst    = "ip_in_ip"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolL2tpConst      = "l2tp"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber0Const   = "number_0"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber10Const  = "number_10"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber100Const = "number_100"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber101Const = "number_101"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber102Const = "number_102"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber103Const = "number_103"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber104Const = "number_104"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber105Const = "number_105"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber106Const = "number_106"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber107Const = "number_107"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber108Const = "number_108"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber109Const = "number_109"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber11Const  = "number_11"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber110Const = "number_110"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber111Const = "number_111"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber113Const = "number_113"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber114Const = "number_114"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber116Const = "number_116"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber117Const = "number_117"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber118Const = "number_118"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber119Const = "number_119"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber12Const  = "number_12"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber120Const = "number_120"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber121Const = "number_121"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber122Const = "number_122"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber123Const = "number_123"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber124Const = "number_124"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber125Const = "number_125"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber126Const = "number_126"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber127Const = "number_127"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber128Const = "number_128"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber129Const = "number_129"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber13Const  = "number_13"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber130Const = "number_130"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber131Const = "number_131"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber133Const = "number_133"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber134Const = "number_134"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber135Const = "number_135"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber136Const = "number_136"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber137Const = "number_137"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber138Const = "number_138"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber139Const = "number_139"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber14Const  = "number_14"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber140Const = "number_140"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber141Const = "number_141"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber142Const = "number_142"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber143Const = "number_143"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber144Const = "number_144"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber145Const = "number_145"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber146Const = "number_146"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber147Const = "number_147"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber148Const = "number_148"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber149Const = "number_149"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber15Const  = "number_15"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber150Const = "number_150"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber151Const = "number_151"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber152Const = "number_152"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber153Const = "number_153"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber154Const = "number_154"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber155Const = "number_155"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber156Const = "number_156"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber157Const = "number_157"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber158Const = "number_158"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber159Const = "number_159"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber16Const  = "number_16"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber160Const = "number_160"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber161Const = "number_161"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber162Const = "number_162"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber163Const = "number_163"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber164Const = "number_164"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber165Const = "number_165"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber166Const = "number_166"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber167Const = "number_167"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber168Const = "number_168"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber169Const = "number_169"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber170Const = "number_170"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber171Const = "number_171"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber172Const = "number_172"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber173Const = "number_173"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber174Const = "number_174"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber175Const = "number_175"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber176Const = "number_176"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber177Const = "number_177"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber178Const = "number_178"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber179Const = "number_179"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber18Const  = "number_18"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber180Const = "number_180"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber181Const = "number_181"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber182Const = "number_182"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber183Const = "number_183"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber184Const = "number_184"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber185Const = "number_185"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber186Const = "number_186"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber187Const = "number_187"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber188Const = "number_188"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber189Const = "number_189"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber19Const  = "number_19"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber190Const = "number_190"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber191Const = "number_191"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber192Const = "number_192"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber193Const = "number_193"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber194Const = "number_194"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber195Const = "number_195"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber196Const = "number_196"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber197Const = "number_197"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber198Const = "number_198"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber199Const = "number_199"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber2Const   = "number_2"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber20Const  = "number_20"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber200Const = "number_200"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber201Const = "number_201"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber202Const = "number_202"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber203Const = "number_203"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber204Const = "number_204"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber205Const = "number_205"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber206Const = "number_206"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber207Const = "number_207"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber208Const = "number_208"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber209Const = "number_209"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber21Const  = "number_21"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber210Const = "number_210"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber211Const = "number_211"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber212Const = "number_212"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber213Const = "number_213"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber214Const = "number_214"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber215Const = "number_215"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber216Const = "number_216"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber217Const = "number_217"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber218Const = "number_218"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber219Const = "number_219"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber22Const  = "number_22"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber220Const = "number_220"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber221Const = "number_221"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber222Const = "number_222"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber223Const = "number_223"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber224Const = "number_224"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber225Const = "number_225"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber226Const = "number_226"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber227Const = "number_227"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber228Const = "number_228"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber229Const = "number_229"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber23Const  = "number_23"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber230Const = "number_230"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber231Const = "number_231"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber232Const = "number_232"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber233Const = "number_233"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber234Const = "number_234"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber235Const = "number_235"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber236Const = "number_236"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber237Const = "number_237"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber238Const = "number_238"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber239Const = "number_239"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber24Const  = "number_24"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber240Const = "number_240"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber241Const = "number_241"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber242Const = "number_242"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber243Const = "number_243"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber244Const = "number_244"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber245Const = "number_245"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber246Const = "number_246"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber247Const = "number_247"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber248Const = "number_248"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber249Const = "number_249"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber25Const  = "number_25"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber250Const = "number_250"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber251Const = "number_251"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber252Const = "number_252"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber253Const = "number_253"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber254Const = "number_254"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber255Const = "number_255"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber26Const  = "number_26"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber27Const  = "number_27"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber28Const  = "number_28"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber29Const  = "number_29"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber3Const   = "number_3"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber30Const  = "number_30"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber31Const  = "number_31"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber32Const  = "number_32"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber33Const  = "number_33"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber34Const  = "number_34"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber35Const  = "number_35"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber36Const  = "number_36"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber37Const  = "number_37"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber38Const  = "number_38"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber39Const  = "number_39"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber40Const  = "number_40"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber41Const  = "number_41"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber42Const  = "number_42"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber43Const  = "number_43"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber44Const  = "number_44"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber45Const  = "number_45"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber48Const  = "number_48"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber49Const  = "number_49"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber5Const   = "number_5"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber52Const  = "number_52"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber53Const  = "number_53"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber54Const  = "number_54"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber55Const  = "number_55"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber56Const  = "number_56"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber57Const  = "number_57"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber58Const  = "number_58"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber59Const  = "number_59"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber60Const  = "number_60"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber61Const  = "number_61"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber62Const  = "number_62"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber63Const  = "number_63"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber64Const  = "number_64"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber65Const  = "number_65"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber66Const  = "number_66"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber67Const  = "number_67"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber68Const  = "number_68"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber69Const  = "number_69"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber7Const   = "number_7"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber70Const  = "number_70"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber71Const  = "number_71"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber72Const  = "number_72"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber73Const  = "number_73"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber74Const  = "number_74"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber75Const  = "number_75"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber76Const  = "number_76"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber77Const  = "number_77"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber78Const  = "number_78"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber79Const  = "number_79"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber8Const   = "number_8"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber80Const  = "number_80"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber81Const  = "number_81"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber82Const  = "number_82"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber83Const  = "number_83"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber84Const  = "number_84"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber85Const  = "number_85"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber86Const  = "number_86"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber87Const  = "number_87"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber88Const  = "number_88"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber89Const  = "number_89"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber9Const   = "number_9"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber90Const  = "number_90"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber91Const  = "number_91"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber92Const  = "number_92"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber93Const  = "number_93"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber94Const  = "number_94"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber95Const  = "number_95"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber96Const  = "number_96"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber97Const  = "number_97"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber98Const  = "number_98"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolNumber99Const  = "number_99"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolRsvpConst      = "rsvp"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolSctpConst      = "sctp"
+	NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototypeProtocolVrrpConst      = "vrrp"
+)
+
+// NewNetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype : Instantiate NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype (Generic Model Constructor)
+func (*VpcV1) NewNetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype(action string, destination string, direction string, source string, protocol string) (_model *NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype, err error) {
+	_model = &NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype{
+		Action:      core.StringPtr(action),
+		Destination: core.StringPtr(destination),
+		Direction:   core.StringPtr(direction),
+		Source:      core.StringPtr(source),
+		Protocol:    core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype) isaNetworkACLRulePrototype() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype unmarshals an instance of NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype from the specified map of raw messages.
+func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRulePrototypeNetworkACLRuleProtocolIndividualPrototype)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleBeforePrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype : A rule for TCP or UDP traffic.
 // This model "extends" NetworkACLRulePrototype
 type NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype struct {
 	// The action to perform for a packet matching the rule.
+	//
+	// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 	Action *string `json:"action" validate:"required"`
 
 	Before NetworkACLRuleBeforePrototypeIntf `json:"before,omitempty"`
@@ -133231,6 +140886,8 @@ type NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype struct {
 
 // Constants associated with the NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype.Action property.
 // The action to perform for a packet matching the rule.
+//
+// Must not be `deny` if `protocol` is `icmp_tcp_udp`.
 const (
 	NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototypeActionAllowConst = "allow"
 	NetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototypeActionDenyConst  = "deny"
@@ -133343,9 +141000,9 @@ func UnmarshalNetworkACLRulePrototypeNetworkACLRuleProtocolTcpudpPrototype(m map
 	return
 }
 
-// NetworkACLRuleNetworkACLRuleProtocolAll : A rule for ICMP, TCP and UDP traffic.
+// NetworkACLRuleNetworkACLRuleProtocolAny : NetworkACLRuleNetworkACLRuleProtocolAny struct
 // This model "extends" NetworkACLRule
-type NetworkACLRuleNetworkACLRuleProtocolAll struct {
+type NetworkACLRuleNetworkACLRuleProtocolAny struct {
 	// The action to perform for a packet matching the rule.
 	Action *string `json:"action" validate:"required"`
 
@@ -133380,39 +141037,39 @@ type NetworkACLRuleNetworkACLRuleProtocolAll struct {
 	Protocol *string `json:"protocol" validate:"required"`
 }
 
-// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAll.Action property.
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAny.Action property.
 // The action to perform for a packet matching the rule.
 const (
-	NetworkACLRuleNetworkACLRuleProtocolAllActionAllowConst = "allow"
-	NetworkACLRuleNetworkACLRuleProtocolAllActionDenyConst  = "deny"
+	NetworkACLRuleNetworkACLRuleProtocolAnyActionAllowConst = "allow"
+	NetworkACLRuleNetworkACLRuleProtocolAnyActionDenyConst  = "deny"
 )
 
-// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAll.Direction property.
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAny.Direction property.
 // The direction of traffic to match.
 const (
-	NetworkACLRuleNetworkACLRuleProtocolAllDirectionInboundConst  = "inbound"
-	NetworkACLRuleNetworkACLRuleProtocolAllDirectionOutboundConst = "outbound"
+	NetworkACLRuleNetworkACLRuleProtocolAnyDirectionInboundConst  = "inbound"
+	NetworkACLRuleNetworkACLRuleProtocolAnyDirectionOutboundConst = "outbound"
 )
 
-// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAll.IPVersion property.
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAny.IPVersion property.
 // The IP version for this rule.
 const (
-	NetworkACLRuleNetworkACLRuleProtocolAllIPVersionIpv4Const = "ipv4"
+	NetworkACLRuleNetworkACLRuleProtocolAnyIPVersionIpv4Const = "ipv4"
 )
 
-// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAll.Protocol property.
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolAny.Protocol property.
 // The network protocol.
 const (
-	NetworkACLRuleNetworkACLRuleProtocolAllProtocolAllConst = "all"
+	NetworkACLRuleNetworkACLRuleProtocolAnyProtocolAnyConst = "any"
 )
 
-func (*NetworkACLRuleNetworkACLRuleProtocolAll) isaNetworkACLRule() bool {
+func (*NetworkACLRuleNetworkACLRuleProtocolAny) isaNetworkACLRule() bool {
 	return true
 }
 
-// UnmarshalNetworkACLRuleNetworkACLRuleProtocolAll unmarshals an instance of NetworkACLRuleNetworkACLRuleProtocolAll from the specified map of raw messages.
-func UnmarshalNetworkACLRuleNetworkACLRuleProtocolAll(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(NetworkACLRuleNetworkACLRuleProtocolAll)
+// UnmarshalNetworkACLRuleNetworkACLRuleProtocolAny unmarshals an instance of NetworkACLRuleNetworkACLRuleProtocolAny from the specified map of raw messages.
+func UnmarshalNetworkACLRuleNetworkACLRuleProtocolAny(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleNetworkACLRuleProtocolAny)
 	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
@@ -133615,6 +141272,542 @@ func UnmarshalNetworkACLRuleNetworkACLRuleProtocolIcmp(m map[string]json.RawMess
 	err = core.UnmarshalPrimitive(m, "type", &obj.Type)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "type-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp : NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp struct
+// This model "extends" NetworkACLRule
+type NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp struct {
+	// The action to perform for a packet matching the rule.
+	Action *string `json:"action" validate:"required"`
+
+	// The rule that this rule is immediately before. If absent, this is the last rule.
+	Before *NetworkACLRuleReference `json:"before,omitempty"`
+
+	// The date and time that the rule was created.
+	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this network ACL rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this network ACL rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	// The name for this network ACL rule. The name is unique across all rules for the network ACL.
+	Name *string `json:"name" validate:"required"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp.Action property.
+// The action to perform for a packet matching the rule.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpActionAllowConst = "allow"
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpDirectionInboundConst  = "inbound"
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp.Protocol property.
+// The network protocol.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIcmptcpudpProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+func (*NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp) isaNetworkACLRule() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRuleNetworkACLRuleProtocolIcmptcpudp unmarshals an instance of NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp from the specified map of raw messages.
+func UnmarshalNetworkACLRuleNetworkACLRuleProtocolIcmptcpudp(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleNetworkACLRuleProtocolIcmptcpudp)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// NetworkACLRuleNetworkACLRuleProtocolIndividual : NetworkACLRuleNetworkACLRuleProtocolIndividual struct
+// This model "extends" NetworkACLRule
+type NetworkACLRuleNetworkACLRuleProtocolIndividual struct {
+	// The action to perform for a packet matching the rule.
+	Action *string `json:"action" validate:"required"`
+
+	// The rule that this rule is immediately before. If absent, this is the last rule.
+	Before *NetworkACLRuleReference `json:"before,omitempty"`
+
+	// The date and time that the rule was created.
+	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
+
+	// The destination IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all destination addresses.
+	Destination *string `json:"destination" validate:"required"`
+
+	// The direction of traffic to match.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this network ACL rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this network ACL rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version for this rule.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	// The name for this network ACL rule. The name is unique across all rules for the network ACL.
+	Name *string `json:"name" validate:"required"`
+
+	// The source IP address or CIDR block to match. The CIDR block `0.0.0.0/0` matches all source addresses.
+	Source *string `json:"source" validate:"required"`
+
+	// The network protocol.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIndividual.Action property.
+// The action to perform for a packet matching the rule.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIndividualActionAllowConst = "allow"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualActionDenyConst  = "deny"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIndividual.Direction property.
+// The direction of traffic to match.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIndividualDirectionInboundConst  = "inbound"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIndividual.IPVersion property.
+// The IP version for this rule.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIndividualIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the NetworkACLRuleNetworkACLRuleProtocolIndividual.Protocol property.
+// The network protocol.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolAhConst        = "ah"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolEspConst       = "esp"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolGreConst       = "gre"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolIPInIPConst    = "ip_in_ip"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolL2tpConst      = "l2tp"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber0Const   = "number_0"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber10Const  = "number_10"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber100Const = "number_100"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber101Const = "number_101"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber102Const = "number_102"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber103Const = "number_103"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber104Const = "number_104"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber105Const = "number_105"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber106Const = "number_106"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber107Const = "number_107"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber108Const = "number_108"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber109Const = "number_109"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber11Const  = "number_11"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber110Const = "number_110"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber111Const = "number_111"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber113Const = "number_113"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber114Const = "number_114"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber116Const = "number_116"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber117Const = "number_117"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber118Const = "number_118"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber119Const = "number_119"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber12Const  = "number_12"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber120Const = "number_120"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber121Const = "number_121"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber122Const = "number_122"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber123Const = "number_123"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber124Const = "number_124"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber125Const = "number_125"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber126Const = "number_126"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber127Const = "number_127"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber128Const = "number_128"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber129Const = "number_129"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber13Const  = "number_13"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber130Const = "number_130"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber131Const = "number_131"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber133Const = "number_133"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber134Const = "number_134"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber135Const = "number_135"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber136Const = "number_136"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber137Const = "number_137"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber138Const = "number_138"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber139Const = "number_139"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber14Const  = "number_14"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber140Const = "number_140"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber141Const = "number_141"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber142Const = "number_142"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber143Const = "number_143"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber144Const = "number_144"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber145Const = "number_145"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber146Const = "number_146"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber147Const = "number_147"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber148Const = "number_148"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber149Const = "number_149"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber15Const  = "number_15"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber150Const = "number_150"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber151Const = "number_151"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber152Const = "number_152"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber153Const = "number_153"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber154Const = "number_154"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber155Const = "number_155"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber156Const = "number_156"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber157Const = "number_157"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber158Const = "number_158"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber159Const = "number_159"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber16Const  = "number_16"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber160Const = "number_160"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber161Const = "number_161"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber162Const = "number_162"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber163Const = "number_163"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber164Const = "number_164"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber165Const = "number_165"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber166Const = "number_166"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber167Const = "number_167"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber168Const = "number_168"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber169Const = "number_169"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber170Const = "number_170"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber171Const = "number_171"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber172Const = "number_172"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber173Const = "number_173"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber174Const = "number_174"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber175Const = "number_175"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber176Const = "number_176"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber177Const = "number_177"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber178Const = "number_178"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber179Const = "number_179"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber18Const  = "number_18"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber180Const = "number_180"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber181Const = "number_181"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber182Const = "number_182"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber183Const = "number_183"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber184Const = "number_184"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber185Const = "number_185"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber186Const = "number_186"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber187Const = "number_187"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber188Const = "number_188"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber189Const = "number_189"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber19Const  = "number_19"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber190Const = "number_190"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber191Const = "number_191"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber192Const = "number_192"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber193Const = "number_193"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber194Const = "number_194"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber195Const = "number_195"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber196Const = "number_196"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber197Const = "number_197"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber198Const = "number_198"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber199Const = "number_199"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber2Const   = "number_2"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber20Const  = "number_20"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber200Const = "number_200"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber201Const = "number_201"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber202Const = "number_202"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber203Const = "number_203"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber204Const = "number_204"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber205Const = "number_205"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber206Const = "number_206"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber207Const = "number_207"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber208Const = "number_208"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber209Const = "number_209"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber21Const  = "number_21"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber210Const = "number_210"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber211Const = "number_211"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber212Const = "number_212"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber213Const = "number_213"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber214Const = "number_214"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber215Const = "number_215"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber216Const = "number_216"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber217Const = "number_217"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber218Const = "number_218"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber219Const = "number_219"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber22Const  = "number_22"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber220Const = "number_220"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber221Const = "number_221"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber222Const = "number_222"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber223Const = "number_223"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber224Const = "number_224"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber225Const = "number_225"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber226Const = "number_226"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber227Const = "number_227"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber228Const = "number_228"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber229Const = "number_229"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber23Const  = "number_23"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber230Const = "number_230"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber231Const = "number_231"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber232Const = "number_232"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber233Const = "number_233"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber234Const = "number_234"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber235Const = "number_235"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber236Const = "number_236"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber237Const = "number_237"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber238Const = "number_238"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber239Const = "number_239"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber24Const  = "number_24"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber240Const = "number_240"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber241Const = "number_241"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber242Const = "number_242"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber243Const = "number_243"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber244Const = "number_244"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber245Const = "number_245"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber246Const = "number_246"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber247Const = "number_247"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber248Const = "number_248"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber249Const = "number_249"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber25Const  = "number_25"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber250Const = "number_250"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber251Const = "number_251"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber252Const = "number_252"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber253Const = "number_253"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber254Const = "number_254"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber255Const = "number_255"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber26Const  = "number_26"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber27Const  = "number_27"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber28Const  = "number_28"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber29Const  = "number_29"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber3Const   = "number_3"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber30Const  = "number_30"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber31Const  = "number_31"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber32Const  = "number_32"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber33Const  = "number_33"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber34Const  = "number_34"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber35Const  = "number_35"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber36Const  = "number_36"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber37Const  = "number_37"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber38Const  = "number_38"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber39Const  = "number_39"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber40Const  = "number_40"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber41Const  = "number_41"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber42Const  = "number_42"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber43Const  = "number_43"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber44Const  = "number_44"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber45Const  = "number_45"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber48Const  = "number_48"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber49Const  = "number_49"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber5Const   = "number_5"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber52Const  = "number_52"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber53Const  = "number_53"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber54Const  = "number_54"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber55Const  = "number_55"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber56Const  = "number_56"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber57Const  = "number_57"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber58Const  = "number_58"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber59Const  = "number_59"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber60Const  = "number_60"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber61Const  = "number_61"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber62Const  = "number_62"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber63Const  = "number_63"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber64Const  = "number_64"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber65Const  = "number_65"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber66Const  = "number_66"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber67Const  = "number_67"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber68Const  = "number_68"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber69Const  = "number_69"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber7Const   = "number_7"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber70Const  = "number_70"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber71Const  = "number_71"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber72Const  = "number_72"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber73Const  = "number_73"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber74Const  = "number_74"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber75Const  = "number_75"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber76Const  = "number_76"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber77Const  = "number_77"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber78Const  = "number_78"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber79Const  = "number_79"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber8Const   = "number_8"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber80Const  = "number_80"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber81Const  = "number_81"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber82Const  = "number_82"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber83Const  = "number_83"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber84Const  = "number_84"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber85Const  = "number_85"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber86Const  = "number_86"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber87Const  = "number_87"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber88Const  = "number_88"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber89Const  = "number_89"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber9Const   = "number_9"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber90Const  = "number_90"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber91Const  = "number_91"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber92Const  = "number_92"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber93Const  = "number_93"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber94Const  = "number_94"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber95Const  = "number_95"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber96Const  = "number_96"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber97Const  = "number_97"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber98Const  = "number_98"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolNumber99Const  = "number_99"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolRsvpConst      = "rsvp"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolSctpConst      = "sctp"
+	NetworkACLRuleNetworkACLRuleProtocolIndividualProtocolVrrpConst      = "vrrp"
+)
+
+func (*NetworkACLRuleNetworkACLRuleProtocolIndividual) isaNetworkACLRule() bool {
+	return true
+}
+
+// UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual unmarshals an instance of NetworkACLRuleNetworkACLRuleProtocolIndividual from the specified map of raw messages.
+func UnmarshalNetworkACLRuleNetworkACLRuleProtocolIndividual(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(NetworkACLRuleNetworkACLRuleProtocolIndividual)
+	err = core.UnmarshalPrimitive(m, "action", &obj.Action)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "action-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "before", &obj.Before, UnmarshalNetworkACLRuleReference)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "before-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "created_at", &obj.CreatedAt)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "created_at-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "destination", &obj.Destination)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "destination-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "source", &obj.Source)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "source-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
 		return
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
@@ -135999,73 +144192,88 @@ func UnmarshalSecurityGroupRuleLocalIP(m map[string]json.RawMessage, result inte
 	return
 }
 
-// SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll : A rule allowing ICMP, TCP and UDP traffic.
-// This model "extends" SecurityGroupRulePrototype
-type SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll struct {
+// SecurityGroupRuleProtocolAny : A rule allowing traffic for any protocol.
+// This model "extends" SecurityGroupRule
+type SecurityGroupRuleProtocolAny struct {
 	// The direction of traffic to allow.
 	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this security group rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this security group rule.
+	ID *string `json:"id" validate:"required"`
 
 	// The IP version to allow. The format of `local.address`, `remote.address`,
 	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
 	//
 	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
 	// version.
-	IPVersion *string `json:"ip_version,omitempty"`
+	IPVersion *string `json:"ip_version" validate:"required"`
 
-	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
 
-	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
+	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
 
 	// The network protocol.
 	Protocol *string `json:"protocol" validate:"required"`
 }
 
-// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll.Direction property.
+// Constants associated with the SecurityGroupRuleProtocolAny.Direction property.
 // The direction of traffic to allow.
 const (
-	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAllDirectionInboundConst  = "inbound"
-	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAllDirectionOutboundConst = "outbound"
+	SecurityGroupRuleProtocolAnyDirectionInboundConst  = "inbound"
+	SecurityGroupRuleProtocolAnyDirectionOutboundConst = "outbound"
 )
 
-// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll.IPVersion property.
+// Constants associated with the SecurityGroupRuleProtocolAny.IPVersion property.
 // The IP version to allow. The format of `local.address`, `remote.address`,
 // `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
 //
 // If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
 // version.
 const (
-	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAllIPVersionIpv4Const = "ipv4"
+	SecurityGroupRuleProtocolAnyIPVersionIpv4Const = "ipv4"
 )
 
-// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll.Protocol property.
+// Constants associated with the SecurityGroupRuleProtocolAny.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleProtocolAnyResourceTypeSecurityGroupRuleConst = "security_group_rule"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolAny.Protocol property.
 // The network protocol.
 const (
-	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAllProtocolAllConst = "all"
+	SecurityGroupRuleProtocolAnyProtocolAnyConst = "any"
 )
 
-// NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolAll : Instantiate SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll (Generic Model Constructor)
-func (*VpcV1) NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolAll(direction string, protocol string) (_model *SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll, err error) {
-	_model = &SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll{
-		Direction: core.StringPtr(direction),
-		Protocol:  core.StringPtr(protocol),
-	}
-	err = core.ValidateStruct(_model, "required parameters")
-	if err != nil {
-		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
-	}
-	return
-}
-
-func (*SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll) isaSecurityGroupRulePrototype() bool {
+func (*SecurityGroupRuleProtocolAny) isaSecurityGroupRule() bool {
 	return true
 }
 
-// UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolAll unmarshals an instance of SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll from the specified map of raw messages.
-func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolAll(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(SecurityGroupRulePrototypeSecurityGroupRuleProtocolAll)
+// UnmarshalSecurityGroupRuleProtocolAny unmarshals an instance of SecurityGroupRuleProtocolAny from the specified map of raw messages.
+func UnmarshalSecurityGroupRuleProtocolAny(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRuleProtocolAny)
 	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
@@ -136073,14 +144281,538 @@ func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolAll(m map[strin
 		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
 		return
 	}
-	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocalPrototype)
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocal)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
-	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// SecurityGroupRuleProtocolIcmptcpudp : A rule allowing ICMP, TCP and UDP traffic.
+// This model "extends" SecurityGroupRule
+type SecurityGroupRuleProtocolIcmptcpudp struct {
+	// The direction of traffic to allow.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this security group rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this security group rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version to allow. The format of `local.address`, `remote.address`,
+	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+	//
+	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+	// version.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
+
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
+	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the SecurityGroupRuleProtocolIcmptcpudp.Direction property.
+// The direction of traffic to allow.
+const (
+	SecurityGroupRuleProtocolIcmptcpudpDirectionInboundConst  = "inbound"
+	SecurityGroupRuleProtocolIcmptcpudpDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIcmptcpudp.IPVersion property.
+// The IP version to allow. The format of `local.address`, `remote.address`,
+// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+//
+// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+// version.
+const (
+	SecurityGroupRuleProtocolIcmptcpudpIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIcmptcpudp.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleProtocolIcmptcpudpResourceTypeSecurityGroupRuleConst = "security_group_rule"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIcmptcpudp.Protocol property.
+// The network protocol.
+const (
+	SecurityGroupRuleProtocolIcmptcpudpProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+func (*SecurityGroupRuleProtocolIcmptcpudp) isaSecurityGroupRule() bool {
+	return true
+}
+
+// UnmarshalSecurityGroupRuleProtocolIcmptcpudp unmarshals an instance of SecurityGroupRuleProtocolIcmptcpudp from the specified map of raw messages.
+func UnmarshalSecurityGroupRuleProtocolIcmptcpudp(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRuleProtocolIcmptcpudp)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocal)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// SecurityGroupRuleProtocolIndividual : A rule allowing traffic for one protocol (other than ICMP, TCP or UDP).
+// This model "extends" SecurityGroupRule
+type SecurityGroupRuleProtocolIndividual struct {
+	// The direction of traffic to allow.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The URL for this security group rule.
+	Href *string `json:"href" validate:"required"`
+
+	// The unique identifier for this security group rule.
+	ID *string `json:"id" validate:"required"`
+
+	// The IP version to allow. The format of `local.address`, `remote.address`,
+	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+	//
+	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+	// version.
+	IPVersion *string `json:"ip_version" validate:"required"`
+
+	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
+
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
+	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
+
+	// The network protocol to allow.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the SecurityGroupRuleProtocolIndividual.Direction property.
+// The direction of traffic to allow.
+const (
+	SecurityGroupRuleProtocolIndividualDirectionInboundConst  = "inbound"
+	SecurityGroupRuleProtocolIndividualDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIndividual.IPVersion property.
+// The IP version to allow. The format of `local.address`, `remote.address`,
+// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+//
+// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+// version.
+const (
+	SecurityGroupRuleProtocolIndividualIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIndividual.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleProtocolIndividualResourceTypeSecurityGroupRuleConst = "security_group_rule"
+)
+
+// Constants associated with the SecurityGroupRuleProtocolIndividual.Protocol property.
+// The network protocol to allow.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	SecurityGroupRuleProtocolIndividualProtocolAhConst        = "ah"
+	SecurityGroupRuleProtocolIndividualProtocolEspConst       = "esp"
+	SecurityGroupRuleProtocolIndividualProtocolGreConst       = "gre"
+	SecurityGroupRuleProtocolIndividualProtocolIPInIPConst    = "ip_in_ip"
+	SecurityGroupRuleProtocolIndividualProtocolL2tpConst      = "l2tp"
+	SecurityGroupRuleProtocolIndividualProtocolNumber0Const   = "number_0"
+	SecurityGroupRuleProtocolIndividualProtocolNumber10Const  = "number_10"
+	SecurityGroupRuleProtocolIndividualProtocolNumber100Const = "number_100"
+	SecurityGroupRuleProtocolIndividualProtocolNumber101Const = "number_101"
+	SecurityGroupRuleProtocolIndividualProtocolNumber102Const = "number_102"
+	SecurityGroupRuleProtocolIndividualProtocolNumber103Const = "number_103"
+	SecurityGroupRuleProtocolIndividualProtocolNumber104Const = "number_104"
+	SecurityGroupRuleProtocolIndividualProtocolNumber105Const = "number_105"
+	SecurityGroupRuleProtocolIndividualProtocolNumber106Const = "number_106"
+	SecurityGroupRuleProtocolIndividualProtocolNumber107Const = "number_107"
+	SecurityGroupRuleProtocolIndividualProtocolNumber108Const = "number_108"
+	SecurityGroupRuleProtocolIndividualProtocolNumber109Const = "number_109"
+	SecurityGroupRuleProtocolIndividualProtocolNumber11Const  = "number_11"
+	SecurityGroupRuleProtocolIndividualProtocolNumber110Const = "number_110"
+	SecurityGroupRuleProtocolIndividualProtocolNumber111Const = "number_111"
+	SecurityGroupRuleProtocolIndividualProtocolNumber113Const = "number_113"
+	SecurityGroupRuleProtocolIndividualProtocolNumber114Const = "number_114"
+	SecurityGroupRuleProtocolIndividualProtocolNumber116Const = "number_116"
+	SecurityGroupRuleProtocolIndividualProtocolNumber117Const = "number_117"
+	SecurityGroupRuleProtocolIndividualProtocolNumber118Const = "number_118"
+	SecurityGroupRuleProtocolIndividualProtocolNumber119Const = "number_119"
+	SecurityGroupRuleProtocolIndividualProtocolNumber12Const  = "number_12"
+	SecurityGroupRuleProtocolIndividualProtocolNumber120Const = "number_120"
+	SecurityGroupRuleProtocolIndividualProtocolNumber121Const = "number_121"
+	SecurityGroupRuleProtocolIndividualProtocolNumber122Const = "number_122"
+	SecurityGroupRuleProtocolIndividualProtocolNumber123Const = "number_123"
+	SecurityGroupRuleProtocolIndividualProtocolNumber124Const = "number_124"
+	SecurityGroupRuleProtocolIndividualProtocolNumber125Const = "number_125"
+	SecurityGroupRuleProtocolIndividualProtocolNumber126Const = "number_126"
+	SecurityGroupRuleProtocolIndividualProtocolNumber127Const = "number_127"
+	SecurityGroupRuleProtocolIndividualProtocolNumber128Const = "number_128"
+	SecurityGroupRuleProtocolIndividualProtocolNumber129Const = "number_129"
+	SecurityGroupRuleProtocolIndividualProtocolNumber13Const  = "number_13"
+	SecurityGroupRuleProtocolIndividualProtocolNumber130Const = "number_130"
+	SecurityGroupRuleProtocolIndividualProtocolNumber131Const = "number_131"
+	SecurityGroupRuleProtocolIndividualProtocolNumber133Const = "number_133"
+	SecurityGroupRuleProtocolIndividualProtocolNumber134Const = "number_134"
+	SecurityGroupRuleProtocolIndividualProtocolNumber135Const = "number_135"
+	SecurityGroupRuleProtocolIndividualProtocolNumber136Const = "number_136"
+	SecurityGroupRuleProtocolIndividualProtocolNumber137Const = "number_137"
+	SecurityGroupRuleProtocolIndividualProtocolNumber138Const = "number_138"
+	SecurityGroupRuleProtocolIndividualProtocolNumber139Const = "number_139"
+	SecurityGroupRuleProtocolIndividualProtocolNumber14Const  = "number_14"
+	SecurityGroupRuleProtocolIndividualProtocolNumber140Const = "number_140"
+	SecurityGroupRuleProtocolIndividualProtocolNumber141Const = "number_141"
+	SecurityGroupRuleProtocolIndividualProtocolNumber142Const = "number_142"
+	SecurityGroupRuleProtocolIndividualProtocolNumber143Const = "number_143"
+	SecurityGroupRuleProtocolIndividualProtocolNumber144Const = "number_144"
+	SecurityGroupRuleProtocolIndividualProtocolNumber145Const = "number_145"
+	SecurityGroupRuleProtocolIndividualProtocolNumber146Const = "number_146"
+	SecurityGroupRuleProtocolIndividualProtocolNumber147Const = "number_147"
+	SecurityGroupRuleProtocolIndividualProtocolNumber148Const = "number_148"
+	SecurityGroupRuleProtocolIndividualProtocolNumber149Const = "number_149"
+	SecurityGroupRuleProtocolIndividualProtocolNumber15Const  = "number_15"
+	SecurityGroupRuleProtocolIndividualProtocolNumber150Const = "number_150"
+	SecurityGroupRuleProtocolIndividualProtocolNumber151Const = "number_151"
+	SecurityGroupRuleProtocolIndividualProtocolNumber152Const = "number_152"
+	SecurityGroupRuleProtocolIndividualProtocolNumber153Const = "number_153"
+	SecurityGroupRuleProtocolIndividualProtocolNumber154Const = "number_154"
+	SecurityGroupRuleProtocolIndividualProtocolNumber155Const = "number_155"
+	SecurityGroupRuleProtocolIndividualProtocolNumber156Const = "number_156"
+	SecurityGroupRuleProtocolIndividualProtocolNumber157Const = "number_157"
+	SecurityGroupRuleProtocolIndividualProtocolNumber158Const = "number_158"
+	SecurityGroupRuleProtocolIndividualProtocolNumber159Const = "number_159"
+	SecurityGroupRuleProtocolIndividualProtocolNumber16Const  = "number_16"
+	SecurityGroupRuleProtocolIndividualProtocolNumber160Const = "number_160"
+	SecurityGroupRuleProtocolIndividualProtocolNumber161Const = "number_161"
+	SecurityGroupRuleProtocolIndividualProtocolNumber162Const = "number_162"
+	SecurityGroupRuleProtocolIndividualProtocolNumber163Const = "number_163"
+	SecurityGroupRuleProtocolIndividualProtocolNumber164Const = "number_164"
+	SecurityGroupRuleProtocolIndividualProtocolNumber165Const = "number_165"
+	SecurityGroupRuleProtocolIndividualProtocolNumber166Const = "number_166"
+	SecurityGroupRuleProtocolIndividualProtocolNumber167Const = "number_167"
+	SecurityGroupRuleProtocolIndividualProtocolNumber168Const = "number_168"
+	SecurityGroupRuleProtocolIndividualProtocolNumber169Const = "number_169"
+	SecurityGroupRuleProtocolIndividualProtocolNumber170Const = "number_170"
+	SecurityGroupRuleProtocolIndividualProtocolNumber171Const = "number_171"
+	SecurityGroupRuleProtocolIndividualProtocolNumber172Const = "number_172"
+	SecurityGroupRuleProtocolIndividualProtocolNumber173Const = "number_173"
+	SecurityGroupRuleProtocolIndividualProtocolNumber174Const = "number_174"
+	SecurityGroupRuleProtocolIndividualProtocolNumber175Const = "number_175"
+	SecurityGroupRuleProtocolIndividualProtocolNumber176Const = "number_176"
+	SecurityGroupRuleProtocolIndividualProtocolNumber177Const = "number_177"
+	SecurityGroupRuleProtocolIndividualProtocolNumber178Const = "number_178"
+	SecurityGroupRuleProtocolIndividualProtocolNumber179Const = "number_179"
+	SecurityGroupRuleProtocolIndividualProtocolNumber18Const  = "number_18"
+	SecurityGroupRuleProtocolIndividualProtocolNumber180Const = "number_180"
+	SecurityGroupRuleProtocolIndividualProtocolNumber181Const = "number_181"
+	SecurityGroupRuleProtocolIndividualProtocolNumber182Const = "number_182"
+	SecurityGroupRuleProtocolIndividualProtocolNumber183Const = "number_183"
+	SecurityGroupRuleProtocolIndividualProtocolNumber184Const = "number_184"
+	SecurityGroupRuleProtocolIndividualProtocolNumber185Const = "number_185"
+	SecurityGroupRuleProtocolIndividualProtocolNumber186Const = "number_186"
+	SecurityGroupRuleProtocolIndividualProtocolNumber187Const = "number_187"
+	SecurityGroupRuleProtocolIndividualProtocolNumber188Const = "number_188"
+	SecurityGroupRuleProtocolIndividualProtocolNumber189Const = "number_189"
+	SecurityGroupRuleProtocolIndividualProtocolNumber19Const  = "number_19"
+	SecurityGroupRuleProtocolIndividualProtocolNumber190Const = "number_190"
+	SecurityGroupRuleProtocolIndividualProtocolNumber191Const = "number_191"
+	SecurityGroupRuleProtocolIndividualProtocolNumber192Const = "number_192"
+	SecurityGroupRuleProtocolIndividualProtocolNumber193Const = "number_193"
+	SecurityGroupRuleProtocolIndividualProtocolNumber194Const = "number_194"
+	SecurityGroupRuleProtocolIndividualProtocolNumber195Const = "number_195"
+	SecurityGroupRuleProtocolIndividualProtocolNumber196Const = "number_196"
+	SecurityGroupRuleProtocolIndividualProtocolNumber197Const = "number_197"
+	SecurityGroupRuleProtocolIndividualProtocolNumber198Const = "number_198"
+	SecurityGroupRuleProtocolIndividualProtocolNumber199Const = "number_199"
+	SecurityGroupRuleProtocolIndividualProtocolNumber2Const   = "number_2"
+	SecurityGroupRuleProtocolIndividualProtocolNumber20Const  = "number_20"
+	SecurityGroupRuleProtocolIndividualProtocolNumber200Const = "number_200"
+	SecurityGroupRuleProtocolIndividualProtocolNumber201Const = "number_201"
+	SecurityGroupRuleProtocolIndividualProtocolNumber202Const = "number_202"
+	SecurityGroupRuleProtocolIndividualProtocolNumber203Const = "number_203"
+	SecurityGroupRuleProtocolIndividualProtocolNumber204Const = "number_204"
+	SecurityGroupRuleProtocolIndividualProtocolNumber205Const = "number_205"
+	SecurityGroupRuleProtocolIndividualProtocolNumber206Const = "number_206"
+	SecurityGroupRuleProtocolIndividualProtocolNumber207Const = "number_207"
+	SecurityGroupRuleProtocolIndividualProtocolNumber208Const = "number_208"
+	SecurityGroupRuleProtocolIndividualProtocolNumber209Const = "number_209"
+	SecurityGroupRuleProtocolIndividualProtocolNumber21Const  = "number_21"
+	SecurityGroupRuleProtocolIndividualProtocolNumber210Const = "number_210"
+	SecurityGroupRuleProtocolIndividualProtocolNumber211Const = "number_211"
+	SecurityGroupRuleProtocolIndividualProtocolNumber212Const = "number_212"
+	SecurityGroupRuleProtocolIndividualProtocolNumber213Const = "number_213"
+	SecurityGroupRuleProtocolIndividualProtocolNumber214Const = "number_214"
+	SecurityGroupRuleProtocolIndividualProtocolNumber215Const = "number_215"
+	SecurityGroupRuleProtocolIndividualProtocolNumber216Const = "number_216"
+	SecurityGroupRuleProtocolIndividualProtocolNumber217Const = "number_217"
+	SecurityGroupRuleProtocolIndividualProtocolNumber218Const = "number_218"
+	SecurityGroupRuleProtocolIndividualProtocolNumber219Const = "number_219"
+	SecurityGroupRuleProtocolIndividualProtocolNumber22Const  = "number_22"
+	SecurityGroupRuleProtocolIndividualProtocolNumber220Const = "number_220"
+	SecurityGroupRuleProtocolIndividualProtocolNumber221Const = "number_221"
+	SecurityGroupRuleProtocolIndividualProtocolNumber222Const = "number_222"
+	SecurityGroupRuleProtocolIndividualProtocolNumber223Const = "number_223"
+	SecurityGroupRuleProtocolIndividualProtocolNumber224Const = "number_224"
+	SecurityGroupRuleProtocolIndividualProtocolNumber225Const = "number_225"
+	SecurityGroupRuleProtocolIndividualProtocolNumber226Const = "number_226"
+	SecurityGroupRuleProtocolIndividualProtocolNumber227Const = "number_227"
+	SecurityGroupRuleProtocolIndividualProtocolNumber228Const = "number_228"
+	SecurityGroupRuleProtocolIndividualProtocolNumber229Const = "number_229"
+	SecurityGroupRuleProtocolIndividualProtocolNumber23Const  = "number_23"
+	SecurityGroupRuleProtocolIndividualProtocolNumber230Const = "number_230"
+	SecurityGroupRuleProtocolIndividualProtocolNumber231Const = "number_231"
+	SecurityGroupRuleProtocolIndividualProtocolNumber232Const = "number_232"
+	SecurityGroupRuleProtocolIndividualProtocolNumber233Const = "number_233"
+	SecurityGroupRuleProtocolIndividualProtocolNumber234Const = "number_234"
+	SecurityGroupRuleProtocolIndividualProtocolNumber235Const = "number_235"
+	SecurityGroupRuleProtocolIndividualProtocolNumber236Const = "number_236"
+	SecurityGroupRuleProtocolIndividualProtocolNumber237Const = "number_237"
+	SecurityGroupRuleProtocolIndividualProtocolNumber238Const = "number_238"
+	SecurityGroupRuleProtocolIndividualProtocolNumber239Const = "number_239"
+	SecurityGroupRuleProtocolIndividualProtocolNumber24Const  = "number_24"
+	SecurityGroupRuleProtocolIndividualProtocolNumber240Const = "number_240"
+	SecurityGroupRuleProtocolIndividualProtocolNumber241Const = "number_241"
+	SecurityGroupRuleProtocolIndividualProtocolNumber242Const = "number_242"
+	SecurityGroupRuleProtocolIndividualProtocolNumber243Const = "number_243"
+	SecurityGroupRuleProtocolIndividualProtocolNumber244Const = "number_244"
+	SecurityGroupRuleProtocolIndividualProtocolNumber245Const = "number_245"
+	SecurityGroupRuleProtocolIndividualProtocolNumber246Const = "number_246"
+	SecurityGroupRuleProtocolIndividualProtocolNumber247Const = "number_247"
+	SecurityGroupRuleProtocolIndividualProtocolNumber248Const = "number_248"
+	SecurityGroupRuleProtocolIndividualProtocolNumber249Const = "number_249"
+	SecurityGroupRuleProtocolIndividualProtocolNumber25Const  = "number_25"
+	SecurityGroupRuleProtocolIndividualProtocolNumber250Const = "number_250"
+	SecurityGroupRuleProtocolIndividualProtocolNumber251Const = "number_251"
+	SecurityGroupRuleProtocolIndividualProtocolNumber252Const = "number_252"
+	SecurityGroupRuleProtocolIndividualProtocolNumber253Const = "number_253"
+	SecurityGroupRuleProtocolIndividualProtocolNumber254Const = "number_254"
+	SecurityGroupRuleProtocolIndividualProtocolNumber255Const = "number_255"
+	SecurityGroupRuleProtocolIndividualProtocolNumber26Const  = "number_26"
+	SecurityGroupRuleProtocolIndividualProtocolNumber27Const  = "number_27"
+	SecurityGroupRuleProtocolIndividualProtocolNumber28Const  = "number_28"
+	SecurityGroupRuleProtocolIndividualProtocolNumber29Const  = "number_29"
+	SecurityGroupRuleProtocolIndividualProtocolNumber3Const   = "number_3"
+	SecurityGroupRuleProtocolIndividualProtocolNumber30Const  = "number_30"
+	SecurityGroupRuleProtocolIndividualProtocolNumber31Const  = "number_31"
+	SecurityGroupRuleProtocolIndividualProtocolNumber32Const  = "number_32"
+	SecurityGroupRuleProtocolIndividualProtocolNumber33Const  = "number_33"
+	SecurityGroupRuleProtocolIndividualProtocolNumber34Const  = "number_34"
+	SecurityGroupRuleProtocolIndividualProtocolNumber35Const  = "number_35"
+	SecurityGroupRuleProtocolIndividualProtocolNumber36Const  = "number_36"
+	SecurityGroupRuleProtocolIndividualProtocolNumber37Const  = "number_37"
+	SecurityGroupRuleProtocolIndividualProtocolNumber38Const  = "number_38"
+	SecurityGroupRuleProtocolIndividualProtocolNumber39Const  = "number_39"
+	SecurityGroupRuleProtocolIndividualProtocolNumber40Const  = "number_40"
+	SecurityGroupRuleProtocolIndividualProtocolNumber41Const  = "number_41"
+	SecurityGroupRuleProtocolIndividualProtocolNumber42Const  = "number_42"
+	SecurityGroupRuleProtocolIndividualProtocolNumber43Const  = "number_43"
+	SecurityGroupRuleProtocolIndividualProtocolNumber44Const  = "number_44"
+	SecurityGroupRuleProtocolIndividualProtocolNumber45Const  = "number_45"
+	SecurityGroupRuleProtocolIndividualProtocolNumber48Const  = "number_48"
+	SecurityGroupRuleProtocolIndividualProtocolNumber49Const  = "number_49"
+	SecurityGroupRuleProtocolIndividualProtocolNumber5Const   = "number_5"
+	SecurityGroupRuleProtocolIndividualProtocolNumber52Const  = "number_52"
+	SecurityGroupRuleProtocolIndividualProtocolNumber53Const  = "number_53"
+	SecurityGroupRuleProtocolIndividualProtocolNumber54Const  = "number_54"
+	SecurityGroupRuleProtocolIndividualProtocolNumber55Const  = "number_55"
+	SecurityGroupRuleProtocolIndividualProtocolNumber56Const  = "number_56"
+	SecurityGroupRuleProtocolIndividualProtocolNumber57Const  = "number_57"
+	SecurityGroupRuleProtocolIndividualProtocolNumber58Const  = "number_58"
+	SecurityGroupRuleProtocolIndividualProtocolNumber59Const  = "number_59"
+	SecurityGroupRuleProtocolIndividualProtocolNumber60Const  = "number_60"
+	SecurityGroupRuleProtocolIndividualProtocolNumber61Const  = "number_61"
+	SecurityGroupRuleProtocolIndividualProtocolNumber62Const  = "number_62"
+	SecurityGroupRuleProtocolIndividualProtocolNumber63Const  = "number_63"
+	SecurityGroupRuleProtocolIndividualProtocolNumber64Const  = "number_64"
+	SecurityGroupRuleProtocolIndividualProtocolNumber65Const  = "number_65"
+	SecurityGroupRuleProtocolIndividualProtocolNumber66Const  = "number_66"
+	SecurityGroupRuleProtocolIndividualProtocolNumber67Const  = "number_67"
+	SecurityGroupRuleProtocolIndividualProtocolNumber68Const  = "number_68"
+	SecurityGroupRuleProtocolIndividualProtocolNumber69Const  = "number_69"
+	SecurityGroupRuleProtocolIndividualProtocolNumber7Const   = "number_7"
+	SecurityGroupRuleProtocolIndividualProtocolNumber70Const  = "number_70"
+	SecurityGroupRuleProtocolIndividualProtocolNumber71Const  = "number_71"
+	SecurityGroupRuleProtocolIndividualProtocolNumber72Const  = "number_72"
+	SecurityGroupRuleProtocolIndividualProtocolNumber73Const  = "number_73"
+	SecurityGroupRuleProtocolIndividualProtocolNumber74Const  = "number_74"
+	SecurityGroupRuleProtocolIndividualProtocolNumber75Const  = "number_75"
+	SecurityGroupRuleProtocolIndividualProtocolNumber76Const  = "number_76"
+	SecurityGroupRuleProtocolIndividualProtocolNumber77Const  = "number_77"
+	SecurityGroupRuleProtocolIndividualProtocolNumber78Const  = "number_78"
+	SecurityGroupRuleProtocolIndividualProtocolNumber79Const  = "number_79"
+	SecurityGroupRuleProtocolIndividualProtocolNumber8Const   = "number_8"
+	SecurityGroupRuleProtocolIndividualProtocolNumber80Const  = "number_80"
+	SecurityGroupRuleProtocolIndividualProtocolNumber81Const  = "number_81"
+	SecurityGroupRuleProtocolIndividualProtocolNumber82Const  = "number_82"
+	SecurityGroupRuleProtocolIndividualProtocolNumber83Const  = "number_83"
+	SecurityGroupRuleProtocolIndividualProtocolNumber84Const  = "number_84"
+	SecurityGroupRuleProtocolIndividualProtocolNumber85Const  = "number_85"
+	SecurityGroupRuleProtocolIndividualProtocolNumber86Const  = "number_86"
+	SecurityGroupRuleProtocolIndividualProtocolNumber87Const  = "number_87"
+	SecurityGroupRuleProtocolIndividualProtocolNumber88Const  = "number_88"
+	SecurityGroupRuleProtocolIndividualProtocolNumber89Const  = "number_89"
+	SecurityGroupRuleProtocolIndividualProtocolNumber9Const   = "number_9"
+	SecurityGroupRuleProtocolIndividualProtocolNumber90Const  = "number_90"
+	SecurityGroupRuleProtocolIndividualProtocolNumber91Const  = "number_91"
+	SecurityGroupRuleProtocolIndividualProtocolNumber92Const  = "number_92"
+	SecurityGroupRuleProtocolIndividualProtocolNumber93Const  = "number_93"
+	SecurityGroupRuleProtocolIndividualProtocolNumber94Const  = "number_94"
+	SecurityGroupRuleProtocolIndividualProtocolNumber95Const  = "number_95"
+	SecurityGroupRuleProtocolIndividualProtocolNumber96Const  = "number_96"
+	SecurityGroupRuleProtocolIndividualProtocolNumber97Const  = "number_97"
+	SecurityGroupRuleProtocolIndividualProtocolNumber98Const  = "number_98"
+	SecurityGroupRuleProtocolIndividualProtocolNumber99Const  = "number_99"
+	SecurityGroupRuleProtocolIndividualProtocolRsvpConst      = "rsvp"
+	SecurityGroupRuleProtocolIndividualProtocolSctpConst      = "sctp"
+	SecurityGroupRuleProtocolIndividualProtocolVrrpConst      = "vrrp"
+)
+
+func (*SecurityGroupRuleProtocolIndividual) isaSecurityGroupRule() bool {
+	return true
+}
+
+// UnmarshalSecurityGroupRuleProtocolIndividual unmarshals an instance of SecurityGroupRuleProtocolIndividual from the specified map of raw messages.
+func UnmarshalSecurityGroupRuleProtocolIndividual(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRuleProtocolIndividual)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocal)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
@@ -136106,6 +144838,10 @@ type SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmp struct {
 	IPVersion *string `json:"ip_version,omitempty"`
 
 	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
 
 	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
 
@@ -136181,6 +144917,11 @@ func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmp(m map[stri
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
@@ -136219,6 +144960,10 @@ type SecurityGroupRulePrototypeSecurityGroupRuleProtocolTcpudp struct {
 	IPVersion *string `json:"ip_version,omitempty"`
 
 	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
 
 	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
 
@@ -136297,6 +145042,11 @@ func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolTcpudp(m map[st
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
@@ -136310,6 +145060,590 @@ func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolTcpudp(m map[st
 	err = core.UnmarshalPrimitive(m, "port_min", &obj.PortMin)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "port_min-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype : A rule allowing traffic for any protocol.
+// This model "extends" SecurityGroupRulePrototype
+type SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype struct {
+	// The direction of traffic to allow.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version to allow. The format of `local.address`, `remote.address`,
+	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+	//
+	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+	// version.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype.Direction property.
+// The direction of traffic to allow.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototypeDirectionInboundConst  = "inbound"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype.IPVersion property.
+// The IP version to allow. The format of `local.address`, `remote.address`,
+// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+//
+// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+// version.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype.Protocol property.
+// The network protocol.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototypeProtocolAnyConst = "any"
+)
+
+// NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype : Instantiate SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype (Generic Model Constructor)
+func (*VpcV1) NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype(direction string, protocol string) (_model *SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype, err error) {
+	_model = &SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype{
+		Direction: core.StringPtr(direction),
+		Protocol:  core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype) isaSecurityGroupRulePrototype() bool {
+	return true
+}
+
+// UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype unmarshals an instance of SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype from the specified map of raw messages.
+func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRulePrototypeSecurityGroupRuleProtocolAnyPrototype)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocalPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype : A rule allowing ICMP, TCP and UDP traffic.
+// This model "extends" SecurityGroupRulePrototype
+type SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype struct {
+	// The direction of traffic to allow.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version to allow. The format of `local.address`, `remote.address`,
+	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+	//
+	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+	// version.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
+
+	// The network protocol.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype.Direction property.
+// The direction of traffic to allow.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototypeDirectionInboundConst  = "inbound"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype.IPVersion property.
+// The IP version to allow. The format of `local.address`, `remote.address`,
+// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+//
+// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+// version.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype.Protocol property.
+// The network protocol.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototypeProtocolIcmpTCPUDPConst = "icmp_tcp_udp"
+)
+
+// NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype : Instantiate SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype (Generic Model Constructor)
+func (*VpcV1) NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype(direction string, protocol string) (_model *SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype, err error) {
+	_model = &SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype{
+		Direction: core.StringPtr(direction),
+		Protocol:  core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype) isaSecurityGroupRulePrototype() bool {
+	return true
+}
+
+// UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype unmarshals an instance of SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype from the specified map of raw messages.
+func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRulePrototypeSecurityGroupRuleProtocolIcmptcpudpPrototype)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocalPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype : SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype struct
+// This model "extends" SecurityGroupRulePrototype
+type SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype struct {
+	// The direction of traffic to allow.
+	Direction *string `json:"direction" validate:"required"`
+
+	// The IP version to allow. The format of `local.address`, `remote.address`,
+	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+	//
+	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+	// version.
+	IPVersion *string `json:"ip_version,omitempty"`
+
+	Local SecurityGroupRuleLocalPrototypeIntf `json:"local,omitempty"`
+
+	// The name for this security group rule. The name must not be used by another rule in the security group. If
+	// unspecified, the name will be a hyphenated list of randomly-selected words.
+	Name *string `json:"name,omitempty"`
+
+	Remote SecurityGroupRuleRemotePrototypeIntf `json:"remote,omitempty"`
+
+	// The network protocol to allow.
+	//
+	// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+	// protocols are:
+	// - `ah`: AH (authentication header, protocol number `51`)
+	// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+	// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+	// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+	// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+	// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+	// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+	// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+	//
+	// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+	Protocol *string `json:"protocol" validate:"required"`
+}
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype.Direction property.
+// The direction of traffic to allow.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeDirectionInboundConst  = "inbound"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeDirectionOutboundConst = "outbound"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype.IPVersion property.
+// The IP version to allow. The format of `local.address`, `remote.address`,
+// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
+//
+// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
+// version.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype.Protocol property.
+// The network protocol to allow.
+//
+// The value must be the name of an individual protocol, excluding `icmp`, `tcp` and `udp`. Names for well known
+// protocols are:
+// - `ah`: AH (authentication header, protocol number `51`)
+// - `esp`: ESP (encapsulating security payload, protocol number `50`)
+// - `gre`: GRE (generic routing encapsulation, protocol number `47`)
+// - `ip_in_ip`: IP encapsulation within IP (protocol number `4`)
+// - `l2tp`: L2TP (layer two tunneling protocol, protocol number `115`)
+// - `rsvp`: RSVP (reservation protocol, protocol number `46`)
+// - `sctp`: SCTP (stream control transmission protocol, protocol number `132`)
+// - `vrrp`: VRRP (virtual router redundancy protocol, protocol number `112`)
+//
+// For other protocols, specify a value of `number_`*N*, where *N* is the network protocol number in decimal.
+const (
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolAhConst        = "ah"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolEspConst       = "esp"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolGreConst       = "gre"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolIPInIPConst    = "ip_in_ip"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolL2tpConst      = "l2tp"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber0Const   = "number_0"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber10Const  = "number_10"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber100Const = "number_100"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber101Const = "number_101"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber102Const = "number_102"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber103Const = "number_103"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber104Const = "number_104"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber105Const = "number_105"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber106Const = "number_106"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber107Const = "number_107"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber108Const = "number_108"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber109Const = "number_109"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber11Const  = "number_11"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber110Const = "number_110"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber111Const = "number_111"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber113Const = "number_113"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber114Const = "number_114"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber116Const = "number_116"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber117Const = "number_117"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber118Const = "number_118"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber119Const = "number_119"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber12Const  = "number_12"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber120Const = "number_120"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber121Const = "number_121"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber122Const = "number_122"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber123Const = "number_123"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber124Const = "number_124"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber125Const = "number_125"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber126Const = "number_126"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber127Const = "number_127"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber128Const = "number_128"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber129Const = "number_129"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber13Const  = "number_13"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber130Const = "number_130"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber131Const = "number_131"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber133Const = "number_133"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber134Const = "number_134"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber135Const = "number_135"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber136Const = "number_136"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber137Const = "number_137"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber138Const = "number_138"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber139Const = "number_139"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber14Const  = "number_14"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber140Const = "number_140"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber141Const = "number_141"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber142Const = "number_142"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber143Const = "number_143"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber144Const = "number_144"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber145Const = "number_145"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber146Const = "number_146"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber147Const = "number_147"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber148Const = "number_148"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber149Const = "number_149"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber15Const  = "number_15"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber150Const = "number_150"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber151Const = "number_151"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber152Const = "number_152"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber153Const = "number_153"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber154Const = "number_154"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber155Const = "number_155"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber156Const = "number_156"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber157Const = "number_157"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber158Const = "number_158"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber159Const = "number_159"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber16Const  = "number_16"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber160Const = "number_160"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber161Const = "number_161"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber162Const = "number_162"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber163Const = "number_163"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber164Const = "number_164"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber165Const = "number_165"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber166Const = "number_166"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber167Const = "number_167"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber168Const = "number_168"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber169Const = "number_169"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber170Const = "number_170"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber171Const = "number_171"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber172Const = "number_172"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber173Const = "number_173"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber174Const = "number_174"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber175Const = "number_175"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber176Const = "number_176"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber177Const = "number_177"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber178Const = "number_178"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber179Const = "number_179"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber18Const  = "number_18"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber180Const = "number_180"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber181Const = "number_181"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber182Const = "number_182"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber183Const = "number_183"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber184Const = "number_184"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber185Const = "number_185"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber186Const = "number_186"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber187Const = "number_187"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber188Const = "number_188"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber189Const = "number_189"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber19Const  = "number_19"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber190Const = "number_190"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber191Const = "number_191"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber192Const = "number_192"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber193Const = "number_193"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber194Const = "number_194"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber195Const = "number_195"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber196Const = "number_196"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber197Const = "number_197"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber198Const = "number_198"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber199Const = "number_199"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber2Const   = "number_2"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber20Const  = "number_20"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber200Const = "number_200"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber201Const = "number_201"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber202Const = "number_202"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber203Const = "number_203"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber204Const = "number_204"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber205Const = "number_205"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber206Const = "number_206"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber207Const = "number_207"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber208Const = "number_208"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber209Const = "number_209"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber21Const  = "number_21"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber210Const = "number_210"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber211Const = "number_211"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber212Const = "number_212"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber213Const = "number_213"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber214Const = "number_214"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber215Const = "number_215"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber216Const = "number_216"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber217Const = "number_217"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber218Const = "number_218"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber219Const = "number_219"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber22Const  = "number_22"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber220Const = "number_220"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber221Const = "number_221"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber222Const = "number_222"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber223Const = "number_223"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber224Const = "number_224"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber225Const = "number_225"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber226Const = "number_226"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber227Const = "number_227"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber228Const = "number_228"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber229Const = "number_229"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber23Const  = "number_23"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber230Const = "number_230"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber231Const = "number_231"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber232Const = "number_232"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber233Const = "number_233"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber234Const = "number_234"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber235Const = "number_235"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber236Const = "number_236"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber237Const = "number_237"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber238Const = "number_238"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber239Const = "number_239"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber24Const  = "number_24"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber240Const = "number_240"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber241Const = "number_241"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber242Const = "number_242"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber243Const = "number_243"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber244Const = "number_244"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber245Const = "number_245"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber246Const = "number_246"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber247Const = "number_247"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber248Const = "number_248"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber249Const = "number_249"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber25Const  = "number_25"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber250Const = "number_250"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber251Const = "number_251"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber252Const = "number_252"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber253Const = "number_253"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber254Const = "number_254"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber255Const = "number_255"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber26Const  = "number_26"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber27Const  = "number_27"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber28Const  = "number_28"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber29Const  = "number_29"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber3Const   = "number_3"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber30Const  = "number_30"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber31Const  = "number_31"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber32Const  = "number_32"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber33Const  = "number_33"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber34Const  = "number_34"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber35Const  = "number_35"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber36Const  = "number_36"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber37Const  = "number_37"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber38Const  = "number_38"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber39Const  = "number_39"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber40Const  = "number_40"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber41Const  = "number_41"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber42Const  = "number_42"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber43Const  = "number_43"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber44Const  = "number_44"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber45Const  = "number_45"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber48Const  = "number_48"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber49Const  = "number_49"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber5Const   = "number_5"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber52Const  = "number_52"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber53Const  = "number_53"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber54Const  = "number_54"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber55Const  = "number_55"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber56Const  = "number_56"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber57Const  = "number_57"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber58Const  = "number_58"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber59Const  = "number_59"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber60Const  = "number_60"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber61Const  = "number_61"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber62Const  = "number_62"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber63Const  = "number_63"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber64Const  = "number_64"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber65Const  = "number_65"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber66Const  = "number_66"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber67Const  = "number_67"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber68Const  = "number_68"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber69Const  = "number_69"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber7Const   = "number_7"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber70Const  = "number_70"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber71Const  = "number_71"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber72Const  = "number_72"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber73Const  = "number_73"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber74Const  = "number_74"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber75Const  = "number_75"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber76Const  = "number_76"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber77Const  = "number_77"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber78Const  = "number_78"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber79Const  = "number_79"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber8Const   = "number_8"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber80Const  = "number_80"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber81Const  = "number_81"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber82Const  = "number_82"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber83Const  = "number_83"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber84Const  = "number_84"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber85Const  = "number_85"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber86Const  = "number_86"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber87Const  = "number_87"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber88Const  = "number_88"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber89Const  = "number_89"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber9Const   = "number_9"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber90Const  = "number_90"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber91Const  = "number_91"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber92Const  = "number_92"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber93Const  = "number_93"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber94Const  = "number_94"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber95Const  = "number_95"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber96Const  = "number_96"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber97Const  = "number_97"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber98Const  = "number_98"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolNumber99Const  = "number_99"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolRsvpConst      = "rsvp"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolSctpConst      = "sctp"
+	SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototypeProtocolVrrpConst      = "vrrp"
+)
+
+// NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype : Instantiate SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype (Generic Model Constructor)
+func (*VpcV1) NewSecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype(direction string, protocol string) (_model *SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype, err error) {
+	_model = &SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype{
+		Direction: core.StringPtr(direction),
+		Protocol:  core.StringPtr(protocol),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype) isaSecurityGroupRulePrototype() bool {
+	return true
+}
+
+// UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype unmarshals an instance of SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype from the specified map of raw messages.
+func UnmarshalSecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(SecurityGroupRulePrototypeSecurityGroupRuleProtocolIndividualPrototype)
+	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocalPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemotePrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
@@ -136721,102 +146055,6 @@ func UnmarshalSecurityGroupRuleRemoteSecurityGroupReference(m map[string]json.Ra
 	return
 }
 
-// SecurityGroupRuleSecurityGroupRuleProtocolAll : A rule allowing ICMP, TCP and UDP traffic.
-// This model "extends" SecurityGroupRule
-type SecurityGroupRuleSecurityGroupRuleProtocolAll struct {
-	// The direction of traffic to allow.
-	Direction *string `json:"direction" validate:"required"`
-
-	// The URL for this security group rule.
-	Href *string `json:"href" validate:"required"`
-
-	// The unique identifier for this security group rule.
-	ID *string `json:"id" validate:"required"`
-
-	// The IP version to allow. The format of `local.address`, `remote.address`,
-	// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
-	//
-	// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
-	// version.
-	IPVersion *string `json:"ip_version" validate:"required"`
-
-	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
-
-	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
-
-	// The network protocol.
-	Protocol *string `json:"protocol" validate:"required"`
-}
-
-// Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolAll.Direction property.
-// The direction of traffic to allow.
-const (
-	SecurityGroupRuleSecurityGroupRuleProtocolAllDirectionInboundConst  = "inbound"
-	SecurityGroupRuleSecurityGroupRuleProtocolAllDirectionOutboundConst = "outbound"
-)
-
-// Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolAll.IPVersion property.
-// The IP version to allow. The format of `local.address`, `remote.address`,
-// `local.cidr_block` or `remote.cidr_block` must match this property, if they are used.
-//
-// If `remote` references a security group, then this rule only applies to IP addresses in that group matching this IP
-// version.
-const (
-	SecurityGroupRuleSecurityGroupRuleProtocolAllIPVersionIpv4Const = "ipv4"
-)
-
-// Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolAll.Protocol property.
-// The network protocol.
-const (
-	SecurityGroupRuleSecurityGroupRuleProtocolAllProtocolAllConst = "all"
-)
-
-func (*SecurityGroupRuleSecurityGroupRuleProtocolAll) isaSecurityGroupRule() bool {
-	return true
-}
-
-// UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolAll unmarshals an instance of SecurityGroupRuleSecurityGroupRuleProtocolAll from the specified map of raw messages.
-func UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolAll(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(SecurityGroupRuleSecurityGroupRuleProtocolAll)
-	err = core.UnmarshalPrimitive(m, "direction", &obj.Direction)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "direction-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "href-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "ip_version", &obj.IPVersion)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "ip_version-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalModel(m, "local", &obj.Local, UnmarshalSecurityGroupRuleLocal)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "protocol", &obj.Protocol)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "protocol-error", common.GetComponentInfo())
-		return
-	}
-	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
-	return
-}
-
 // SecurityGroupRuleSecurityGroupRuleProtocolIcmp : A rule specifying the ICMP traffic to allow.
 // This model "extends" SecurityGroupRule
 type SecurityGroupRuleSecurityGroupRuleProtocolIcmp struct {
@@ -136838,7 +146076,13 @@ type SecurityGroupRuleSecurityGroupRuleProtocolIcmp struct {
 
 	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
 
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
 	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
 
 	// The ICMP traffic code to allow. If absent, all codes are allowed.
 	Code *int64 `json:"code,omitempty"`
@@ -136865,6 +146109,12 @@ const (
 // version.
 const (
 	SecurityGroupRuleSecurityGroupRuleProtocolIcmpIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolIcmp.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleSecurityGroupRuleProtocolIcmpResourceTypeSecurityGroupRuleConst = "security_group_rule"
 )
 
 // Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolIcmp.Protocol property.
@@ -136905,9 +146155,19 @@ func UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolIcmp(m map[string]json.R
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "code", &obj.Code)
@@ -136953,7 +146213,13 @@ type SecurityGroupRuleSecurityGroupRuleProtocolTcpudp struct {
 
 	Local SecurityGroupRuleLocalIntf `json:"local" validate:"required"`
 
+	// The name for this security group rule. The name is unique across all rules in the security group.
+	Name *string `json:"name" validate:"required"`
+
 	Remote SecurityGroupRuleRemoteIntf `json:"remote" validate:"required"`
+
+	// The resource type.
+	ResourceType *string `json:"resource_type" validate:"required"`
 
 	// The inclusive upper bound of the TCP or UDP destination port range.
 	PortMax *int64 `json:"port_max,omitempty"`
@@ -136980,6 +146246,12 @@ const (
 // version.
 const (
 	SecurityGroupRuleSecurityGroupRuleProtocolTcpudpIPVersionIpv4Const = "ipv4"
+)
+
+// Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolTcpudp.ResourceType property.
+// The resource type.
+const (
+	SecurityGroupRuleSecurityGroupRuleProtocolTcpudpResourceTypeSecurityGroupRuleConst = "security_group_rule"
 )
 
 // Constants associated with the SecurityGroupRuleSecurityGroupRuleProtocolTcpudp.Protocol property.
@@ -137021,9 +146293,19 @@ func UnmarshalSecurityGroupRuleSecurityGroupRuleProtocolTcpudp(m map[string]json
 		err = core.SDKErrorf(err, "", "local-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "remote", &obj.Remote, UnmarshalSecurityGroupRuleRemote)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "remote-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "resource_type", &obj.ResourceType)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "resource_type-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalPrimitive(m, "port_max", &obj.PortMax)
@@ -149683,6 +158965,8 @@ type InstancePrototypeInstanceByCatalogOfferingInstanceByCatalogOfferingInstance
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
 
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
+
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
 
@@ -149828,6 +159112,11 @@ func UnmarshalInstancePrototypeInstanceByCatalogOfferingInstanceByCatalogOfferin
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -149941,6 +159230,8 @@ type InstancePrototypeInstanceByCatalogOfferingInstanceByCatalogOfferingInstance
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -150087,6 +159378,11 @@ func UnmarshalInstancePrototypeInstanceByCatalogOfferingInstanceByCatalogOfferin
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -150200,6 +159496,8 @@ type InstancePrototypeInstanceByImageInstanceByImageInstanceByNetworkAttachment 
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -150347,6 +159645,11 @@ func UnmarshalInstancePrototypeInstanceByImageInstanceByImageInstanceByNetworkAt
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -150460,6 +159763,8 @@ type InstancePrototypeInstanceByImageInstanceByImageInstanceByNetworkInterface s
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -150607,6 +159912,11 @@ func UnmarshalInstancePrototypeInstanceByImageInstanceByImageInstanceByNetworkIn
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -150720,6 +160030,8 @@ type InstancePrototypeInstanceBySourceSnapshotInstanceBySourceSnapshotInstanceBy
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -150864,6 +160176,11 @@ func UnmarshalInstancePrototypeInstanceBySourceSnapshotInstanceBySourceSnapshotI
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -150972,6 +160289,8 @@ type InstancePrototypeInstanceBySourceSnapshotInstanceBySourceSnapshotInstanceBy
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -151116,6 +160435,11 @@ func UnmarshalInstancePrototypeInstanceBySourceSnapshotInstanceBySourceSnapshotI
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -151224,6 +160548,8 @@ type InstancePrototypeInstanceByVolumeInstanceByVolumeInstanceByNetworkAttachmen
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -151368,6 +160694,11 @@ func UnmarshalInstancePrototypeInstanceByVolumeInstanceByVolumeInstanceByNetwork
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -151476,6 +160807,8 @@ type InstancePrototypeInstanceByVolumeInstanceByVolumeInstanceByNetworkInterface
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -151620,6 +160953,11 @@ func UnmarshalInstancePrototypeInstanceByVolumeInstanceByVolumeInstanceByNetwork
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -151726,6 +161064,8 @@ type InstanceTemplatePrototypeInstanceTemplateByCatalogOfferingInstanceTemplateB
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -151872,6 +161212,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByCatalogOfferingInstance
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -151983,6 +161328,8 @@ type InstanceTemplatePrototypeInstanceTemplateByCatalogOfferingInstanceTemplateB
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -152129,6 +161476,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByCatalogOfferingInstance
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -152240,6 +161592,8 @@ type InstanceTemplatePrototypeInstanceTemplateByImageInstanceTemplateByImageInst
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -152387,6 +161741,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByImageInstanceTemplateBy
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -152498,6 +161857,8 @@ type InstanceTemplatePrototypeInstanceTemplateByImageInstanceTemplateByImageInst
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -152645,6 +162006,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateByImageInstanceTemplateBy
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -152756,6 +162122,8 @@ type InstanceTemplatePrototypeInstanceTemplateBySourceSnapshotInstanceTemplateBy
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -152900,6 +162268,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateBySourceSnapshotInstanceT
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -153006,6 +162379,8 @@ type InstanceTemplatePrototypeInstanceTemplateBySourceSnapshotInstanceTemplateBy
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -153150,6 +162525,11 @@ func UnmarshalInstanceTemplatePrototypeInstanceTemplateBySourceSnapshotInstanceT
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -153268,6 +162648,8 @@ type InstanceTemplateInstanceByCatalogOfferingInstanceTemplateContextInstanceByC
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -153420,6 +162802,11 @@ func UnmarshalInstanceTemplateInstanceByCatalogOfferingInstanceTemplateContextIn
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -153543,6 +162930,8 @@ type InstanceTemplateInstanceByCatalogOfferingInstanceTemplateContextInstanceByC
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -153695,6 +163084,11 @@ func UnmarshalInstanceTemplateInstanceByCatalogOfferingInstanceTemplateContextIn
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -153818,6 +163212,8 @@ type InstanceTemplateInstanceByImageInstanceTemplateContextInstanceByImageInstan
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -153971,6 +163367,11 @@ func UnmarshalInstanceTemplateInstanceByImageInstanceTemplateContextInstanceByIm
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -154094,6 +163495,8 @@ type InstanceTemplateInstanceByImageInstanceTemplateContextInstanceByImageInstan
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -154247,6 +163650,11 @@ func UnmarshalInstanceTemplateInstanceByImageInstanceTemplateContextInstanceByIm
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -154370,6 +163778,8 @@ type InstanceTemplateInstanceBySourceSnapshotInstanceTemplateContextInstanceBySo
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -154523,6 +163933,11 @@ func UnmarshalInstanceTemplateInstanceBySourceSnapshotInstanceTemplateContextIns
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
 		return
 	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
+		return
+	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "volume_attachments-error", common.GetComponentInfo())
@@ -154646,6 +164061,8 @@ type InstanceTemplateInstanceBySourceSnapshotInstanceTemplateContextInstanceBySo
 	// The [user data](https://cloud.ibm.com/docs/vpc?topic=vpc-user-data) to make available when setting up the virtual
 	// server instance.
 	UserData *string `json:"user_data,omitempty"`
+
+	Vcpu *InstanceVcpuPrototype `json:"vcpu,omitempty"`
 
 	// The additional volume attachments to create for the virtual server instance.
 	VolumeAttachments []VolumeAttachmentPrototype `json:"volume_attachments,omitempty"`
@@ -154800,6 +164217,11 @@ func UnmarshalInstanceTemplateInstanceBySourceSnapshotInstanceTemplateContextIns
 	err = core.UnmarshalPrimitive(m, "user_data", &obj.UserData)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "user_data-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "vcpu", &obj.Vcpu, UnmarshalInstanceVcpuPrototype)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "vcpu-error", common.GetComponentInfo())
 		return
 	}
 	err = core.UnmarshalModel(m, "volume_attachments", &obj.VolumeAttachments, UnmarshalVolumeAttachmentPrototype)

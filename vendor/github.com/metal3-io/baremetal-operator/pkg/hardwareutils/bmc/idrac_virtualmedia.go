@@ -1,8 +1,13 @@
 package bmc
 
 import (
-	"fmt"
 	"net/url"
+)
+
+const (
+	idrac        = "idrac"
+	idracRedfish = "idrac-redfish"
+	redfish      = "redfish"
 )
 
 func init() {
@@ -12,30 +17,30 @@ func init() {
 
 func newRedfishiDracVirtualMediaAccessDetails(parsedURL *url.URL, disableCertificateVerification bool) (AccessDetails, error) {
 	return &redfishiDracVirtualMediaAccessDetails{
-		bmcType:                        parsedURL.Scheme,
-		host:                           parsedURL.Host,
-		path:                           parsedURL.Path,
-		disableCertificateVerification: disableCertificateVerification,
+		redfishAccessDetails{
+			bmcType:                        parsedURL.Scheme,
+			host:                           parsedURL.Host,
+			path:                           parsedURL.Path,
+			disableCertificateVerification: disableCertificateVerification,
+		},
 	}, nil
 }
 
 type redfishiDracVirtualMediaAccessDetails struct {
-	bmcType                        string
-	host                           string
-	path                           string
-	disableCertificateVerification bool
+	redfishAccessDetails
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) Type() string {
 	return a.bmcType
 }
 
-// NeedsMAC returns true when the host is going to need a separate
-// port created rather than having it discovered.
+// NeedsMAC returns false for virtual media drivers since they can boot
+// from virtual media without requiring a pre-configured boot MAC address,
+// and the MAC can be populated after hardware inspection completes. When
+// inspection is disabled a MAC is still required, but that requirement is
+// enforced by the callers via host.InspectionDisabled().
 func (a *redfishiDracVirtualMediaAccessDetails) NeedsMAC() bool {
-	// For the inspection to work, we need a MAC address
-	// https://github.com/metal3-io/baremetal-operator/pull/284#discussion_r317579040
-	return true
+	return false
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) DisableCertificateVerification() bool {
@@ -48,28 +53,17 @@ func (a *redfishiDracVirtualMediaAccessDetails) DisableCertificateVerification()
 // expected to add any other information that might be needed (such as
 // the kernel and ramdisk locations).
 func (a *redfishiDracVirtualMediaAccessDetails) DriverInfo(bmcCreds Credentials) map[string]interface{} {
-	result := map[string]interface{}{
-		"redfish_system_id": a.path,
-		"redfish_username":  bmcCreds.Username,
-		"redfish_password":  bmcCreds.Password,
-		"redfish_address":   getRedfishAddress(a.bmcType, a.host),
-	}
-
-	if a.disableCertificateVerification {
-		result["redfish_verify_ca"] = false
-	}
-
-	return result
+	return a.redfishAccessDetails.DriverInfo(bmcCreds)
 }
 
 // iDrac Virtual Media Overrides
 
 func (a *redfishiDracVirtualMediaAccessDetails) Driver() string {
-	return "idrac"
+	return idrac
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) BIOSInterface() string {
-	return "idrac-redfish"
+	return redfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) BootInterface() string {
@@ -77,24 +71,28 @@ func (a *redfishiDracVirtualMediaAccessDetails) BootInterface() string {
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) FirmwareInterface() string {
-	return "redfish"
+	return redfish
+}
+
+func (a *redfishiDracVirtualMediaAccessDetails) InspectInterface() string {
+	// FIXME(dtantsur): this should be using idracRedfish, but it's not currently enabled in ironic-image.
+	return redfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) ManagementInterface() string {
-	return "idrac-redfish"
+	return idracRedfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) PowerInterface() string {
-	return "idrac-redfish"
+	return redfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) RAIDInterface() string {
-	return "idrac-redfish"
+	return idracRedfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) VendorInterface() string {
-	// NOTE(dtantsur): the idrac hardware type defaults to WSMAN vendor, we need to use the Redfish implementation.
-	return "idrac-redfish"
+	return redfish
 }
 
 func (a *redfishiDracVirtualMediaAccessDetails) SupportsSecureBoot() bool {
@@ -107,11 +105,4 @@ func (a *redfishiDracVirtualMediaAccessDetails) SupportsISOPreprovisioningImage(
 
 func (a *redfishiDracVirtualMediaAccessDetails) RequiresProvisioningNetwork() bool {
 	return false
-}
-
-func (a *redfishiDracVirtualMediaAccessDetails) BuildBIOSSettings(firmwareConfig *FirmwareConfig) (settings []map[string]string, err error) {
-	if firmwareConfig != nil {
-		return nil, fmt.Errorf("firmware settings for %s are not supported", a.Driver())
-	}
-	return nil, nil
 }

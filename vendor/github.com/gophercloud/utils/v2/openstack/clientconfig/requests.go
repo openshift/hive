@@ -2,11 +2,13 @@ package clientconfig
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/gophercloud/gophercloud/v2"
@@ -254,7 +256,7 @@ func GetCloudFromYAML(opts *ClientOpts) (*Cloud, error) {
 
 			cloud, err = mergeClouds(cloud, publicCloud)
 			if err != nil {
-				return nil, fmt.Errorf("Could not merge information from clouds.yaml and clouds-public.yaml for cloud %s", profileName)
+				return nil, fmt.Errorf("could not merge information from clouds.yaml and clouds-public.yaml for cloud %s", profileName)
 			}
 		}
 	}
@@ -282,7 +284,7 @@ func GetCloudFromYAML(opts *ClientOpts) (*Cloud, error) {
 			// if no entry in clouds.yaml was found and
 			// if a single-entry secureCloud wasn't used.
 			// At this point, no entry could be determined at all.
-			return nil, fmt.Errorf("Could not find cloud %s", cloudName)
+			return nil, fmt.Errorf("could not find cloud %s", cloudName)
 		}
 
 		// If secureCloud has content and it differs from the cloud entry,
@@ -298,7 +300,7 @@ func GetCloudFromYAML(opts *ClientOpts) (*Cloud, error) {
 	// As an extra precaution, do one final check to see if cloud is nil.
 	// We shouldn't reach this point, though.
 	if cloud == nil {
-		return nil, fmt.Errorf("Could not find cloud %s", cloudName)
+		return nil, fmt.Errorf("could not find cloud %s", cloudName)
 	}
 
 	// Default is to verify SSL API requests
@@ -402,7 +404,7 @@ func AuthOptions(opts *ClientOpts) (*gophercloud.AuthOptions, error) {
 		return v3auth(cloud, opts)
 	}
 
-	return nil, fmt.Errorf("Unable to build AuthOptions")
+	return nil, fmt.Errorf("unable to build AuthOptions")
 }
 
 func determineIdentityAPI(cloud *Cloud, opts *ClientOpts) string {
@@ -653,6 +655,12 @@ func v3auth(cloud *Cloud, opts *ClientOpts) (*gophercloud.AuthOptions, error) {
 		}
 	}
 
+	if cloud.AuthInfo.TrustID == "" {
+		if v := env.Getenv(envPrefix + "TRUST_ID"); v != "" {
+			cloud.AuthInfo.TrustID = v
+		}
+	}
+
 	// Build a scope and try to do it correctly.
 	// https://github.com/openstack/os-client-config/blob/master/os_client_config/config.py#L595
 	scope := new(gophercloud.AuthScope)
@@ -662,6 +670,8 @@ func v3auth(cloud *Cloud, opts *ClientOpts) (*gophercloud.AuthOptions, error) {
 		// If Domain* is set, but UserDomain* or ProjectDomain* aren't,
 		// then use Domain* as the default setting.
 		cloud = setDomainIfNeeded(cloud)
+	} else if cloud.AuthInfo.TrustID != "" {
+		scope.TrustID = cloud.AuthInfo.TrustID
 	} else {
 		if !isProjectScoped(cloud.AuthInfo) {
 			if cloud.AuthInfo.DomainID != "" {
@@ -737,6 +747,62 @@ func AuthenticatedClient(ctx context.Context, opts *ClientOpts) (*gophercloud.Pr
 	return openstack.AuthenticatedClient(ctx, *ao)
 }
 
+// PrepareTLSConfig builds a *tls.Config from environment variables and cloud
+// configuration. Environment variables are checked first; cloud entry values
+// override if set.
+func PrepareTLSConfig(envPrefix string, cloud *Cloud) (*tls.Config, error) {
+	// Check if a custom CA cert was provided.
+	// First, check if the CACERT environment variable is set.
+	var caCertPath string
+	if v := env.Getenv(envPrefix + "CACERT"); v != "" {
+		caCertPath = v
+	}
+	// Next, check if the cloud entry sets a CA cert.
+	if v := cloud.CACertFile; v != "" {
+		caCertPath = v
+	}
+
+	// Check if a custom client cert was provided.
+	// First, check if the CERT environment variable is set.
+	var clientCertPath string
+	if v := env.Getenv(envPrefix + "CERT"); v != "" {
+		clientCertPath = v
+	}
+	// Next, check if the cloud entry sets a client cert.
+	if v := cloud.ClientCertFile; v != "" {
+		clientCertPath = v
+	}
+
+	// Check if a custom client key was provided.
+	// First, check if the KEY environment variable is set.
+	var clientKeyPath string
+	if v := env.Getenv(envPrefix + "KEY"); v != "" {
+		clientKeyPath = v
+	}
+	// Next, check if the cloud entry sets a client key.
+	if v := cloud.ClientKeyFile; v != "" {
+		clientKeyPath = v
+	}
+
+	// Define whether or not SSL API requests should be verified.
+	// First, check if the INSECURE environment variable is set.
+	var insecurePtr *bool
+	if v := env.Getenv(envPrefix + "INSECURE"); v != "" {
+		insecure, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %sINSECURE: %w", envPrefix, err)
+		}
+		insecurePtr = &insecure
+	}
+	// Next, check if the cloud entry sets verify (inverted to insecure).
+	if cloud.Verify != nil {
+		insecure := !*cloud.Verify
+		insecurePtr = &insecure
+	}
+
+	return internal.PrepareTLSConfig(caCertPath, clientCertPath, clientKeyPath, insecurePtr)
+}
+
 // NewServiceClient is a convenience function to get a new service client.
 func NewServiceClient(ctx context.Context, service string, opts *ClientOpts) (*gophercloud.ServiceClient, error) {
 	cloud := new(Cloud)
@@ -774,48 +840,7 @@ func NewServiceClient(ctx context.Context, service string, opts *ClientOpts) (*g
 		}
 	}
 
-	// Check if a custom CA cert was provided.
-	// First, check if the CACERT environment variable is set.
-	var caCertPath string
-	if v := env.Getenv(envPrefix + "CACERT"); v != "" {
-		caCertPath = v
-	}
-	// Next, check if the cloud entry sets a CA cert.
-	if v := cloud.CACertFile; v != "" {
-		caCertPath = v
-	}
-
-	// Check if a custom client cert was provided.
-	// First, check if the CERT environment variable is set.
-	var clientCertPath string
-	if v := env.Getenv(envPrefix + "CERT"); v != "" {
-		clientCertPath = v
-	}
-	// Next, check if the cloud entry sets a client cert.
-	if v := cloud.ClientCertFile; v != "" {
-		clientCertPath = v
-	}
-
-	// Check if a custom client key was provided.
-	// First, check if the KEY environment variable is set.
-	var clientKeyPath string
-	if v := env.Getenv(envPrefix + "KEY"); v != "" {
-		clientKeyPath = v
-	}
-	// Next, check if the cloud entry sets a client key.
-	if v := cloud.ClientKeyFile; v != "" {
-		clientKeyPath = v
-	}
-
-	// Define whether or not SSL API requests should be verified.
-	var insecurePtr *bool
-	if cloud.Verify != nil {
-		// Here we take the boolean pointer negation.
-		insecure := !*cloud.Verify
-		insecurePtr = &insecure
-	}
-
-	tlsConfig, err := internal.PrepareTLSConfig(caCertPath, clientCertPath, clientKeyPath, insecurePtr)
+	tlsConfig, err := PrepareTLSConfig(envPrefix, cloud)
 	if err != nil {
 		return nil, err
 	}

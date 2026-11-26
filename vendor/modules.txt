@@ -1053,8 +1053,8 @@ github.com/gobwas/glob/util/strings
 # github.com/gofrs/flock v0.12.1
 ## explicit; go 1.21.0
 github.com/gofrs/flock
-# github.com/gofrs/uuid/v5 v5.3.0
-## explicit; go 1.19
+# github.com/gofrs/uuid/v5 v5.5.1
+## explicit; go 1.25
 github.com/gofrs/uuid/v5
 # github.com/golang-jwt/jwt/v4 v4.5.2 => github.com/golang-jwt/jwt/v4 v4.5.2
 ## explicit; go 1.16
@@ -1328,8 +1328,8 @@ github.com/googleapis/gax-go/v2/internallog
 github.com/googleapis/gax-go/v2/internallog/grpclog
 github.com/googleapis/gax-go/v2/internallog/internal
 github.com/googleapis/gax-go/v2/iterator
-# github.com/gophercloud/gophercloud/v2 v2.10.0
-## explicit; go 1.22
+# github.com/gophercloud/gophercloud/v2 v2.15.0
+## explicit; go 1.25.0
 github.com/gophercloud/gophercloud/v2
 github.com/gophercloud/gophercloud/v2/openstack
 github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/availabilityzones
@@ -1374,8 +1374,8 @@ github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares
 github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/snapshots
 github.com/gophercloud/gophercloud/v2/openstack/utils
 github.com/gophercloud/gophercloud/v2/pagination
-# github.com/gophercloud/utils/v2 v2.0.0-20250212084022-725b94822eeb
-## explicit; go 1.22
+# github.com/gophercloud/utils/v2 v2.0.0-20260922174841-b4759ea0529b
+## explicit; go 1.25.0
 github.com/gophercloud/utils/v2/env
 github.com/gophercloud/utils/v2/gnocchi
 github.com/gophercloud/utils/v2/internal

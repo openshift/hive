@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"maps"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -18,11 +19,9 @@ import (
 //
 // This is useful for determining the extra fields returned in response bodies
 // for resources that can contain an arbitrary or dynamic number of fields.
-func RemainingKeys(s interface{}, m map[string]interface{}) (extras map[string]interface{}) {
-	extras = make(map[string]interface{})
-	for k, v := range m {
-		extras[k] = v
-	}
+func RemainingKeys(s any, m map[string]any) (extras map[string]any) {
+	extras = make(map[string]any)
+	maps.Copy(extras, m)
 
 	valueOf := reflect.ValueOf(s)
 	typeOf := reflect.TypeOf(s)
@@ -44,14 +43,14 @@ func RemainingKeys(s interface{}, m map[string]interface{}) (extras map[string]i
 func PrepareTLSConfig(caCertFile, clientCertFile, clientKeyFile string, insecure *bool) (*tls.Config, error) {
 	config := &tls.Config{}
 	if caCertFile != "" {
-		caCert, _, err := pathOrContents(caCertFile)
+		caCert, err := pathOrContents(caCertFile)
 		if err != nil {
-			return nil, fmt.Errorf("Error reading CA Cert: %s", err)
+			return nil, fmt.Errorf("error reading CA Cert: %s", err)
 		}
 
 		caCertPool := x509.NewCertPool()
 		if ok := caCertPool.AppendCertsFromPEM(bytes.TrimSpace(caCert)); !ok {
-			return nil, fmt.Errorf("Error parsing CA Cert from %s", caCertFile)
+			return nil, fmt.Errorf("error parsing CA Cert from %s", caCertFile)
 		}
 		config.RootCAs = caCertPool
 	}
@@ -63,13 +62,13 @@ func PrepareTLSConfig(caCertFile, clientCertFile, clientKeyFile string, insecure
 	}
 
 	if clientCertFile != "" && clientKeyFile != "" {
-		clientCert, _, err := pathOrContents(clientCertFile)
+		clientCert, err := pathOrContents(clientCertFile)
 		if err != nil {
-			return nil, fmt.Errorf("Error reading Client Cert: %s", err)
+			return nil, fmt.Errorf("error reading Client Cert: %s", err)
 		}
-		clientKey, _, err := pathOrContents(clientKeyFile)
+		clientKey, err := pathOrContents(clientKeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("Error reading Client Key: %s", err)
+			return nil, fmt.Errorf("error reading Client Key: %s", err)
 		}
 
 		cert, err := tls.X509KeyPair(clientCert, clientKey)
@@ -78,22 +77,21 @@ func PrepareTLSConfig(caCertFile, clientCertFile, clientKeyFile string, insecure
 		}
 
 		config.Certificates = []tls.Certificate{cert}
-		config.BuildNameToCertificate()
 	}
 
 	return config, nil
 }
 
-func pathOrContents(poc string) ([]byte, bool, error) {
+func pathOrContents(poc string) ([]byte, error) {
 	if len(poc) == 0 {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	path := poc
 	if path[0] == '~' {
 		usr, err := user.Current()
 		if err != nil {
-			return []byte(path), true, err
+			return []byte(path), err
 		}
 
 		if len(path) == 1 {
@@ -106,10 +104,10 @@ func pathOrContents(poc string) ([]byte, bool, error) {
 	if _, err := os.Stat(path); err == nil {
 		contents, err := os.ReadFile(path)
 		if err != nil {
-			return contents, true, err
+			return contents, err
 		}
-		return contents, true, nil
+		return contents, nil
 	}
 
-	return []byte(poc), false, nil
+	return []byte(poc), nil
 }

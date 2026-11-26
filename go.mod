@@ -483,7 +483,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v0.59.0 // indirect
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20251029084908-344babe6a957
+	github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20261119212241-2dbb6a19dfce
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/quasilyte/gogrep v0.5.0 // indirect

@@ -807,6 +807,10 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 					// copy over the value to spoof the immutability checker
 					oldObject.Spec.ClusterMetadata.MetadataJSONSecretRef = cd.Spec.ClusterMetadata.MetadataJSONSecretRef
 				}
+				if cd.Spec.ClusterMetadata.AdminPasswordSecretRef == nil && oldObject.Spec.ClusterMetadata.AdminPasswordSecretRef != nil {
+					// copy over the value to spoof the immutability checker
+					oldObject.Spec.ClusterMetadata.AdminPasswordSecretRef = nil
+				}
 				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}
 		} else {

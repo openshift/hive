@@ -519,7 +519,7 @@ replace github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
 // CVE-2026-73500: Transitive deps
 // NB: I *think* the CVE is for etcd-the-product, not etcd-the-lib. But this (and the `require`s) ought to stop us getting flagged.
 replace (
-	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.1
+	go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.4
 	go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.1
 )
 

@@ -4385,5 +4385,5 @@ sigs.k8s.io/yaml/kyaml
 # k8s.io/cloud-provider-vsphere => github.com/openshift/cloud-provider-vsphere v1.19.1-0.20261022123231-103974bfb3aa
 # github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
 # github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
-# go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.1
+# go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.4
 # go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.1

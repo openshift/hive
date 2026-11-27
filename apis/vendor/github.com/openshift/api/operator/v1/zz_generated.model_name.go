@@ -141,6 +141,16 @@ func (in CSISnapshotControllerStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CanaryNodePlacement) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.CanaryNodePlacement"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in CanaryToleration) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.CanaryToleration"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in Capability) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.Capability"
 }
@@ -173,6 +183,51 @@ func (in CloudCredentialSpec) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in CloudCredentialStatus) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.CloudCredentialStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPI) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPI"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIInstallerComponent) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIInstallerComponent"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIInstallerComponentImage) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIInstallerComponentImage"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIInstallerComponentSource) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIInstallerComponentSource"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIInstallerRevision) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIInstallerRevision"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIInstallerRevisionManifestSubstitution) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIInstallerRevisionManifestSubstitution"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIList) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPISpec) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPISpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterAPIStatus) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ClusterAPIStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -241,6 +296,16 @@ func (in Console) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ConsoleAuthProxyConfig) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ConsoleAuthProxyConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ConsoleAuthProxyTrustedCAConfigMapReference) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ConsoleAuthProxyTrustedCAConfigMapReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ConsoleConfigRoute) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.ConsoleConfigRoute"
 }
@@ -248,6 +313,11 @@ func (in ConsoleConfigRoute) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ConsoleCustomization) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.ConsoleCustomization"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ConsoleIngress) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.ConsoleIngress"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -411,6 +481,11 @@ func (in GCPLoadBalancerParameters) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in GatewayAPIIngressConfig) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.GatewayAPIIngressConfig"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in GatewayConfig) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.GatewayConfig"
 }
@@ -506,6 +581,11 @@ func (in Ingress) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressCanary) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressCanary"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in IngressController) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.IngressController"
 }
@@ -528,6 +608,11 @@ func (in IngressControllerCaptureHTTPHeader) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in IngressControllerCaptureHTTPHeaders) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.IngressControllerCaptureHTTPHeaders"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressControllerContainerResource) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressControllerContainerResource"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -566,6 +651,11 @@ func (in IngressControllerLogging) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressControllerResources) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressControllerResources"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in IngressControllerSetHTTPHeader) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.IngressControllerSetHTTPHeader"
 }
@@ -583,6 +673,21 @@ func (in IngressControllerStatus) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in IngressControllerTuningOptions) OpenAPIModelName() string {
 	return "com.github.openshift.api.operator.v1.IngressControllerTuningOptions"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressList) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressSpec) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in IngressStatus) OpenAPIModelName() string {
+	return "com.github.openshift.api.operator.v1.IngressStatus"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

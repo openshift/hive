@@ -22,7 +22,7 @@ require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/heptio/velero v1.0.0
+	github.com/heptio/velero v1.19.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/json-iterator/go v1.1.12
 	github.com/miekg/dns v1.1.35

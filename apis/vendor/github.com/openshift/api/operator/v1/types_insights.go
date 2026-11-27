@@ -12,6 +12,7 @@ import (
 // +kubebuilder:subresource:status
 // +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1237
 // +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=insights,operatorOrdering=00
+// +openshift:capability=Insights
 //
 // InsightsOperator holds cluster-wide information about the Insights Operator.
 //
@@ -96,13 +97,13 @@ type HealthCheck struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=4
 	TotalRisk int32 `json:"totalRisk"`
-	// advisorURI provides the URL link to the Insights Advisor.
+	// advisorURI provides the URL link to the Red Hat Lightspeed Advisor UI.
 	// +required
 	// +kubebuilder:validation:Pattern=`^https:\/\/\S+`
 	AdvisorURI string `json:"advisorURI"`
 	// state determines what the current state of the health check is.
 	// Health check is enabled by default and can be disabled
-	// by the user in the Insights advisor user interface.
+	// by the user in the Red Hat Lightspeed Advisor UI.
 	// +required
 	State HealthCheckState `json:"state"`
 }

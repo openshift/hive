@@ -4386,4 +4386,4 @@ sigs.k8s.io/yaml/kyaml
 # github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
 # github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
 # go.etcd.io/etcd/pkg/v3 => go.etcd.io/etcd/pkg/v3 v3.7.1
-# go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.1
+# go.etcd.io/etcd/server/v3 => go.etcd.io/etcd/server/v3 v3.7.4

@@ -9,7 +9,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

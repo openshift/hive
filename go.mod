@@ -47,7 +47,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
-	github.com/tidwall/gjson v1.18.0
+	github.com/tidwall/gjson v1.20.6
 	github.com/vmware/govmomi v0.53.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/lint v0.0.0-20241112194109-818c5a804067
@@ -491,7 +491,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sivchari/tenv v1.12.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/pretty v1.3.0 // indirect
 	github.com/tidwall/sjson v1.2.5
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect

@@ -2303,13 +2303,13 @@ github.com/tdakkota/asciicheck
 # github.com/tetafro/godot v1.5.0
 ## explicit; go 1.20
 github.com/tetafro/godot
-# github.com/tidwall/gjson v1.18.0
-## explicit; go 1.12
+# github.com/tidwall/gjson v1.20.6
+## explicit; go 1.23
 github.com/tidwall/gjson
 # github.com/tidwall/match v1.1.1
 ## explicit; go 1.15
 github.com/tidwall/match
-# github.com/tidwall/pretty v1.2.1
+# github.com/tidwall/pretty v1.3.0
 ## explicit; go 1.16
 github.com/tidwall/pretty
 # github.com/tidwall/sjson v1.2.5

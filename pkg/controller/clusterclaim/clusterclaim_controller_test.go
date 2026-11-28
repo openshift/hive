@@ -721,7 +721,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					{
 						APIGroups:     []string{""},
 						Resources:     []string{"secrets"},
-						ResourceNames: []string{kubeconfigSecretName, passwordSecretName, metadatajsonSecretName},
+						ResourceNames: []string{kubeconfigSecretName, metadatajsonSecretName, passwordSecretName},
 						Verbs:         []string{"get"},
 					},
 				}
@@ -930,7 +930,7 @@ func testRole() *rbacv1.Role {
 			{
 				APIGroups:     []string{""},
 				Resources:     []string{"secrets"},
-				ResourceNames: []string{kubeconfigSecretName, passwordSecretName, metadatajsonSecretName},
+				ResourceNames: []string{kubeconfigSecretName, metadatajsonSecretName, passwordSecretName},
 				Verbs:         []string{"get"},
 			},
 		},
@@ -950,4 +950,100 @@ func testRoleBinding() *rbacv1.RoleBinding {
 			Name:     hiveClaimOwnerRoleName,
 		},
 	}
+}
+
+// TestReconcileClusterClaimWithClearedAdminPassword tests RBAC creation when AdminPasswordSecretRef is cleared
+func TestReconcileClusterClaimWithClearedAdminPassword(t *testing.T) {
+	scheme := scheme.GetScheme()
+
+	// Create ClusterPool (required for RBAC creation)
+	pool := testcp.FullBuilder(claimNamespace, "test-pool", scheme).
+		GenericOptions(
+			testgeneric.WithFinalizer(finalizer),
+		).
+		Options(
+			testcp.ForAWS("secret", "us-east-1"),
+			testcp.WithBaseDomain("test-domain"),
+			testcp.WithImageSet("test-imageset"),
+		).Build()
+
+	// Create a ClusterDeployment WITHOUT AdminPasswordSecretRef (cleared/nil)
+	cd := testcd.FullBuilder(clusterName, clusterName, scheme).Options(
+		func(cd *hivev1.ClusterDeployment) {
+			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: kubeconfigSecretName},
+				AdminPasswordSecretRef:   nil, // CLEARED - this is what we're testing!
+				MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadatajsonSecretName},
+			}
+		},
+		testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+		testcd.WithStatusPowerState(hivev1.ClusterPowerStateRunning),
+	).Build()
+
+	// Create initialized claim with conditions (matches "existing assignment" test pattern)
+	claim := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
+		testclaim.WithSubjects(subjects),
+		testclaim.WithCluster(clusterName),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterClaimPendingCondition,
+		}),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterRunningCondition,
+		}),
+	).Build()
+
+	c := testfake.NewFakeClientBuilder().
+		WithRuntimeObjects(cd, claim, pool).
+		Build()
+
+	r := &ReconcileClusterClaim{
+		Client: c,
+		logger: log.WithField("controller", "clusterclaim"),
+	}
+
+	// Reconcile the claim (may need multiple passes)
+	_, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      claimName,
+			Namespace: claimNamespace,
+		},
+	})
+	require.NoError(t, err, "unexpected error during first reconciliation")
+
+	// Second reconcile to ensure RBAC is applied
+	_, err = r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      claimName,
+			Namespace: claimNamespace,
+		},
+	})
+	require.NoError(t, err, "unexpected error during second reconciliation")
+
+	// Verify RBAC role was created
+	role := &rbacv1.Role{}
+	err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName}, role)
+	require.NoError(t, err, "role should be created")
+
+	// Find the secrets policy rule
+	var secretsRule *rbacv1.PolicyRule
+	for i := range role.Rules {
+		if len(role.Rules[i].Resources) > 0 && role.Rules[i].Resources[0] == "secrets" {
+			secretsRule = &role.Rules[i]
+			break
+		}
+	}
+	require.NotNil(t, secretsRule, "secrets policy rule not found")
+
+	// IMPORTANT: Should only have 2 secrets (kubeconfig and metadata), NOT password
+	expectedResourceNames := []string{kubeconfigSecretName, metadatajsonSecretName}
+	assert.Equal(t, expectedResourceNames, secretsRule.ResourceNames,
+		"when AdminPasswordSecretRef is nil, RBAC should only include kubeconfig and metadata secrets (NOT password secret)")
+
+	// Verify role binding was also created
+	roleBinding := &rbacv1.RoleBinding{}
+	err = c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName}, roleBinding)
+	assert.NoError(t, err, "role binding should be created")
+	assert.Equal(t, subjects, roleBinding.Subjects, "unexpected role binding subjects")
 }

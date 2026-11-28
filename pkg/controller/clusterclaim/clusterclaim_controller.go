@@ -587,6 +587,14 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeploy
 	if cd.Spec.ClusterMetadata.MetadataJSONSecretRef == nil || cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name == "" {
 		return fmt.Errorf("can't apply RBAC for ClusterClaim owner: ClusterDeployment %s/%s has no metadata.json Secret", cd.Namespace, cd.Name)
 	}
+	resourceNames := []string{
+		cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, // HIVE-2485: n/a
+		cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name,
+	}
+	// Only add admin password secret if it exists
+	if cd.Spec.ClusterMetadata.AdminPasswordSecretRef != nil {
+		resourceNames = append(resourceNames, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name)
+	}
 	desiredRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cd.Namespace,
@@ -601,14 +609,10 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeploy
 			},
 			// Allow read access to the kubeconfig, admin password, and metadata.json secrets
 			{
-				APIGroups: []string{corev1.GroupName},
-				Resources: []string{"secrets"},
-				ResourceNames: []string{
-					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, // HIVE-2485: n/a
-					cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name,
-					cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name,
-				},
-				Verbs: []string{"get"},
+				APIGroups:     []string{corev1.GroupName},
+				Resources:     []string{"secrets"},
+				ResourceNames: resourceNames,
+				Verbs:         []string{"get"},
 			},
 		},
 	}

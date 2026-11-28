@@ -320,6 +320,85 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name: "Clear AdminPasswordSecretRef: installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "kubeadmin-password"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   nil, // CLEARED
+				}
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Clear AdminPasswordSecretRef: not installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "kubeadmin-password"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   nil, // CLEARED
+				}
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Modify AdminPasswordSecretRef: should fail",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "old-password"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:                  "an-infra-id",
+					ClusterID:                "a-cluster-id",
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"},
+					AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "new-password"}, // MODIFIED
+				}
+				return cd
+			}(),
+			operation:       admissionv1.Update,
+			expectedAllowed: false, // Should FAIL - we only allow CLEARING, not CHANGING
+		},
+		{
 			name: "Test clearing installed flag",
 			oldObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()

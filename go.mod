@@ -514,7 +514,7 @@ replace (
 replace github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
 
 // CVE-2025-30204: Some transitive deps are still using older v4. Safe to remove once go.sum shows only 4.5.2 or higher.
-replace github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2
+replace github.com/golang-jwt/jwt/v5 => github.com/golang-jwt/jwt/v4 v5.3.1
 
 // CVE-2026-73500: Transitive deps
 // NB: I *think* the CVE is for etcd-the-product, not etcd-the-lib. But this (and the `require`s) ought to stop us getting flagged.

@@ -148,7 +148,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.7
-	github.com/aws/smithy-go v1.24.2
+	github.com/aws/smithy-go v1.28.10
 	github.com/gophercloud/utils/v2 v2.0.0-20250212084022-725b94822eeb
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
 )

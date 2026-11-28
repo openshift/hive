@@ -11,8 +11,6 @@ var legacyFeatureGates = sets.New(
 	// never add to this list, if you think you have an exception ask @deads2k
 	"AutomatedEtcdBackup",
 	// never add to this list, if you think you have an exception ask @deads2k
-	"AzureWorkloadIdentity",
-	// never add to this list, if you think you have an exception ask @deads2k
 	"BootcNodeManagement",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"BuildCSIVolumes",
@@ -34,8 +32,6 @@ var legacyFeatureGates = sets.New(
 	"GCPClusterHostedDNS",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"HardwareSpeed",
-	// never add to this list, if you think you have an exception ask @deads2k
-	"ImageStreamImportMode",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"IngressControllerDynamicConfigurationManager",
 	// never add to this list, if you think you have an exception ask @deads2k
@@ -87,15 +83,9 @@ var legacyFeatureGates = sets.New(
 	// never add to this list, if you think you have an exception ask @deads2k
 	"SignatureStores",
 	// never add to this list, if you think you have an exception ask @deads2k
-	"SigstoreImageVerification",
-	// never add to this list, if you think you have an exception ask @deads2k
-	"UpgradeStatus",
-	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereControlPlaneMachineSet",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereDriverConfiguration",
-	// never add to this list, if you think you have an exception ask @deads2k
-	"VSphereMultiNetworks",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"VSphereMultiVCenters",
 	// never add to this list, if you think you have an exception ask @deads2k

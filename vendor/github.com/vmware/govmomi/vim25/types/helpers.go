@@ -217,7 +217,7 @@ func (ci VirtualMachineConfigInfo) ToConfigSpec() VirtualMachineConfigSpec {
 
 	if l := len(ci.CpuFeatureMask); l > 0 {
 		cs.CpuFeatureMask = make([]VirtualMachineCpuIdInfoSpec, l)
-		for i := 0; i < l; i++ {
+		for i := range l {
 			cs.CpuFeatureMask[i] = VirtualMachineCpuIdInfoSpec{
 				ArrayUpdateSpec: ArrayUpdateSpec{
 					Operation: ArrayUpdateOperationAdd,
@@ -236,7 +236,7 @@ func (ci VirtualMachineConfigInfo) ToConfigSpec() VirtualMachineConfigSpec {
 
 	if l := len(ci.Hardware.Device); l > 0 {
 		cs.DeviceChange = make([]BaseVirtualDeviceConfigSpec, l)
-		for i := 0; i < l; i++ {
+		for i := range l {
 			cs.DeviceChange[i] = &VirtualDeviceConfigSpec{
 				Operation:     VirtualDeviceConfigSpecOperationAdd,
 				FileOperation: VirtualDeviceConfigSpecFileOperationCreate,
@@ -294,6 +294,10 @@ func (ci VirtualMachineConfigInfo) ToConfigSpec() VirtualMachineConfigSpec {
 
 		for i := range civa.Property {
 			p := civa.Property[i]
+
+			if p.UserConfigurable == nil {
+				p.UserConfigurable = NewBool(false)
+			}
 			csva.Property = append(
 				csva.Property,
 				VAppPropertySpec{

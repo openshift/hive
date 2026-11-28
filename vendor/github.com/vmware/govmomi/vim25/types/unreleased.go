@@ -156,76 +156,317 @@ func init() {
 }
 
 func init() {
-	Add("PodVMOverheadInfo", reflect.TypeOf((*PodVMOverheadInfo)(nil)).Elem())
+	minAPIVersionForType["HostRuntimeInfoPodVMInfo"] = "9.1.0.0"
+	Add("HostRuntimeInfoPodVMInfo", reflect.TypeOf((*HostRuntimeInfoPodVMInfo)(nil)).Elem())
 }
 
-type PodVMOverheadInfo struct {
-	CrxPageSharingSupported         bool  `xml:"crxPageSharingSupported"`
-	PodVMOverheadWithoutPageSharing int32 `xml:"podVMOverheadWithoutPageSharing"`
-	PodVMOverheadWithPageSharing    int32 `xml:"podVMOverheadWithPageSharing"`
+type HostRuntimeInfoPodVMInfo struct {
+	DynamicData
+
+	HasPageSharingPodVM bool              `xml:"hasPageSharingPodVM"`
+	PodVMOverheadInfo   PodVMOverheadInfo `xml:"podVMOverheadInfo"`
 }
 
-// Describes an action for the initial placement of a virtual machine in a cluster.
-//
-// This action is used by the cross cluster placement API when a virtual machine
-// needs to be placed across a set of given clusters. See `Folder.PlaceVmsXCluster`.
-// This action encapsulates details about the chosen cluster (via the resource pool
-// inside that cluster), the chosen host and the chosen datastores for the disks of
-// the virtual machine.
-type ClusterClusterInitialPlacementActionEx struct {
-	ClusterAction
+type UpdatePodVMPropertyRequestType struct {
+	This ManagedObjectReference `xml:"_this" json:"-"`
+	// Indicates the property within PodVMInfo to update
+	PropertyPath string `xml:"propertyPath" json:"propertyPath"`
+	// Value of propertyPath requested to be updated
+	Property AnyType `xml:"property,omitempty,typeattr" json:"property,omitempty"`
+}
 
-	// The host where the virtual machine should be initially placed.
-	//
-	// This field is optional because the primary use case of
-	// `Folder.PlaceVmsXCluster` is to select the best cluster for placing VMs. This
-	// `ClusterClusterInitialPlacementAction.targetHost` denotes the best host
-	// within the best cluster and it is only returned if the client asks for it,
-	// which is determined by `PlaceVmsXClusterSpec.hostRecommRequired`.
-	// If `PlaceVmsXClusterSpec.hostRecommRequired` is set to true, then the
-	// targetHost is returned with a valid value and if it is either set to false
-	// or left unset, then targetHost is also left unset. When this field is unset,
-	// then it means that the client did not ask for the target host within the
-	// recommended cluster. It does not mean that there is no recommended host
-	// for placing this VM in the recommended cluster.
-	//
-	// Refers instance of `HostSystem`.
-	TargetHost *ManagedObjectReference `xml:"targetHost,omitempty" json:"targetHost,omitempty"`
+func init() {
+	t["UpdatePodVMPropertyRequestType"] = reflect.TypeOf((*UpdatePodVMPropertyRequestType)(nil)).Elem()
+}
 
-	// The chosen resource pool for placing the virtual machine.
-	//
-	// This is non-optional because recommending the best cluster (by recommending the
-	// resource pool in the best cluster) is the primary use case for the
-	// `ClusterClusterInitialPlacementAction`.
-	//
-	// Refers instance of `ResourcePool`.
-	Pool ManagedObjectReference `xml:"pool" json:"pool"`
+type UpdatePodVMProperty UpdatePodVMPropertyRequestType
 
-	// The config spec of the virtual machine to be placed.
-	//
-	// The `Folder.PlaceVmsXCluster` method takes input of `VirtualMachineConfigSpec`
-	// from client and populates the backing for each virtual disk and the VM home
-	// path in it unless the input ConfigSpec already provides them. The existing
-	// settings in the input ConfigSpec are preserved and not overridden in the
-	// returned ConfigSpec in this action as well as the resulting
-	// `ClusterRecommendation`. This field is set based on whether the client needs
-	// `Folder.PlaceVmsXCluster` to recommend a backing datastore for the disks of
-	// the candidate VMs or not, which is specified via
-	// `PlaceVmsXClusterSpec.datastoreRecommRequired`. If
-	// `PlaceVmsXClusterSpec.datastoreRecommRequired` is set to true, then this
-	// `ClusterClusterInitialPlacementAction.configSpec` is also set with the
-	// backing of each disk populated. If
-	// `PlaceVmsXClusterSpec.datastoreRecommRequired` is either set to false or left
-	// unset, then this field is also left unset. When this field is left unset,
-	// then it means that the client did not ask to populate the backing datastore
-	// for the disks of the candidate VMs.
-	ConfigSpec *VirtualMachineConfigSpec `xml:"configSpec,omitempty" json:"configSpec,omitempty"`
+func init() {
+	minAPIVersionForType["UpdatePodVMProperty"] = "9.1.0.0"
+	t["UpdatePodVMProperty"] = reflect.TypeOf((*UpdatePodVMProperty)(nil)).Elem()
+}
 
-	AvailableNetworks []ManagedObjectReference `xml:"availableNetworks,omitempty" json:"availableNetworks,omitempty"`
+type UpdatePodVMPropertyResponse struct {
+}
+
+type BaseClusterClusterInitialPlacementAction interface {
+	GetClusterClusterInitialPlacementAction() *ClusterClusterInitialPlacementAction
+}
+
+func (a ClusterClusterInitialPlacementAction) GetClusterClusterInitialPlacementAction() *ClusterClusterInitialPlacementAction {
+	return &a
 }
 
 func init() {
 	minAPIVersionForType["ClusterClusterInitialPlacementActionEx"] = "9.1.0.0"
-	t["ClusterClusterInitialPlacementActionEx"] = reflect.TypeOf((*ClusterClusterInitialPlacementActionEx)(nil)).Elem()
-	Add("ClusterClusterInitialPlacementAction", reflect.TypeOf((*ClusterClusterInitialPlacementActionEx)(nil)).Elem())
+	t["ClusterClusterInitialPlacementAction"] = reflect.TypeOf((*ClusterClusterInitialPlacementAction)(nil)).Elem()
+	t["BaseClusterClusterInitialPlacementAction"] = reflect.TypeOf((*ClusterClusterInitialPlacementAction)(nil)).Elem()
+}
+
+// SharedDiskVmGroupInfoSharedDiskVmInfo is a row in SharedDiskVmGroupInfo (vim.vm.SharedDiskVmGroupInfo.SharedDiskVmInfo).
+type SharedDiskVmGroupInfoSharedDiskVmInfo struct {
+	DynamicData
+
+	DiskKey       int32           `xml:"diskKey" json:"diskKey"`
+	VirtualDiskId []VirtualDiskId `xml:"virtualDiskId,omitempty" json:"virtualDiskId,omitempty"`
+}
+
+func init() {
+	t["SharedDiskVmGroupInfoSharedDiskVmInfo"] = reflect.TypeOf((*SharedDiskVmGroupInfoSharedDiskVmInfo)(nil)).Elem()
+}
+
+// SharedDiskVmGroupInfo describes VMs sharing multi-writer or SCSI bus-sharing disks (vim.vm.SharedDiskVmGroupInfo).
+type SharedDiskVmGroupInfo struct {
+	DynamicData
+
+	SharedDiskVmInfo []SharedDiskVmGroupInfoSharedDiskVmInfo `xml:"sharedDiskVmInfo,omitempty" json:"sharedDiskVmInfo,omitempty"`
+}
+
+func init() {
+	t["SharedDiskVmGroupInfo"] = reflect.TypeOf((*SharedDiskVmGroupInfo)(nil)).Elem()
+}
+
+type FetchVmGroupForMultiwriterDisksRequestType struct {
+	This    ManagedObjectReference `xml:"_this" json:"-"`
+	DiskIds *ArrayOfInt            `xml:"diskIds,omitempty" json:"diskIds,omitempty"`
+}
+
+func init() {
+	t["FetchVmGroupForMultiwriterDisksRequestType"] = reflect.TypeOf((*FetchVmGroupForMultiwriterDisksRequestType)(nil)).Elem()
+}
+
+// FetchVmGroupForMultiwriterDisks is VirtualMachine#fetchVmGroupForMultiwriterDisks (MultiwriterDiskVMotion).
+type FetchVmGroupForMultiwriterDisks FetchVmGroupForMultiwriterDisksRequestType
+
+func init() {
+	t["FetchVmGroupForMultiwriterDisks"] = reflect.TypeOf((*FetchVmGroupForMultiwriterDisks)(nil)).Elem()
+}
+
+type FetchVmGroupForMultiwriterDisksResponse struct {
+	Returnval *SharedDiskVmGroupInfo `xml:"returnval,omitempty" json:"returnval,omitempty"`
+}
+
+// InsufficientResourcesQuotaResourceType identifies the type of resource whose quota was exceeded.
+type InsufficientResourcesQuotaResourceType string
+
+const (
+	// InsufficientResourcesQuotaResourceTypeCpu indicates CPU quota was exceeded (unit: MHz).
+	InsufficientResourcesQuotaResourceTypeCpu = InsufficientResourcesQuotaResourceType("cpu")
+	// InsufficientResourcesQuotaResourceTypeMemory indicates memory quota was exceeded (unit: bytes).
+	InsufficientResourcesQuotaResourceTypeMemory = InsufficientResourcesQuotaResourceType("memory")
+)
+
+func (e InsufficientResourcesQuotaResourceType) Values() []InsufficientResourcesQuotaResourceType {
+	return []InsufficientResourcesQuotaResourceType{
+		InsufficientResourcesQuotaResourceTypeCpu,
+		InsufficientResourcesQuotaResourceTypeMemory,
+	}
+}
+
+func (e InsufficientResourcesQuotaResourceType) Strings() []string {
+	return EnumValuesAsStrings(e.Values())
+}
+
+func init() {
+	t["InsufficientResourcesQuotaResourceType"] = reflect.TypeOf((*InsufficientResourcesQuotaResourceType)(nil)).Elem()
+}
+
+// InsufficientResourcesQuotaResourceQuotaType identifies the type of quota that was violated.
+type InsufficientResourcesQuotaResourceQuotaType string
+
+const (
+	// InsufficientResourcesQuotaResourceQuotaTypeReservation indicates a violation against reservation capacity.
+	InsufficientResourcesQuotaResourceQuotaTypeReservation = InsufficientResourcesQuotaResourceQuotaType("reservation")
+	// InsufficientResourcesQuotaResourceQuotaTypeConfiguredSize indicates a violation against configured size capacity.
+	InsufficientResourcesQuotaResourceQuotaTypeConfiguredSize = InsufficientResourcesQuotaResourceQuotaType("configuredSize")
+)
+
+func (e InsufficientResourcesQuotaResourceQuotaType) Values() []InsufficientResourcesQuotaResourceQuotaType {
+	return []InsufficientResourcesQuotaResourceQuotaType{
+		InsufficientResourcesQuotaResourceQuotaTypeReservation,
+		InsufficientResourcesQuotaResourceQuotaTypeConfiguredSize,
+	}
+}
+
+func (e InsufficientResourcesQuotaResourceQuotaType) Strings() []string {
+	return EnumValuesAsStrings(e.Values())
+}
+
+func init() {
+	t["InsufficientResourcesQuotaResourceQuotaType"] = reflect.TypeOf((*InsufficientResourcesQuotaResourceQuotaType)(nil)).Elem()
+}
+
+// InsufficientResourcesQuotaFailureNotificationMode indicates whether the failure is transient or permanent.
+type InsufficientResourcesQuotaFailureNotificationMode string
+
+const (
+	// InsufficientResourcesQuotaFailureNotificationModeFailureModeTransient indicates the failure is temporary and may be resolved through reallocation.
+	InsufficientResourcesQuotaFailureNotificationModeFailureModeTransient = InsufficientResourcesQuotaFailureNotificationMode("failureModeTransient")
+	// InsufficientResourcesQuotaFailureNotificationModeFailureModePermanent indicates the failure cannot be resolved.
+	InsufficientResourcesQuotaFailureNotificationModeFailureModePermanent = InsufficientResourcesQuotaFailureNotificationMode("failureModePermanent")
+)
+
+func (e InsufficientResourcesQuotaFailureNotificationMode) Values() []InsufficientResourcesQuotaFailureNotificationMode {
+	return []InsufficientResourcesQuotaFailureNotificationMode{
+		InsufficientResourcesQuotaFailureNotificationModeFailureModeTransient,
+		InsufficientResourcesQuotaFailureNotificationModeFailureModePermanent,
+	}
+}
+
+func (e InsufficientResourcesQuotaFailureNotificationMode) Strings() []string {
+	return EnumValuesAsStrings(e.Values())
+}
+
+func init() {
+	t["InsufficientResourcesQuotaFailureNotificationMode"] = reflect.TypeOf((*InsufficientResourcesQuotaFailureNotificationMode)(nil)).Elem()
+}
+
+// InsufficientResourcesQuota is thrown when an operation exceeds the quota in an associated resource envelope.
+type InsufficientResourcesQuota struct {
+	InsufficientResourcesFault
+
+	// ResourceType identifies the type of resource whose quota was exceeded.
+	// See InsufficientResourcesQuotaResourceType for supported values.
+	ResourceType string `xml:"resourceType" json:"resourceType"`
+	// ResourceQuotaType identifies the type of quota that was violated.
+	// See InsufficientResourcesQuotaResourceQuotaType for supported values.
+	ResourceQuotaType string `xml:"resourceQuotaType" json:"resourceQuotaType"`
+	// Available is the amount of the resource still available under the quota
+	// (MHz for CPU, bytes for memory).
+	Available int64 `xml:"available" json:"available"`
+	// Requested is the amount of the resource requested in the failed operation.
+	Requested int64 `xml:"requested" json:"requested"`
+	// Entity is the identifier of the entity that violated the quota (e.g., a VM or resource envelope).
+	Entity string `xml:"entity" json:"entity"`
+	// ResourceEnvelope is the identifier of the resource envelope whose quota was exceeded.
+	ResourceEnvelope string `xml:"resourceEnvelope" json:"resourceEnvelope"`
+	// FailureNotificationMode indicates whether the failure is transient or permanent.
+	// See InsufficientResourcesQuotaFailureNotificationMode for supported values.
+	FailureNotificationMode string `xml:"failureNotificationMode" json:"failureNotificationMode"`
+}
+
+func init() {
+	t["InsufficientResourcesQuota"] = reflect.TypeOf((*InsufficientResourcesQuota)(nil)).Elem()
+}
+
+type InsufficientResourcesQuotaFault InsufficientResourcesQuota
+
+func init() {
+	t["InsufficientResourcesQuotaFault"] = reflect.TypeOf((*InsufficientResourcesQuotaFault)(nil)).Elem()
+}
+
+// VirtualMachineExtensionCompatibilityConstraintType enumerates the set of
+// constraintType values defined in this release. The value is carried as an
+// open string on the wire; these are the named constants.
+type VirtualMachineExtensionCompatibilityConstraintType string
+
+const (
+	// VirtualMachineExtensionCompatibilityConstraintTypeSERVICE is the virtual machine's vCenter service (cross-vCenter move).
+	VirtualMachineExtensionCompatibilityConstraintTypeSERVICE = VirtualMachineExtensionCompatibilityConstraintType("SERVICE")
+	// VirtualMachineExtensionCompatibilityConstraintTypeFOLDER is the virtual machine's folder.
+	VirtualMachineExtensionCompatibilityConstraintTypeFOLDER = VirtualMachineExtensionCompatibilityConstraintType("FOLDER")
+	// VirtualMachineExtensionCompatibilityConstraintTypePOOL is the virtual machine's resource pool.
+	VirtualMachineExtensionCompatibilityConstraintTypePOOL = VirtualMachineExtensionCompatibilityConstraintType("POOL")
+	// VirtualMachineExtensionCompatibilityConstraintTypeVM_STORAGE_POLICY is the virtual machine-level storage policy.
+	VirtualMachineExtensionCompatibilityConstraintTypeVM_STORAGE_POLICY = VirtualMachineExtensionCompatibilityConstraintType("VM_STORAGE_POLICY")
+	// VirtualMachineExtensionCompatibilityConstraintTypeDISK_STORAGE_POLICY is per-disk storage policies.
+	VirtualMachineExtensionCompatibilityConstraintTypeDISK_STORAGE_POLICY = VirtualMachineExtensionCompatibilityConstraintType("DISK_STORAGE_POLICY")
+	// VirtualMachineExtensionCompatibilityConstraintTypeDEVICE is virtual device configuration (for example, device backings).
+	VirtualMachineExtensionCompatibilityConstraintTypeDEVICE = VirtualMachineExtensionCompatibilityConstraintType("DEVICE")
+)
+
+func (e VirtualMachineExtensionCompatibilityConstraintType) Values() []VirtualMachineExtensionCompatibilityConstraintType {
+	return []VirtualMachineExtensionCompatibilityConstraintType{
+		VirtualMachineExtensionCompatibilityConstraintTypeSERVICE,
+		VirtualMachineExtensionCompatibilityConstraintTypeFOLDER,
+		VirtualMachineExtensionCompatibilityConstraintTypePOOL,
+		VirtualMachineExtensionCompatibilityConstraintTypeVM_STORAGE_POLICY,
+		VirtualMachineExtensionCompatibilityConstraintTypeDISK_STORAGE_POLICY,
+		VirtualMachineExtensionCompatibilityConstraintTypeDEVICE,
+	}
+}
+
+func (e VirtualMachineExtensionCompatibilityConstraintType) Strings() []string {
+	return EnumValuesAsStrings(e.Values())
+}
+
+func init() {
+	t["VirtualMachineExtensionCompatibilityConstraintType"] = reflect.TypeOf((*VirtualMachineExtensionCompatibilityConstraintType)(nil)).Elem()
+}
+
+// VirtualMachineExtensionCompatibilityConstraintKind enumerates the set of
+// constraintKind values defined in this release. The value is carried as an
+// open string on the wire; these are the named constants.
+type VirtualMachineExtensionCompatibilityConstraintKind string
+
+const (
+	// VirtualMachineExtensionCompatibilityConstraintKindINVARIANT asserts the constrained property must not change from the virtual machine's current value.
+	VirtualMachineExtensionCompatibilityConstraintKindINVARIANT = VirtualMachineExtensionCompatibilityConstraintKind("INVARIANT")
+)
+
+func (e VirtualMachineExtensionCompatibilityConstraintKind) Values() []VirtualMachineExtensionCompatibilityConstraintKind {
+	return []VirtualMachineExtensionCompatibilityConstraintKind{
+		VirtualMachineExtensionCompatibilityConstraintKindINVARIANT,
+	}
+}
+
+func (e VirtualMachineExtensionCompatibilityConstraintKind) Strings() []string {
+	return EnumValuesAsStrings(e.Values())
+}
+
+func init() {
+	t["VirtualMachineExtensionCompatibilityConstraintKind"] = reflect.TypeOf((*VirtualMachineExtensionCompatibilityConstraintKind)(nil)).Elem()
+}
+
+type ArrayOfVirtualMachineExtensionCompatibilityConstraint struct {
+	VirtualMachineExtensionCompatibilityConstraint []VirtualMachineExtensionCompatibilityConstraint `xml:"VirtualMachineExtensionCompatibilityConstraint,omitempty" json:"_value"`
+}
+
+func init() {
+	t["ArrayOfVirtualMachineExtensionCompatibilityConstraint"] = reflect.TypeOf((*ArrayOfVirtualMachineExtensionCompatibilityConstraint)(nil)).Elem()
+}
+
+// VirtualMachineExtensionCompatibilityConstraint is a compatibility constraint
+// declared by a managing extension on a virtual machine it manages. A
+// constraint has two orthogonal dimensions: ConstraintType identifies what
+// property is constrained and ConstraintKind identifies how it is evaluated.
+// Within a single VM a constraint's identity is the (ConstraintType,
+// ConstraintKind) pair; ConstraintName is descriptive only.
+type VirtualMachineExtensionCompatibilityConstraint struct {
+	DynamicData
+
+	// ConstraintName is an optional descriptive label for the constraint,
+	// chosen by the managing extension (for example, "pool-invariant"). It is
+	// not required to be unique and is not used to evaluate or identify the
+	// constraint.
+	ConstraintName string `xml:"constraintName,omitempty" json:"constraintName,omitempty"`
+	// ConstraintType is the property that this constraint protects. The values
+	// defined today are enumerated by
+	// VirtualMachineExtensionCompatibilityConstraintType. An unrecognized value
+	// causes the create or reconfigure operation that registers the constraint
+	// to fail.
+	ConstraintType string `xml:"constraintType" json:"constraintType"`
+	// ConstraintKind is how the constraint is evaluated. The only kind defined
+	// today is
+	// VirtualMachineExtensionCompatibilityConstraintKindINVARIANT. This field is
+	// required and must be set explicitly.
+	ConstraintKind string `xml:"constraintKind" json:"constraintKind"`
+}
+
+func init() {
+	t["VirtualMachineExtensionCompatibilityConstraint"] = reflect.TypeOf((*VirtualMachineExtensionCompatibilityConstraint)(nil)).Elem()
+}
+
+// VirtualMachineExtensionCompatibilityConstraintSet represents the set of
+// VirtualMachineExtensionCompatibilityConstraint objects declared on a virtual
+// machine. An empty Constraint array means no constraints are declared.
+type VirtualMachineExtensionCompatibilityConstraintSet struct {
+	DynamicData
+
+	// Constraint is the extension compatibility constraints in this set.
+	Constraint []VirtualMachineExtensionCompatibilityConstraint `xml:"constraint,omitempty" json:"constraint,omitempty"`
+}
+
+func init() {
+	t["VirtualMachineExtensionCompatibilityConstraintSet"] = reflect.TypeOf((*VirtualMachineExtensionCompatibilityConstraintSet)(nil)).Elem()
 }

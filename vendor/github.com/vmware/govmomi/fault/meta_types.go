@@ -9,6 +9,10 @@ import "github.com/vmware/govmomi/vim25/types"
 // IsAlreadyPoweredOffError verifies that the error is an InvalidPowerState
 // error and returns true if the existing state from the error is powered off
 func IsAlreadyPoweredOffError(err any) bool {
+	if err == nil {
+		return false
+	}
+
 	var existingState types.VirtualMachinePowerState
 
 	In(err, func(
@@ -33,9 +37,14 @@ func IsAlreadyPoweredOffError(err any) bool {
 // potentially longer term, such as HostCommunication; they are inherently
 // transient but may not resolve in a short time frame.
 func IsTransientError(err any) bool {
+	if err == nil {
+		return false
+	}
+
 	return Is(err, &types.TaskInProgress{}) ||
 		Is(err, &types.NetworkDisruptedAndConfigRolledBack{}) ||
 		Is(err, &types.VAppTaskInProgress{}) ||
 		Is(err, &types.FailToLockFaultToleranceVMs{}) ||
-		Is(err, &types.HostCommunication{})
+		Is(err, &types.HostCommunication{}) ||
+		Is(err, &types.ConcurrentAccess{})
 }

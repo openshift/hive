@@ -48,7 +48,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.18.0
-	github.com/vmware/govmomi v0.53.0
+	github.com/vmware/govmomi v0.56.2
 	golang.org/x/crypto v0.58.0
 	golang.org/x/lint v0.0.0-20241112194109-818c5a804067
 	golang.org/x/mod v0.41.0
@@ -511,7 +511,7 @@ replace (
 )
 
 // Pinned for machine-api-operator compatibility
-replace github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
+replace github.com/vmware/govmomi => github.com/vmware/govmomi v0.56.2
 
 // CVE-2025-30204: Some transitive deps are still using older v4. Safe to remove once go.sum shows only 4.5.2 or higher.
 replace github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.5.2

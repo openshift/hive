@@ -85,6 +85,7 @@ type CnsVolumeCreateSpec struct {
 	BackingObjectDetails BaseCnsBackingObjectDetails           `xml:"backingObjectDetails,typeattr" json:"backingObjectDetails"`
 	Profile              []types.BaseVirtualMachineProfileSpec `xml:"profile,omitempty,typeattr" json:"profile"`
 	ActiveClusters       []types.ManagedObjectReference        `xml:"activeClusters,omitempty,typeattr" json:"activeClusters"`
+	Hosts                []types.ManagedObjectReference        `xml:"hosts,omitempty" json:"hosts"`
 	CreateSpec           BaseCnsBaseCreateSpec                 `xml:"createSpec,omitempty,typeattr" json:"createSpec"`
 	VolumeSource         BaseCnsVolumeSource                   `xml:"volumeSource,omitempty,typeattr" json:"volumeSource"`
 }
@@ -214,12 +215,14 @@ type CnsDetachVolumeResponse struct {
 type CnsVolumeAttachDetachSpec struct {
 	types.DynamicData
 
-	VolumeId      CnsVolumeId                  `xml:"volumeId" json:"volumeId"`
-	Vm            types.ManagedObjectReference `xml:"vm" json:"vm"`
-	DiskMode      string                       `xml:"diskMode,omitempty" json:"diskMode"`
-	Sharing       string                       `xml:"sharing,omitempty" json:"sharing"`
-	ControllerKey int64                        `xml:"controllerKey,omitempty" json:"controllerKey"`
-	UnitNumber    int64                        `xml:"unitNumber,omitempty" json:"unitNumber"`
+	VolumeId        CnsVolumeId                  `xml:"volumeId" json:"volumeId"`
+	Vm              types.ManagedObjectReference `xml:"vm" json:"vm"`
+	DiskMode        string                       `xml:"diskMode,omitempty" json:"diskMode"`
+	Sharing         string                       `xml:"sharing,omitempty" json:"sharing"`
+	ControllerKey   *int32                       `xml:"controllerKey,omitempty" json:"controllerKey"`
+	UnitNumber      *int32                       `xml:"unitNumber,omitempty" json:"unitNumber"`
+	BackingTypeName CnsVolumeBackingType         `xml:"backingTypeName,omitempty" json:"backingTypeName"`
+	VolumeEncrypted *bool                        `xml:"volumeEncrypted,omitempty" json:"volumeEncrypted"`
 }
 
 func init() {
@@ -308,6 +311,7 @@ type CnsVolume struct {
 	ComplianceStatus             string                      `xml:"complianceStatus,omitempty" json:"complianceStatus"`
 	DatastoreAccessibilityStatus string                      `xml:"datastoreAccessibilityStatus,omitempty" json:"datastoreAccessibilityStatus"`
 	HealthStatus                 string                      `xml:"healthStatus,omitempty" json:"healthStatus"`
+	ChangedBlockTracking         CnsVolumeCBTStatus          `xml:"changedBlockTracking,omitempty" json:"changedBlockTracking,omitempty"`
 }
 
 func init() {
@@ -338,7 +342,8 @@ func init() {
 type CnsPlacementResult struct {
 	Datastore       types.ManagedObjectReference   `xml:"datastore,omitempty" json:"datastore"`
 	PlacementFaults []*types.LocalizedMethodFault  `xml:"placementFaults,omitempty" json:"placementFaults"`
-	Clusters        []types.ManagedObjectReference `xml:"clusters,omitempty" json:"clusters"`
+	Clusters        []types.ManagedObjectReference  `xml:"clusters,omitempty" json:"clusters"`
+	Host            *types.ManagedObjectReference  `xml:"host,omitempty" json:"host,omitempty"`
 }
 
 func init() {
@@ -463,6 +468,7 @@ type CnsQueryFilter struct {
 	DatastoreAccessibilityStatus string                         `xml:"datastoreAccessibilityStatus,omitempty" json:"datastoreAccessibilityStatus"`
 	Cursor                       *CnsCursor                     `xml:"cursor,omitempty" json:"cursor"`
 	HealthStatus                 string                         `xml:"healthStatus,omitempty" json:"healthStatus"`
+	ChangedBlockTracking         CnsVolumeCBTStatus             `xml:"changedBlockTracking,omitempty" json:"changedBlockTracking,omitempty"`
 }
 
 func (f *CnsQueryFilter) GetCnsQueryFilter() *CnsQueryFilter {
@@ -480,12 +486,12 @@ func init() {
 // CnsKubernetesQueryFilter enables querying CNS volumes using Kubernetes metadata such as
 // namespaces, pod names, PVC names, and PV names.
 //
-// - Values in the PodNames, PvcNames, and PvNames lists are treated as OR conditions.
-// - Values in the Namespaces list are also treated as OR conditions.
-// - When PodNames, PvcNames, or PvNames are specified along with Namespaces,
-//   the filter applies an AND condition — i.e., the pod, PVC must belong to the specified namespace.
-// - When only Namespaces are provided (without any pod, PVC names),
-//   all volumes associated with those namespaces will be returned.
+//   - Values in the PodNames, PvcNames, and PvNames lists are treated as OR conditions.
+//   - Values in the Namespaces list are also treated as OR conditions.
+//   - When PodNames, PvcNames, or PvNames are specified along with Namespaces,
+//     the filter applies an AND condition — i.e., the pod, PVC must belong to the specified namespace.
+//   - When only Namespaces are provided (without any pod, PVC names),
+//     all volumes associated with those namespaces will be returned.
 //
 // This allows flexible volume queries such as:
 // - Listing all volumes in one or more namespaces.
@@ -636,6 +642,16 @@ type CnsVolumeNotFoundFault struct {
 
 func init() {
 	types.Add("CnsVolumeNotFoundFault", reflect.TypeOf((*CnsVolumeNotFoundFault)(nil)).Elem())
+}
+
+type CnsNotRegisteredFault struct {
+	CnsFault
+
+	VolumeId CnsVolumeId `xml:"volumeId" json:"volumeId"`
+}
+
+func init() {
+	types.Add("CnsNotRegisteredFault", reflect.TypeOf((*CnsNotRegisteredFault)(nil)).Elem())
 }
 
 type CnsVolumeAlreadyExistsFault struct {
@@ -824,10 +840,11 @@ func init() {
 type CnsSnapshot struct {
 	types.DynamicData
 
-	SnapshotId  CnsSnapshotId `xml:"snapshotId" json:"snapshotId"`
-	VolumeId    CnsVolumeId   `xml:"volumeId" json:"volumeId"`
-	Description string        `xml:"description,omitempty" json:"description"`
-	CreateTime  time.Time     `xml:"createTime" json:"createTime"`
+	SnapshotId             CnsSnapshotId `xml:"snapshotId" json:"snapshotId"`
+	VolumeId               CnsVolumeId   `xml:"volumeId" json:"volumeId"`
+	Description            string        `xml:"description,omitempty" json:"description"`
+	CreateTime             time.Time     `xml:"createTime" json:"createTime"`
+	ChangedBlockTrackingId string        `xml:"changedBlockTrackingId,omitempty" json:"changedBlockTrackingId,omitempty"`
 }
 
 func init() {
@@ -969,8 +986,9 @@ type CnsReconfigVolumePolicyResponse struct {
 type CnsVolumePolicyReconfigSpec struct {
 	types.DynamicData
 
-	VolumeId CnsVolumeId                           `xml:"volumeId" json:"volumeId"`
-	Profile  []types.BaseVirtualMachineProfileSpec `xml:"profile,omitempty,typeattr" json:"profile"`
+	VolumeId       CnsVolumeId                           `xml:"volumeId" json:"volumeId"`
+	Profile        []types.BaseVirtualMachineProfileSpec `xml:"profile,omitempty,typeattr" json:"profile"`
+	ActiveClusters []types.ManagedObjectReference        `xml:"activeClusters,omitempty,typeattr" json:"activeClusters"`
 }
 
 func init() {
@@ -1056,4 +1074,51 @@ type CnsUnregisterVolumeSpec struct {
 
 func init() {
 	types.Add("vsan:CnsUnregisterVolumeSpec", reflect.TypeOf((*CnsUnregisterVolumeSpec)(nil)).Elem())
+}
+
+type CnsVolumeControlFlagsSpec struct {
+	types.DynamicData
+
+	VolumeId     CnsVolumeId `xml:"volumeId" json:"volumeId"`
+	ControlFlags []string    `xml:"controlFlags,omitempty" json:"controlFlags,omitempty"`
+}
+
+func init() {
+	types.Add("CnsVolumeControlFlagsSpec", reflect.TypeOf((*CnsVolumeControlFlagsSpec)(nil)).Elem())
+}
+
+type CnsSetVolumeControlFlags CnsSetVolumeControlFlagsRequestType
+
+func init() {
+	types.Add("CnsSetVolumeControlFlags", reflect.TypeOf((*CnsSetVolumeControlFlags)(nil)).Elem())
+}
+
+type CnsSetVolumeControlFlagsRequestType struct {
+	This              types.ManagedObjectReference `xml:"_this" json:"-"`
+	ControlFlagsSpecs []CnsVolumeControlFlagsSpec  `xml:"controlFlagsSpecs,omitempty" json:"controlFlagsSpecs,omitempty"`
+}
+
+func init() {
+	types.Add("CnsSetVolumeControlFlagsRequestType", reflect.TypeOf((*CnsSetVolumeControlFlagsRequestType)(nil)).Elem())
+}
+
+type CnsSetVolumeControlFlagsResponse struct {
+}
+
+type CnsClearVolumeControlFlags CnsClearVolumeControlFlagsRequestType
+
+func init() {
+	types.Add("CnsClearVolumeControlFlags", reflect.TypeOf((*CnsClearVolumeControlFlags)(nil)).Elem())
+}
+
+type CnsClearVolumeControlFlagsRequestType struct {
+	This              types.ManagedObjectReference `xml:"_this" json:"-"`
+	ControlFlagsSpecs []CnsVolumeControlFlagsSpec  `xml:"controlFlagsSpecs,omitempty" json:"controlFlagsSpecs,omitempty"`
+}
+
+func init() {
+	types.Add("CnsClearVolumeControlFlagsRequestType", reflect.TypeOf((*CnsClearVolumeControlFlagsRequestType)(nil)).Elem())
+}
+
+type CnsClearVolumeControlFlagsResponse struct {
 }

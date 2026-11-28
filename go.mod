@@ -150,7 +150,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.7
 	github.com/aws/smithy-go v1.24.2
 	github.com/gophercloud/utils/v2 v2.0.0-20250212084022-725b94822eeb
-	gopkg.in/evanphx/json-patch.v4 v4.13.0
+	gopkg.in/evanphx/json-patch.v5 v5.9.11
 )
 
 require (

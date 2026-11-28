@@ -5,12 +5,10 @@ package ec2
 import (
 	"context"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	presignedurlcust "github.com/aws/aws-sdk-go-v2/service/internal/presigned-url"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates an exact copy of an Amazon EBS snapshot.
@@ -136,20 +134,7 @@ type CopySnapshotInput struct {
 	// complete, but eventually fails.
 	KmsKeyId *string
 
-	// When you copy an encrypted source snapshot using the Amazon EC2 Query API, you
-	// must supply a pre-signed URL. This parameter is optional for unencrypted
-	// snapshots. For more information, see [Query requests].
-	//
-	// The PresignedUrl should use the snapshot source endpoint, the CopySnapshot
-	// action, and include the SourceRegion , SourceSnapshotId , and DestinationRegion
-	// parameters. The PresignedUrl must be signed using Amazon Web Services Signature
-	// Version 4. Because EBS snapshots are stored in Amazon S3, the signing algorithm
-	// for this parameter uses the same logic that is described in [Authenticating Requests: Using Query Parameters (Amazon Web Services Signature Version 4)]in the Amazon S3
-	// API Reference. An invalid or improperly signed PresignedUrl will cause the copy
-	// operation to fail asynchronously, and the snapshot will move to an error state.
-	//
-	// [Authenticating Requests: Using Query Parameters (Amazon Web Services Signature Version 4)]: https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
-	// [Query requests]: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/Query-Requests.html
+	// Deprecated.
 	PresignedUrl *string
 
 	// The tags to apply to the new snapshot.
@@ -177,9 +162,6 @@ type CopySnapshotOutput struct {
 }
 
 func (c *Client) addOperationCopySnapshotMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsEc2query_serializeOpCopySnapshot{}, middleware.After)
 	if err != nil {
 		return err
@@ -188,71 +170,23 @@ func (c *Client) addOperationCopySnapshotMiddlewares(stack *middleware.Stack, op
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "CopySnapshot"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCopySnapshotPresignURLMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCopySnapshotValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opCopySnapshot(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -265,12 +199,6 @@ func (c *Client) addOperationCopySnapshotMiddlewares(stack *middleware.Stack, op
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -356,14 +284,6 @@ func (c *presignAutoFillCopySnapshotClient) PresignURL(ctx context.Context, srcR
 	}
 	presignOptFn := WithPresignClientFromClientOptions(optFn)
 	return c.client.PresignCopySnapshot(ctx, input, presignOptFn)
-}
-
-func newServiceMetadataMiddleware_opCopySnapshot(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "CopySnapshot",
-	}
 }
 
 // PresignCopySnapshot is used to generate a presigned HTTP Request which contains

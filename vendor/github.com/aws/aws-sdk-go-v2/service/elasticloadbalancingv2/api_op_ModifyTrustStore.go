@@ -4,11 +4,10 @@ package elasticloadbalancingv2
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Update the ca certificate bundle for the specified trust store.
@@ -51,6 +50,27 @@ type ModifyTrustStoreInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ModifyTrustStoreInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ModifyTrustStoreInput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ModifyTrustStoreInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.CaCertificatesBundleS3Bucket != nil {
+		s.WriteString(schemas.ModifyTrustStoreInput_CaCertificatesBundleS3Bucket, *v.CaCertificatesBundleS3Bucket)
+	}
+	if v.CaCertificatesBundleS3Key != nil {
+		s.WriteString(schemas.ModifyTrustStoreInput_CaCertificatesBundleS3Key, *v.CaCertificatesBundleS3Key)
+	}
+	if v.CaCertificatesBundleS3ObjectVersion != nil {
+		s.WriteString(schemas.ModifyTrustStoreInput_CaCertificatesBundleS3ObjectVersion, *v.CaCertificatesBundleS3ObjectVersion)
+	}
+	if v.TrustStoreArn != nil {
+		s.WriteString(schemas.ModifyTrustStoreInput_TrustStoreArn, *v.TrustStoreArn)
+	}
+}
+
 type ModifyTrustStoreOutput struct {
 
 	// Information about the modified trust store.
@@ -62,80 +82,47 @@ type ModifyTrustStoreOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ModifyTrustStoreOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ModifyTrustStoreOutput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ModifyTrustStoreOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.TrustStores != nil {
+		serializeTrustStores(s, schemas.ModifyTrustStoreOutput_TrustStores, v.TrustStores)
+	}
+}
+func (v *ModifyTrustStoreOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ModifyTrustStoreOutput, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ModifyTrustStoreOutput_TrustStores:
+			return deserializeTrustStores(d, schemas.ModifyTrustStoreOutput_TrustStores, &v.TrustStores)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationModifyTrustStoreMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ModifyTrustStore, schemas.ModifyTrustStoreInput, schemas.ModifyTrustStoreOutput)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpModifyTrustStore{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ModifyTrustStore, schemas.ModifyTrustStoreInput, schemas.ModifyTrustStoreOutput), output: &ModifyTrustStoreOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpModifyTrustStore{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ModifyTrustStore"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpModifyTrustStoreValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opModifyTrustStore(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -150,22 +137,8 @@ func (c *Client) addOperationModifyTrustStoreMiddlewares(stack *middleware.Stack
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opModifyTrustStore(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ModifyTrustStore",
-	}
 }

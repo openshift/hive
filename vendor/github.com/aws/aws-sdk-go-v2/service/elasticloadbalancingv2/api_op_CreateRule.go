@@ -4,24 +4,23 @@ package elasticloadbalancingv2
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Creates a rule for the specified listener. The listener must be associated with
-// an Application Load Balancer.
+// an Application Load Balancer or a dual-stack Network Load Balancer.
 //
-// Each rule consists of a priority, one or more actions, one or more conditions,
-// and up to two optional transforms. Rules are evaluated in priority order, from
-// the lowest value to the highest value. When the conditions for a rule are met,
-// its actions are performed. If the conditions for no rules are met, the actions
-// for the default rule are performed. For more information, see [Listener rules]in the
-// Application Load Balancers Guide.
+// Each rule consists of a priority, one or more actions, and one or more
+// conditions. Rules are evaluated in priority order, from the lowest value to the
+// highest value. When the conditions for a rule are met, its actions are
+// performed. If the conditions for no rules are met, the actions for the default
+// rule are performed. For more information, see [Listener rules]in the Application Load Balancers
+// Guide or [Listener rules]in the Network Load Balancers Guide.
 //
-// [Listener rules]: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html#listener-rules
+// [Listener rules]: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html#listener-rules
 func (c *Client) CreateRule(ctx context.Context, params *CreateRuleInput, optFns ...func(*Options)) (*CreateRuleOutput, error) {
 	if params == nil {
 		params = &CreateRuleInput{}
@@ -69,6 +68,33 @@ type CreateRuleInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateRuleInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateRuleInput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateRuleInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Actions != nil {
+		serializeActions(s, schemas.CreateRuleInput_Actions, v.Actions)
+	}
+	if v.Conditions != nil {
+		serializeRuleConditionList(s, schemas.CreateRuleInput_Conditions, v.Conditions)
+	}
+	if v.ListenerArn != nil {
+		s.WriteString(schemas.CreateRuleInput_ListenerArn, *v.ListenerArn)
+	}
+	if v.Priority != nil {
+		s.WriteInt32(schemas.CreateRuleInput_Priority, *v.Priority)
+	}
+	if v.Tags != nil {
+		serializeTagList(s, schemas.CreateRuleInput_Tags, v.Tags)
+	}
+	if v.Transforms != nil {
+		serializeRuleTransformList(s, schemas.CreateRuleInput_Transforms, v.Transforms)
+	}
+}
+
 type CreateRuleOutput struct {
 
 	// Information about the rule.
@@ -80,80 +106,47 @@ type CreateRuleOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *CreateRuleOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.CreateRuleOutput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *CreateRuleOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Rules != nil {
+		serializeRules(s, schemas.CreateRuleOutput_Rules, v.Rules)
+	}
+}
+func (v *CreateRuleOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.CreateRuleOutput, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.CreateRuleOutput_Rules:
+			return deserializeRules(d, schemas.CreateRuleOutput_Rules, &v.Rules)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationCreateRuleMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateRule, schemas.CreateRuleInput, schemas.CreateRuleOutput)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpCreateRule{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.CreateRule, schemas.CreateRuleInput, schemas.CreateRuleOutput), output: &CreateRuleOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpCreateRule{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "CreateRule"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpCreateRuleValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opCreateRule(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -168,22 +161,8 @@ func (c *Client) addOperationCreateRuleMiddlewares(stack *middleware.Stack, opti
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opCreateRule(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "CreateRule",
-	}
 }

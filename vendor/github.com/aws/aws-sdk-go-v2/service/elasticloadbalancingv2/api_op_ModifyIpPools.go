@@ -4,11 +4,10 @@ package elasticloadbalancingv2
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // [Application Load Balancers] Modify the IP pool associated to a load balancer.
@@ -43,6 +42,26 @@ type ModifyIpPoolsInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ModifyIpPoolsInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ModifyIpPoolsInput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ModifyIpPoolsInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IpamPools != nil {
+		s.WriteStruct(schemas.ModifyIpPoolsInput_IpamPools)
+		v.IpamPools.SerializeMembers(s)
+		s.CloseStruct()
+	}
+	if v.LoadBalancerArn != nil {
+		s.WriteString(schemas.ModifyIpPoolsInput_LoadBalancerArn, *v.LoadBalancerArn)
+	}
+	if v.RemoveIpamPools != nil {
+		serializeRemoveIpamPools(s, schemas.ModifyIpPoolsInput_RemoveIpamPools, v.RemoveIpamPools)
+	}
+}
+
 type ModifyIpPoolsOutput struct {
 
 	// The IPAM pool ID.
@@ -54,80 +73,50 @@ type ModifyIpPoolsOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *ModifyIpPoolsOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.ModifyIpPoolsOutput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *ModifyIpPoolsOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.IpamPools != nil {
+		s.WriteStruct(schemas.ModifyIpPoolsOutput_IpamPools)
+		v.IpamPools.SerializeMembers(s)
+		s.CloseStruct()
+	}
+}
+func (v *ModifyIpPoolsOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.ModifyIpPoolsOutput, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.ModifyIpPoolsOutput_IpamPools:
+			v.IpamPools = &types.IpamPools{}
+			return v.IpamPools.Deserialize(d)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationModifyIpPoolsMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ModifyIpPools, schemas.ModifyIpPoolsInput, schemas.ModifyIpPoolsOutput)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpModifyIpPools{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.ModifyIpPools, schemas.ModifyIpPoolsInput, schemas.ModifyIpPoolsOutput), output: &ModifyIpPoolsOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpModifyIpPools{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "ModifyIpPools"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpModifyIpPoolsValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opModifyIpPools(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -142,22 +131,8 @@ func (c *Client) addOperationModifyIpPoolsMiddlewares(stack *middleware.Stack, o
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opModifyIpPools(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "ModifyIpPools",
-	}
 }

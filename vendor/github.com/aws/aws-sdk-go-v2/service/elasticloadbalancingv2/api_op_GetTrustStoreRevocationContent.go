@@ -4,10 +4,9 @@ package elasticloadbalancingv2
 
 import (
 	"context"
-	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/schemas"
+	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Retrieves the specified revocation file.
@@ -43,6 +42,21 @@ type GetTrustStoreRevocationContentInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetTrustStoreRevocationContentInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetTrustStoreRevocationContentInput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetTrustStoreRevocationContentInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.RevocationId != nil {
+		s.WriteInt64(schemas.GetTrustStoreRevocationContentInput_RevocationId, *v.RevocationId)
+	}
+	if v.TrustStoreArn != nil {
+		s.WriteString(schemas.GetTrustStoreRevocationContentInput_TrustStoreArn, *v.TrustStoreArn)
+	}
+}
+
 type GetTrustStoreRevocationContentOutput struct {
 
 	// The revocation files Amazon S3 URI.
@@ -54,80 +68,48 @@ type GetTrustStoreRevocationContentOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *GetTrustStoreRevocationContentOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.GetTrustStoreRevocationContentOutput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *GetTrustStoreRevocationContentOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Location != nil {
+		s.WriteString(schemas.GetTrustStoreRevocationContentOutput_Location, *v.Location)
+	}
+}
+func (v *GetTrustStoreRevocationContentOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.GetTrustStoreRevocationContentOutput, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.GetTrustStoreRevocationContentOutput_Location:
+			v.Location = new(string)
+			return d.ReadString(schemas.GetTrustStoreRevocationContentOutput_Location, v.Location)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationGetTrustStoreRevocationContentMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetTrustStoreRevocationContent, schemas.GetTrustStoreRevocationContentInput, schemas.GetTrustStoreRevocationContentOutput)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpGetTrustStoreRevocationContent{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.GetTrustStoreRevocationContent, schemas.GetTrustStoreRevocationContentInput, schemas.GetTrustStoreRevocationContentOutput), output: &GetTrustStoreRevocationContentOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpGetTrustStoreRevocationContent{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "GetTrustStoreRevocationContent"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpGetTrustStoreRevocationContentValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opGetTrustStoreRevocationContent(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -142,22 +124,8 @@ func (c *Client) addOperationGetTrustStoreRevocationContentMiddlewares(stack *mi
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
-		return err
-	}
 	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
-}
-
-func newServiceMetadataMiddleware_opGetTrustStoreRevocationContent(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "GetTrustStoreRevocationContent",
-	}
 }

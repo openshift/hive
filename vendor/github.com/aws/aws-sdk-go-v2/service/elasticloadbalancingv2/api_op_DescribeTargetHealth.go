@@ -6,12 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/schemas"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
 	smithytime "github.com/aws/smithy-go/time"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 	smithywaiter "github.com/aws/smithy-go/waiter"
 	"time"
 )
@@ -48,6 +47,24 @@ type DescribeTargetHealthInput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DescribeTargetHealthInput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DescribeTargetHealthInput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DescribeTargetHealthInput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.Include != nil {
+		serializeListOfDescribeTargetHealthIncludeOptions(s, schemas.DescribeTargetHealthInput_Include, v.Include)
+	}
+	if v.TargetGroupArn != nil {
+		s.WriteString(schemas.DescribeTargetHealthInput_TargetGroupArn, *v.TargetGroupArn)
+	}
+	if v.Targets != nil {
+		serializeTargetDescriptions(s, schemas.DescribeTargetHealthInput_Targets, v.Targets)
+	}
+}
+
 type DescribeTargetHealthOutput struct {
 
 	// Information about the health of the targets.
@@ -59,80 +76,47 @@ type DescribeTargetHealthOutput struct {
 	noSmithyDocumentSerde
 }
 
+func (v *DescribeTargetHealthOutput) Serialize(s smithy.ShapeSerializer) {
+	s.WriteStruct(schemas.DescribeTargetHealthOutput)
+	v.SerializeMembers(s)
+	s.CloseStruct()
+}
+
+func (v *DescribeTargetHealthOutput) SerializeMembers(s smithy.ShapeSerializer) {
+	if v.TargetHealthDescriptions != nil {
+		serializeTargetHealthDescriptions(s, schemas.DescribeTargetHealthOutput_TargetHealthDescriptions, v.TargetHealthDescriptions)
+	}
+}
+func (v *DescribeTargetHealthOutput) Deserialize(d smithy.ShapeDeserializer) error {
+	return smithy.ReadStruct(d, schemas.DescribeTargetHealthOutput, func(s *smithy.Schema) error {
+		switch s {
+		case schemas.DescribeTargetHealthOutput_TargetHealthDescriptions:
+			return deserializeTargetHealthDescriptions(d, schemas.DescribeTargetHealthOutput_TargetHealthDescriptions, &v.TargetHealthDescriptions)
+		}
+		return nil
+	})
+}
 func (c *Client) addOperationDescribeTargetHealthMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+	if err := stack.Serialize.Add(&serializeRequestMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DescribeTargetHealth, schemas.DescribeTargetHealthInput, schemas.DescribeTargetHealthOutput)}, middleware.After); err != nil {
 		return err
 	}
-	err = stack.Serialize.Add(&awsAwsquery_serializeOpDescribeTargetHealth{}, middleware.After)
-	if err != nil {
+	if err := stack.Deserialize.Add(&deserializeResponseMiddleware{options: &options, operationSchema: smithy.NewOperationSchema(schemas.DescribeTargetHealth, schemas.DescribeTargetHealthInput, schemas.DescribeTargetHealthOutput), output: &DescribeTargetHealthOutput{}}, middleware.After); err != nil {
 		return err
-	}
-	err = stack.Deserialize.Add(&awsAwsquery_deserializeOpDescribeTargetHealth{}, middleware.After)
-	if err != nil {
-		return err
-	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "DescribeTargetHealth"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
 	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
 		return err
 	}
 	if err = addOpDescribeTargetHealthValidationMiddleware(stack); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDescribeTargetHealth(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -145,12 +129,6 @@ func (c *Client) addOperationDescribeTargetHealthMiddlewares(stack *middleware.S
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -572,11 +550,3 @@ type DescribeTargetHealthAPIClient interface {
 }
 
 var _ DescribeTargetHealthAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opDescribeTargetHealth(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "DescribeTargetHealth",
-	}
-}

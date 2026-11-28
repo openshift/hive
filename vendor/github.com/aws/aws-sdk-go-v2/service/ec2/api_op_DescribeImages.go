@@ -6,12 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	smithy "github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
 	smithytime "github.com/aws/smithy-go/time"
-	smithyhttp "github.com/aws/smithy-go/transport/http"
 	smithywaiter "github.com/aws/smithy-go/waiter"
 	"strconv"
 	"time"
@@ -110,6 +108,9 @@ type DescribeImagesInput struct {
 	//   - block-device-mapping.encrypted - A Boolean that indicates whether the Amazon
 	//   EBS volume is encrypted.
 	//
+	//   - boot-mode – The boot mode of the image ( legacy-bios | uefi | uefi-preferred
+	//   ).
+	//
 	//   - creation-date - The time when the image was created, in the ISO 8601 format
 	//   in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), for example,
 	//   2021-09-29T11:04:43.305Z . You can use a wildcard ( * ), for example,
@@ -130,7 +131,36 @@ type DescribeImagesInput struct {
 	//
 	//   - image-id - The ID of the image.
 	//
+	//   - image-watermark.source-image-creation-time - The creation date of the source
+	//   AMI, in the ISO 8601 format in the UTC time zone (
+	//   YYYY-MM-DDTHH:MM:SS.ssssss+HH:MM ). You can use a wildcard ( * ), for example,
+	//   2021-09-29T* , which matches an entire day.
+	//
+	//   - image-watermark.source-image-id - The ID of the AMI to which the watermark
+	//   was originally attached.
+	//
+	//   - image-watermark.source-image-region - The Region where the watermark was
+	//   originally attached.
+	//
+	//   - image-watermark.watermark-creation-time - The date and time the watermark
+	//   was attached to the AMI, in the ISO 8601 format in the UTC time zone (
+	//   YYYY-MM-DDTHH:MM:SS.ssssss+HH:MM ). You can use a wildcard ( * ), for example,
+	//   2021-09-29T* , which matches an entire day.
+	//
+	//   - image-watermark.watermark-key - The watermark identifier, in
+	//   accountId:watermarkName format (for example, 123456789012:approvedAmi ).
+	//
 	//   - image-type - The image type ( machine | kernel | ramdisk ).
+	//
+	//   - instance-type-specification.supported-instance-type – The instance types
+	//   that are compatible with the AMI, as specified by the AMI owner. Values can be
+	//   individual instance types (for example, t3.micro ) or wildcard patterns that
+	//   match multiple instance types (for example, t3.* ).
+	//
+	//   - instance-type-specification.unsupported-instance-type – The instance types
+	//   that are not compatible with the AMI, as specified by the AMI owner. Values can
+	//   be individual instance types (for example, t3.micro ) or wildcard patterns
+	//   that match multiple instance types (for example, t3.* ).
 	//
 	//   - is-public - A Boolean that indicates whether the image is public.
 	//
@@ -154,6 +184,11 @@ type DescribeImagesInput struct {
 	//
 	//   - product-code.type - The type of the product code ( marketplace ).
 	//
+	//   - public-ssm-parameter-name - The name of a public Systems Manager parameter
+	//   associated with the AMI. The parameter must be in a trusted Amazon Web Services
+	//   namespace under aws/service/ . Returns all AMIs that have ever been associated
+	//   with the parameter, including previous versions.
+	//
 	//   - ramdisk-id - The RAM disk ID.
 	//
 	//   - root-device-name - The device name of the root device volume (for example,
@@ -161,6 +196,46 @@ type DescribeImagesInput struct {
 	//
 	//   - root-device-type - The type of the root device volume ( ebs | instance-store
 	//   ).
+	//
+	//   - scan-result.critical-fix-available-since - The earliest date and time, in
+	//   the ISO 8601 format in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), at which
+	//   Amazon Inspector reported a fix as available for a critical severity finding
+	//   on the AMI.
+	//
+	//   - scan-result.finding-scan-date - The date and time, in the ISO 8601 format in
+	//   the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), of the most recent Amazon
+	//   Inspector scan of the AMI.
+	//
+	//   - scan-result.high-fix-available-since - The earliest date and time, in the
+	//   ISO 8601 format in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), at which Amazon
+	//   Inspector reported a fix as available for a high severity finding on the AMI.
+	//
+	//   - scan-result.highest-finding-severity-label - The highest severity among the
+	//   AMI's Amazon Inspector findings, whether or not a fix is available. The valid
+	//   values are the following Amazon Inspector severity levels:
+	//
+	//   - informational - CVSS score of 0.
+	//
+	//   - low - CVSS score of 0.1 to 3.9.
+	//
+	//   - medium - CVSS score of 4.0 to 6.9.
+	//
+	//   - high - CVSS score of 7.0 to 8.9.
+	//
+	//   - critical - CVSS score of 9.0 to 10.0.
+	//
+	//   - scan-result.informational-fix-available-since - The earliest date and time,
+	//   in the ISO 8601 format in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), at which
+	//   Amazon Inspector reported a fix as available for an informational severity
+	//   finding on the AMI.
+	//
+	//   - scan-result.low-fix-available-since - The earliest date and time, in the ISO
+	//   8601 format in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), at which Amazon
+	//   Inspector reported a fix as available for a low severity finding on the AMI.
+	//
+	//   - scan-result.medium-fix-available-since - The earliest date and time, in the
+	//   ISO 8601 format in the UTC time zone (YYYY-MM-DDThh:mm:ss.sssZ), at which Amazon
+	//   Inspector reported a fix as available for a medium severity finding on the AMI.
 	//
 	//   - source-image-id - The ID of the source AMI from which the AMI was created.
 	//
@@ -246,9 +321,6 @@ type DescribeImagesOutput struct {
 }
 
 func (c *Client) addOperationDescribeImagesMiddlewares(stack *middleware.Stack, options Options) (err error) {
-	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
-		return err
-	}
 	err = stack.Serialize.Add(&awsEc2query_serializeOpDescribeImages{}, middleware.After)
 	if err != nil {
 		return err
@@ -257,65 +329,17 @@ func (c *Client) addOperationDescribeImagesMiddlewares(stack *middleware.Stack, 
 	if err != nil {
 		return err
 	}
-	if err := addProtocolFinalizerMiddlewares(stack, options, "DescribeImages"); err != nil {
-		return fmt.Errorf("add protocol finalizers: %v", err)
-	}
 
-	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
-		return err
-	}
-	if err = addSetLoggerMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addClientRequestID(stack); err != nil {
-		return err
-	}
-	if err = addComputeContentLength(stack); err != nil {
-		return err
-	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
 	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetry(stack, options); err != nil {
-		return err
-	}
-	if err = addRawResponseToMetadata(stack); err != nil {
-		return err
-	}
-	if err = addRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addSpanRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack, options); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
-		return err
-	}
-	if err = addTimeOffsetBuild(stack, c); err != nil {
-		return err
-	}
-	if err = addUserAgentRetryMode(stack, options); err != nil {
+	if err = addRecordResponseTiming(stack, options); err != nil {
 		return err
 	}
 	if err = addCredentialSource(stack, options); err != nil {
-		return err
-	}
-	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opDescribeImages(options.Region), middleware.Before); err != nil {
-		return err
-	}
-	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -328,12 +352,6 @@ func (c *Client) addOperationDescribeImagesMiddlewares(stack *middleware.Stack, 
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
 	if err = addInterceptors(stack, options); err != nil {
@@ -836,11 +854,3 @@ type DescribeImagesAPIClient interface {
 }
 
 var _ DescribeImagesAPIClient = (*Client)(nil)
-
-func newServiceMetadataMiddleware_opDescribeImages(region string) *awsmiddleware.RegisterServiceMetadata {
-	return &awsmiddleware.RegisterServiceMetadata{
-		Region:        region,
-		ServiceID:     ServiceID,
-		OperationName: "DescribeImages",
-	}
-}

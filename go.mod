@@ -56,7 +56,7 @@ require (
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.287.1
-	gopkg.in/ini.v1 v1.67.3
+	gopkg.in/ini.v1 v1.68.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.36.2
 	k8s.io/apiextensions-apiserver v0.36.2

@@ -1,8 +1,8 @@
 <p align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="/.github/images/logo-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="/.github/images/logo-light.png">
-  <img src="/.github/images/logo-light.png" width="240" alt="GJSON" >
+  <source media="(prefers-color-scheme: dark)" srcset=".github/images/logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset=".github/images/logo-light.png">
+  <img src=".github/images/logo-light.png" width="240" alt="GJSON" >
 </picture>
 <br>
 <a href="https://godoc.org/github.com/tidwall/gjson"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
@@ -56,7 +56,7 @@ This will print:
 ```
 Prichard
 ```
-*There's also the [GetMany](#get-multiple-values-at-once) function to get multiple values at once, and [GetBytes](#working-with-bytes) for working with JSON byte slices.*
+*There's also [GetBytes](#working-with-bytes) for working with JSON byte slices.*
 
 ## Path Syntax
 

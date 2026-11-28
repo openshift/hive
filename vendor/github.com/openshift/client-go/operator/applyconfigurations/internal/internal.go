@@ -225,6 +225,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: protocol
       type:
         scalar: string
+    - name: securityGroups
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: subnets
       type:
         namedType: com.github.openshift.api.operator.v1.AWSSubnets
@@ -1004,6 +1010,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.operator.v1.QuickStarts
       default: {}
+- name: com.github.openshift.api.operator.v1.ConsoleIngress
+  map:
+    fields:
+    - name: clientDownloadsURL
+      type:
+        scalar: string
+      default: ""
+    - name: consoleURL
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.operator.v1.ConsoleProviders
   map:
     fields:
@@ -1019,7 +1036,7 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: ingress
       type:
-        namedType: com.github.openshift.api.operator.v1.Ingress
+        namedType: com.github.openshift.api.operator.v1.ConsoleIngress
       default: {}
     - name: logLevel
       type:
@@ -1553,6 +1570,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: routingViaHost
       type:
         scalar: boolean
+    - name: uplinkMode
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1.GatherStatus
   map:
     fields:
@@ -1748,17 +1768,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: internalTransitSwitchSubnet
       type:
         scalar: string
-- name: com.github.openshift.api.operator.v1.Ingress
-  map:
-    fields:
-    - name: clientDownloadsURL
-      type:
-        scalar: string
-      default: ""
-    - name: consoleURL
-      type:
-        scalar: string
-      default: ""
 - name: com.github.openshift.api.operator.v1.IngressController
   map:
     fields:
@@ -4482,6 +4491,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+- name: com.github.openshift.api.operator.v1alpha1.GatewayAPIIngressConfig
+  map:
+    fields:
+    - name: managementMode
+      type:
+        scalar: string
 - name: com.github.openshift.api.operator.v1alpha1.ImageContentSourcePolicy
   map:
     fields:
@@ -4508,6 +4523,48 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.openshift.api.operator.v1alpha1.RepositoryDigestMirrors
           elementRelationship: atomic
+- name: com.github.openshift.api.operator.v1alpha1.Ingress
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.IngressSpec
+      default: {}
+    - name: status
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.IngressStatus
+      default: {}
+- name: com.github.openshift.api.operator.v1alpha1.IngressSpec
+  map:
+    fields:
+    - name: gatewayAPI
+      type:
+        namedType: com.github.openshift.api.operator.v1alpha1.GatewayAPIIngressConfig
+      default: {}
+- name: com.github.openshift.api.operator.v1alpha1.IngressStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: observedGeneration
+      type:
+        scalar: numeric
 - name: com.github.openshift.api.operator.v1alpha1.OLM
   map:
     fields:
